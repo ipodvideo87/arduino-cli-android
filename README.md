@@ -1,61 +1,90 @@
-# arduino-cli
+Arduino CLI Android
 
-![cli-logo](./docs/img/CLI_Logo_small.png)
+A fork of Arduino CLI with experimental Android/Termux support.
 
-Arduino CLI is an all-in-one solution that provides Boards/Library Managers, sketch builder, board detection, uploader,
-and many other tools needed to use any Arduino compatible board and platform from command line or machine interfaces.
+Overview
 
-[![Test Go status](https://github.com/arduino/arduino-cli/actions/workflows/test-go-task.yml/badge.svg)](https://github.com/arduino/arduino-cli/actions/workflows/test-go-task.yml)
-[![Publish Nightly Build status](https://github.com/arduino/arduino-cli/actions/workflows/publish-go-nightly-task.yml/badge.svg)](https://github.com/arduino/arduino-cli/actions/workflows/publish-go-nightly-task.yml)
-[![Deploy Website status](https://github.com/arduino/arduino-cli/actions/workflows/deploy-cobra-mkdocs-versioned-poetry.yml/badge.svg)](https://github.com/arduino/arduino-cli/actions/workflows/deploy-cobra-mkdocs-versioned-poetry.yml)
-[![Codecov](https://codecov.io/gh/arduino/arduino-cli/branch/master/graph/badge.svg)](https://codecov.io/gh/arduino/arduino-cli)
+This project explores running Arduino CLI directly on Android devices through Termux, with a focus on compiling and flashing ESP32 and ESP32-S3 firmware without requiring a desktop computer.
 
-## Docs
+The goal is to make Arduino development fully portable and enable web-based IDEs, local development environments, and mobile workflows that can compile and upload firmware directly from Android devices.
 
-For guidance on installation and development, see the [User documentation].
+Current Status
 
-## Quickstart
+Working
 
-1. [Install] the Arduino CLI
-1. Follow the [Getting Started] guide to check out what the CLI can do
-1. Browse the [Commands reference] to see all the available commands
-1. Should you have an issue, read the [FAQ] page
+- Arduino CLI builds successfully on Android (Termux)
+- ESP32 board manager index downloads successfully
+- ESP32 core installation works
+- ESP32-S3 toolchains install successfully
+- Xtensa compiler toolchains install successfully
+- OpenOCD installs successfully
+- GDB installs successfully
+- LittleFS and SPIFFS tools install successfully
 
-## How to contribute
+Android Compatibility Improvements
 
-Contributions are welcome!
+This fork currently includes Android host compatibility improvements that allow Arduino CLI to use Linux ARM64-compatible toolchains when running under Android.
 
-Please read the document [How to contribute] which will show you how to build the source code, run the tests, and
-contribute your changes to the project.
+These changes enable installation of ESP32 platform packages that were previously rejected due to unsupported host detection.
 
-:sparkles: Thanks to all our [contributors]! :sparkles:
+Motivation
 
-### Testing builds
+The long-term goal is to support projects such as:
 
-[Nightly builds] are available for testing.
+- Web-based Arduino IDEs
+- Mobile ESP32 development environments
+- Browser-based ESP32 flashing tools
+- Self-contained embedded development platforms
+- Android-native firmware development workflows
 
-## Security
+Tested Environment
 
-If you think you found a vulnerability or other security-related bug in the Arduino CLI, please read our [security
-policy] and report the bug to our Security Team 🛡️ Thank you!
+- Android (Termux)
+- ARM64 architecture
+- ESP32 core version 3.3.10
+- ESP32-S3 toolchain installation
 
-e-mail contact: security@arduino.cc
+Example Result
 
-## License
+Successful installation:
 
-Arduino CLI is licensed under the GPL-3.0 license.
+Platform esp32:esp32@3.3.10 installed
 
-You can be released from the requirements of the above license by purchasing a commercial license. Buying such a license
-is mandatory if you want to modify or otherwise use the software for commercial activities involving the Arduino
-software without disclosing the source code of your own applications. To purchase a commercial license, send an email to
-license@arduino.cc
+Installed tools include:
 
-[install]: https://arduino.github.io/arduino-cli/latest/installation
-[user documentation]: https://arduino.github.io/arduino-cli/latest/
-[getting started]: https://arduino.github.io/arduino-cli/latest/getting-started/
-[commands reference]: https://arduino.github.io/arduino-cli/latest/commands/arduino-cli
-[faq]: https://arduino.github.io/arduino-cli/latest/FAQ/
-[how to contribute]: https://arduino.github.io/arduino-cli/latest/CONTRIBUTING/
-[contributors]: https://github.com/arduino/arduino-cli/graphs/contributors
-[nightly builds]: https://arduino.github.io/arduino-cli/latest/installation/#nightly-builds
-[security policy]: https://github.com/arduino/arduino-cli/security/policy
+- esp-x32
+- esp-rv32
+- xtensa-esp-elf-gdb
+- riscv32-esp-elf-gdb
+- openocd-esp32
+- esptool_py
+- mkspiffs
+- mklittlefs
+- ESP32 libraries
+- ESP32-S3 libraries
+
+Building
+
+git clone https://github.com/ipodvideo87/arduino-cli-android.git
+cd arduino-cli-android
+
+go build -o arduino-cli .
+
+Disclaimer
+
+This project is experimental and is not affiliated with Arduino SA.
+
+Use at your own risk. Android support is still under active investigation and development.
+
+Future Work
+
+- Complete Android platform support
+- Improve package installation compatibility
+- Validate sketch compilation on Android
+- Validate flashing ESP32 devices from Android
+- Integrate with web-based IDE projects
+- Upstream compatible improvements where possible
+
+License
+
+This project remains subject to the original Arduino CLI license and any licenses of included dependencies.
