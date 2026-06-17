@@ -1,0 +1,55 @@
+name: Build Android CLI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    runs-on: ubuntu-24.04
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Show Environment
+        run: |
+          go version
+          go env
+
+      - name: Download Modules
+        run: |
+          go mod download
+
+      - name: Build Android ARM64
+        run: |
+          mkdir -p dist/android-arm64
+
+          CGO_ENABLED=0 \
+          GOOS=android \
+          GOARCH=arm64 \
+          go build \
+            -trimpath \
+            -buildvcs=false \
+            -o dist/android-arm64/arduino-cli
+
+      - name: Verify Binary
+        run: |
+          file dist/android-arm64/arduino-cli
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arduino-cli-android-arm64
+          path: dist/android-arm64/
