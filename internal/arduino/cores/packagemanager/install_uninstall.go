@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/arduino/arduino-cli/internal/android"
 	"github.com/arduino/arduino-cli/commands/cmderrors"
 	"github.com/arduino/arduino-cli/internal/arduino/cores"
 	"github.com/arduino/arduino-cli/internal/arduino/cores/packageindex"
@@ -172,6 +173,10 @@ func (pme *Explorer) InstallPlatformInDirectory(platformRelease *cores.PlatformR
 	} else {
 		return err
 	}
+	// Apply Android compatibility patches
+   if err := android.PatchPlatformForAndroid(destDir.String()); err != nil {
+    return err
+    }
 	if err := pme.cacheInstalledJSON(platformRelease); err != nil {
 		return errors.New(i18n.Tr("creating installed.json in %[1]s: %[2]s", platformRelease.InstallDir, err))
 	}
