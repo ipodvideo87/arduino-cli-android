@@ -70,6 +70,12 @@ cd arduino-cli-android
 
 go build -o arduino-cli .
 
+Android ARM64 build:
+
+CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build -buildvcs=false -o arduino-cli-android-arm64 .
+
+Android host compatibility targets modern 64-bit Android devices using Go `android/arm64`. When installing board package tools, Android ARM64 is matched to Linux ARM64 tool archives such as `aarch64-linux-gnu` and `arm64-linux-gnu`.
+
 Disclaimer
 
 This project is experimental and is not affiliated with Arduino SA.

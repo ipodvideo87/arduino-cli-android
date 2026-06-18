@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -382,7 +383,7 @@ func (pme *Explorer) ResolveFQBN(fqbn *fqbn.FQBN) (
 			buildProperties.Set("runtime.ide.path", "")
 		}
 	}
-	buildProperties.Set("runtime.os", properties.GetOSSuffix())
+	buildProperties.Set("runtime.os", runtimeOSSuffix())
 	buildProperties.Set("build.library_discovery_phase", "0")
 
 	if buildProperties.Get("build.board") == "" {
@@ -402,6 +403,17 @@ func (pme *Explorer) ResolveFQBN(fqbn *fqbn.FQBN) (
 	buildProperties.Merge(pme.GetCustomGlobalProperties())
 
 	return targetPackage, boardPlatformRelease, board, buildProperties, corePlatformRelease, nil
+}
+
+func runtimeOSSuffix() string {
+	return runtimeOSSuffixForGOOS(runtime.GOOS)
+}
+
+func runtimeOSSuffixForGOOS(goos string) string {
+	if goos == "android" {
+		return "linux"
+	}
+	return properties.GetOSSuffix()
 }
 
 func (pme *Explorer) determineReferencedPlatformRelease(boardBuildProperties *properties.Map, boardPlatformRelease *cores.PlatformRelease, fqbn *fqbn.FQBN) (string, *cores.PlatformRelease, string, *cores.PlatformRelease, error) {

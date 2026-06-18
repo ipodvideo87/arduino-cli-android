@@ -187,17 +187,14 @@ func (f *Flavor) isCompatibleWith(osName, osArch string) (bool, int) {
 	}
 
 	switch osName + "," + osArch {
-case "android,arm":
-    return regexpLinuxArm.MatchString(f.OS), 50
-
-case "android,arm64":
-    return regexpLinuxArm64.MatchString(f.OS), 50
-
-case "android,amd64":
-    return regexpLinux64.MatchString(f.OS), 50
-
-case "android,386":
-    return regexpLinux32.MatchString(f.OS), 50
+	case "android,arm":
+		return regexpLinuxArm.MatchString(f.OS), 50
+	case "android,arm64":
+		return regexpLinuxArm64.MatchString(f.OS), 50
+	case "android,amd64":
+		return regexpLinux64.MatchString(f.OS), 50
+	case "android,386":
+		return regexpLinux32.MatchString(f.OS), 50
 	case "windows,amd64":
 		return regexpWindows32.MatchString(f.OS), 10
 	case "windows,arm64":

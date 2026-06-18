@@ -1053,3 +1053,7 @@ func TestCorrectlyUsesDownloaderConfig(t *testing.T) {
 	pm := pmb.Build()
 	require.Equal(t, downloaderCfg, pm.downloaderConfig)
 }
+
+func TestRuntimeOSSuffixForAndroid(t *testing.T) {
+	require.Equal(t, "linux", runtimeOSSuffixForGOOS("android"))
+}

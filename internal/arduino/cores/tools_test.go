@@ -37,6 +37,10 @@ func TestFlavorCompatibility(t *testing.T) {
 	linuxArmbe := &os{"linux", "armbe"}
 	linuxArm64 := &os{"linux", "arm64"}
 	linuxRiscv64 := &os{"linux", "riscv64"}
+	android32 := &os{"android", "386"}
+	android64 := &os{"android", "amd64"}
+	androidArm := &os{"android", "arm"}
+	androidArm64 := &os{"android", "arm64"}
 	darwin32 := &os{"darwin", "386"}
 	darwin64 := &os{"darwin", "amd64"}
 	darwinArm64 := &os{"darwin", "arm64"}
@@ -52,6 +56,10 @@ func TestFlavorCompatibility(t *testing.T) {
 		linuxArmbe,
 		linuxArm64,
 		linuxRiscv64,
+		android32,
+		android64,
+		androidArm,
+		androidArm64,
 		darwin32,
 		darwin64,
 		darwinArm64,
@@ -78,16 +86,16 @@ func TestFlavorCompatibility(t *testing.T) {
 		// Ubuntu Mate on PI2: "arm-linux-gnueabihf"
 		// Debian 7.9 on BBB: "arm-linux-gnueabihf"
 		// Raspbian on PI Zero: "arm-linux-gnueabihf"
-		{&Flavor{OS: "arm-linux-gnueabihf"}, []*os{linuxArm, linuxArmbe}, []*os{linuxArm, linuxArmbe}},
+		{&Flavor{OS: "arm-linux-gnueabihf"}, []*os{linuxArm, linuxArmbe, androidArm}, []*os{linuxArm, linuxArmbe}},
 		// Arch-linux on PI2: "armv7l-unknown-linux-gnueabihf"
-		{&Flavor{OS: "armv7l-unknown-linux-gnueabihf"}, []*os{linuxArm, linuxArmbe}, []*os{linuxArm, linuxArmbe}},
+		{&Flavor{OS: "armv7l-unknown-linux-gnueabihf"}, []*os{linuxArm, linuxArmbe, androidArm}, []*os{linuxArm, linuxArmbe}},
 
-		{&Flavor{OS: "i686-linux-gnu"}, []*os{linux32}, []*os{linux32}},
-		{&Flavor{OS: "i686-pc-linux-gnu"}, []*os{linux32}, []*os{linux32}},
-		{&Flavor{OS: "x86_64-linux-gnu"}, []*os{linux64}, []*os{linux64}},
-		{&Flavor{OS: "x86_64-pc-linux-gnu"}, []*os{linux64}, []*os{linux64}},
-		{&Flavor{OS: "aarch64-linux-gnu"}, []*os{linuxArm64}, []*os{linuxArm64}},
-		{&Flavor{OS: "arm64-linux-gnu"}, []*os{linuxArm64}, []*os{linuxArm64}},
+		{&Flavor{OS: "i686-linux-gnu"}, []*os{linux32, android32}, []*os{linux32}},
+		{&Flavor{OS: "i686-pc-linux-gnu"}, []*os{linux32, android32}, []*os{linux32}},
+		{&Flavor{OS: "x86_64-linux-gnu"}, []*os{linux64, android64}, []*os{linux64}},
+		{&Flavor{OS: "x86_64-pc-linux-gnu"}, []*os{linux64, android64}, []*os{linux64}},
+		{&Flavor{OS: "aarch64-linux-gnu"}, []*os{linuxArm64, androidArm64}, []*os{linuxArm64}},
+		{&Flavor{OS: "arm64-linux-gnu"}, []*os{linuxArm64, androidArm64}, []*os{linuxArm64}},
 		{&Flavor{OS: "riscv64-linux-gnu"}, []*os{linuxRiscv64}, []*os{linuxRiscv64}},
 	}
 
@@ -200,4 +208,13 @@ func TestFlavorPrioritySelection(t *testing.T) {
 	}).GetFlavourCompatibleWith("windows", "arm64")
 	require.NotNil(t, res)
 	require.Equal(t, "1", res.ArchiveFileName)
+
+	res = (&ToolRelease{
+		Flavors: []*Flavor{
+			{OS: "x86_64-linux-gnu", Resource: &resources.DownloadResource{ArchiveFileName: "1"}},
+			{OS: "aarch64-linux-gnu", Resource: &resources.DownloadResource{ArchiveFileName: "2"}},
+		},
+	}).GetFlavourCompatibleWith("android", "arm64")
+	require.NotNil(t, res)
+	require.Equal(t, "2", res.ArchiveFileName)
 }

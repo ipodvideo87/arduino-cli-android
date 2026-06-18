@@ -163,6 +163,21 @@ tasks:
       PACKAGE_PLATFORM: "Linux_ARM64"
       PACKAGE_NAME: "{{.PROJECT_NAME}}_{{.VERSION}}_{{.PACKAGE_PLATFORM}}.tar.gz"
 
+  Android_ARM64:
+    desc: Builds Android ARM64 binaries
+    cmds:
+      - |
+        CGO_ENABLED=0 GOOS=android GOARCH=arm64 {{.BUILD_COMMAND}}
+
+        cd {{.DIST_DIR}}
+        tar cz -C {{.PLATFORM_DIR}} {{.PROJECT_NAME}} -C ../.. LICENSE.txt  -f {{.PACKAGE_NAME}}
+
+    vars:
+      PLATFORM_DIR: "{{.PROJECT_NAME}}_android_arm64"
+      BUILD_COMMAND: "go build -buildvcs=false -o {{.DIST_DIR}}/{{.PLATFORM_DIR}}/{{.PROJECT_NAME}} {{.LDFLAGS}}"
+      PACKAGE_PLATFORM: "Android_ARM64"
+      PACKAGE_NAME: "{{.PROJECT_NAME}}_{{.VERSION}}_{{.PACKAGE_PLATFORM}}.tar.gz"
+
   macOS_64bit:
     desc: Builds Mac OS X 64 bit binaries
     dir: "{{.DIST_DIR}}"
