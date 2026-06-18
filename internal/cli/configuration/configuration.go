@@ -61,7 +61,7 @@ func getDefaultArduinoDataDir() string {
 	}
 
 	switch runtime.GOOS {
-	case "linux":
+	case "linux", "android":
 		return filepath.Join(userHomeDir, ".arduino15")
 	case "darwin":
 		return filepath.Join(userHomeDir, "Library", "Arduino15")
@@ -86,7 +86,7 @@ func getDefaultUserDir() string {
 	}
 
 	switch runtime.GOOS {
-	case "linux":
+	case "linux", "android":
 		return filepath.Join(userHomeDir, "Arduino")
 	case "darwin":
 		return filepath.Join(userHomeDir, "Documents", "Arduino")
