@@ -10,13 +10,13 @@ import (
 // PatchPlatformForAndroid patches an installed Arduino platform
 // so it can execute correctly under Android/Termux.
 func PatchPlatformForAndroid(root string) error {
-	// Only do anything on Android.
+	// Nothing to do unless we're running on Android.
 	if runtime.GOOS != "android" {
 		return nil
 	}
 
-	// Patch all platform.txt files.
-	if err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	// Walk the installed platform.
+	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -25,16 +25,87 @@ func PatchPlatformForAndroid(root string) error {
 			return nil
 		}
 
+		// Patch platform.txt
 		if filepath.Base(path) == "platform.txt" {
 			if err := patchPlatform(path); err != nil {
+				return err
+			}
+			return nil
+		}
+
+		// Patch executable binaries.
+		if info.Mode()&0111 != 0 {
+			if err := patchExecutable(path); err != nil {
 				return err
 			}
 		}
 
 		return nil
-	}); err != nil {
+	})
+}
+
+// patchPlatform modifies platform.txt for Android compatibility.
+func patchPlatform(filename string) error {
+	data, err := os.ReadFile(filename)
+	if err != nil {
 		return err
 	}
+
+	text := string(data)
+
+	// Replace hardcoded /usr/bin/env with env.
+	text = strings.ReplaceAll(
+		text,
+		"/usr/bin/env",
+		"env",
+	)
+
+	return os.WriteFile(filename, []byte(text), 0644)
+}
+
+// patchExecutable patches a single executable if needed.
+func patchExecutable(path string) error {
+	isElf, err := isELF(path)
+	if err != nil {
+		return err
+	}
+
+	// Ignore scripts and other non-ELF executables.
+	if !isElf {
+		return nil
+	}
+
+	// TODO:
+	// This is where we'll call:
+	//
+	//     grun --set <path>
+	//
+	// or eventually patch the ELF directly using patchelf.
+	//
+	// For now we simply detect the executable successfully.
+
+	return nil
+}
+
+// isELF returns true if the file is an ELF executable.
+func isELF(path string) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	header := make([]byte, 4)
+
+	if _, err := f.Read(header); err != nil {
+		return false, err
+	}
+
+	return header[0] == 0x7f &&
+		header[1] == 'E' &&
+		header[2] == 'L' &&
+		header[3] == 'F', nil
+}	}
 
 	// Patch Linux executables (implementation comes next).
 	if err := patchExecutables(root); err != nil {
