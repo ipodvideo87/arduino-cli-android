@@ -12,6 +12,7 @@ import (
 // PatchPlatformForAndroid patches an installed Arduino platform
 // so it works correctly under Android/Termux.
 func PatchPlatformForAndroid(root string) error {
+	panic("ANDROID PATCHER IS RUNNING")
 	// Only patch on Android.
 	if runtime.GOOS != "android" {
 		return nil
