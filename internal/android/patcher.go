@@ -96,7 +96,7 @@ func patchExecutables(root string) error {
 		// We'll implement that next.
 
 		return nil
-	}
+	})
 }
 
 // isELF returns true if the file is an ELF executable.
