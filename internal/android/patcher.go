@@ -1,7 +1,9 @@
 package android
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -10,30 +12,35 @@ import (
 // PatchPlatformForAndroid patches an installed Arduino platform
 // so it works correctly under Android/Termux.
 func PatchPlatformForAndroid(root string) error {
-	// Only run on Android.
+	// Only patch on Android.
 	if runtime.GOOS != "android" {
 		return nil
 	}
 
-	// Walk the platform directory looking for files to patch.
-	if err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	fmt.Printf("Android: patching platform %s\n", root)
+
+	// Walk the platform looking for platform.txt files.
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Patch platform.txt files.
-		if !info.IsDir() && filepath.Base(path) == "platform.txt" {
-			if err := patchPlatform(path); err != nil {
-				return err
-			}
+		if info.IsDir() {
+			return nil
+		}
+
+		if filepath.Base(path) == "platform.txt" {
+			fmt.Printf("Android: patching %s\n", path)
+			return patchPlatform(path)
 		}
 
 		return nil
-	}); err != nil {
+	})
+	if err != nil {
 		return err
 	}
 
-	// Patch Linux executables.
+	// Patch executables.
 	if err := patchExecutables(root); err != nil {
 		return err
 	}
@@ -41,7 +48,7 @@ func PatchPlatformForAndroid(root string) error {
 	return nil
 }
 
-// patchPlatform modifies platform.txt so it works under Termux.
+// patchPlatform patches platform.txt for Android.
 func patchPlatform(filename string) error {
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -50,53 +57,71 @@ func patchPlatform(filename string) error {
 
 	text := string(data)
 
-	// Replace hardcoded /usr/bin/env with env.
-	text = strings.ReplaceAll(
-		text,
-		"/usr/bin/env",
-		"env",
-	)
+	// Replace hardcoded /usr/bin/env.
+	text = strings.ReplaceAll(text, "/usr/bin/env", "env")
 
 	return os.WriteFile(filename, []byte(text), 0644)
 }
 
-// patchExecutables walks the installed platform looking for
-// Linux executables that need Android compatibility fixes.
+// patchExecutables patches every ELF executable in the platform.
 func patchExecutables(root string) error {
 	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Skip directories.
 		if info.IsDir() {
 			return nil
 		}
 
-		// Skip files that aren't executable.
+		// Skip non-executable files.
 		if info.Mode()&0111 == 0 {
 			return nil
 		}
 
-		// Only process ELF executables.
 		ok, err := isELF(path)
 		if err != nil {
 			return err
 		}
+
 		if !ok {
 			return nil
 		}
 
-		// TODO:
-		// Run:
-		//     glibc-runner -c <path>
-		//
-		// or eventually patch the ELF directly with patchelf.
-		//
-		// We'll implement that next.
+		fmt.Printf("Android: patching executable %s\n", path)
+
+		if err := runPatcher(path); err != nil {
+			fmt.Printf("Android: warning: %v\n", err)
+		}
 
 		return nil
 	})
+}
+
+// runPatcher attempts to configure a Linux executable for Android.
+func runPatcher(path string) error {
+	commands := [][]string{
+		{"glibc-runner", "-c", path},
+		{"grun", "-c", path},
+	}
+
+	for _, command := range commands {
+		cmd := exec.Command(command[0], command[1:]...)
+
+		output, err := cmd.CombinedOutput()
+		if err == nil {
+			return nil
+		}
+
+		if _, ok := err.(*exec.Error); ok {
+			// Command not installed.
+			continue
+		}
+
+		return fmt.Errorf("%s failed:\n%s", command[0], string(output))
+	}
+
+	return fmt.Errorf("neither glibc-runner nor grun was found")
 }
 
 // isELF returns true if the file is an ELF executable.
