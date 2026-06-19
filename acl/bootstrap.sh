@@ -17,6 +17,7 @@ VERSION="0.1.0-dev"
 BUILD="0001"
 
 ACL_ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ACL_ROOT"
 
 ###############################################################################
 # Colors
@@ -207,9 +208,18 @@ EOF_BUILD
 runtime/cache/
 runtime/staging/
 dist/
+build/
+bin/
+acl-scan
+cmd/acl-scan/acl-scan
 *.log
 *.tmp
 *.bak
+*.exe
+*.out
+*.test
+*.o
+*.a
 EOF_GITIGNORE
 
     success "Metadata written."

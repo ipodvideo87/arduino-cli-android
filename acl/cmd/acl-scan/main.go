@@ -1,45 +1,89 @@
 package main
 
 import (
-	"debug/elf"
+	"errors"
 	"fmt"
 	"os"
+
+	"github.com/arduino/arduino-cli/internal/acl/elfscan"
+)
+
+const (
+	exitOK            = 0
+	exitUsage         = 2
+	exitOpen          = 3
+	exitNotELF        = 4
+	exitNoInterpreter = 5
+)
+
+type mode int
+
+const (
+	modeScan mode = iota
+	modeDeps
+	modeInterpreter
+	modeSymbols
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Println("Usage: acl-scan <elf-file>")
-		os.Exit(1)
+	runMode, file, err := parseArgs(os.Args[1:])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		printUsage()
+		os.Exit(exitUsage)
 	}
 
-	file := os.Args[1]
-
-	f, err := elf.Open(file)
+	result, err := elfscan.Inspect(file)
 	if err != nil {
-		fmt.Printf("Not an ELF: %v\n", err)
-		os.Exit(1)
-	}
-	defer f.Close()
-
-	fmt.Println("===================================")
-	fmt.Println("Android Compatibility Layer Scanner")
-	fmt.Println("===================================")
-	fmt.Println()
-
-	fmt.Printf("File: %s\n", file)
-	fmt.Printf("Class: %s\n", f.Class)
-	fmt.Printf("Machine: %s\n", f.Machine)
-	fmt.Printf("Type: %s\n", f.Type)
-	fmt.Println()
-
-	fmt.Println("Shared Libraries:")
-
-	libs, err := f.ImportedLibraries()
-	if err != nil {
-		fmt.Println("  (unable to read)")
-	} else {
-		for _, lib := range libs {
-			fmt.Printf("  - %s\n", lib)
+		exitCode := exitOpen
+		if errors.Is(err, elfscan.ErrNotELF) {
+			exitCode = exitNotELF
 		}
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(exitCode)
 	}
+
+	switch runMode {
+	case modeDeps:
+		for _, lib := range result.ImportedLibraries {
+			fmt.Println(lib)
+		}
+	case modeInterpreter:
+		if result.Interpreter == "" {
+			fmt.Fprintln(os.Stderr, "no PT_INTERP entry present")
+			os.Exit(exitNoInterpreter)
+		}
+		fmt.Println(result.Interpreter)
+	case modeSymbols:
+		fmt.Println("symbol scanning is not implemented yet")
+	default:
+		fmt.Print(elfscan.Format(result))
+	}
+}
+
+func parseArgs(args []string) (mode, string, error) {
+	if len(args) == 1 {
+		return modeScan, args[0], nil
+	}
+
+	if len(args) != 2 {
+		return modeScan, "", fmt.Errorf("acl-scan expects a file path, or a mode plus a file path")
+	}
+
+	switch args[0] {
+	case "scan":
+		return modeScan, args[1], nil
+	case "deps":
+		return modeDeps, args[1], nil
+	case "interpreter":
+		return modeInterpreter, args[1], nil
+	case "symbols":
+		return modeSymbols, args[1], nil
+	default:
+		return modeScan, "", fmt.Errorf("unknown mode %q", args[0])
+	}
+}
+
+func printUsage() {
+	fmt.Fprintln(os.Stderr, "Usage: acl-scan [scan|deps|interpreter|symbols] <elf-file>")
 }

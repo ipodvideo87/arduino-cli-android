@@ -1,96 +1,44 @@
-Arduino CLI Android
+# Arduino CLI Android
 
-A fork of Arduino CLI with experimental Android/Termux support.
+An experimental fork of Arduino CLI with Android and Termux compatibility work.
 
-Overview
+## Project Goal
 
-This project explores running Arduino CLI directly on Android devices through Termux, with a focus on compiling and flashing ESP32 and ESP32-S3 firmware without requiring a desktop computer.
+Run Arduino CLI and its toolchain-dependent helpers directly on Android devices while keeping
+the workflow understandable, testable, and as upstream-friendly as possible.
 
-The goal is to make Arduino development fully portable and enable web-based IDEs, local development environments, and mobile workflows that can compile and upload firmware directly from Android devices.
+## Current Working Features
 
-Current Status
+- Arduino CLI builds successfully on Android/Termux.
+- ESP32 board indexes and core packages install successfully.
+- Linux ARM64-compatible host handling is in place for the current toolchain flow.
+- ACL v0.1 can scan ELF files and report basic runtime metadata.
 
-Working
+## Current Broken or Experimental Features
 
-- Arduino CLI builds successfully on Android (Termux)
-- ESP32 board manager index downloads successfully
-- ESP32 core installation works
-- ESP32-S3 toolchains install successfully
-- Xtensa compiler toolchains install successfully
-- OpenOCD installs successfully
-- GDB installs successfully
-- LittleFS and SPIFFS tools install successfully
+- The ACL runtime is still experimental and carries Termux-origin assumptions.
+- ELF patching is mostly a plan-first workflow; the actual rewrite path is not finished.
+- Runtime verification is conservative and may fail until the runtime tree is fully populated.
+- ACL should not be treated as production-ready or complete.
 
-Android Compatibility Improvements
+## ACL Architecture
 
-This fork currently includes Android host compatibility improvements that allow Arduino CLI to use Linux ARM64-compatible toolchains when running under Android.
+- `scanner` inspects ELF files and extracts interpreter and dependency data.
+- `patcher` plans or applies safe ELF edits when the runtime requirements are known.
+- `verifier` checks runtime layout and file compatibility before launch.
+- `launcher` will eventually wrap the runtime and execute tools in a controlled environment.
+- `builder` packages the runtime and supporting assets.
 
-These changes enable installation of ESP32 platform packages that were previously rejected due to unsupported host detection.
+## Known Blocker
 
-Motivation
+The portable runtime is still the main blocker. Without a complete runtime tree and loader
+story, ACL can analyze binaries and plan changes, but it cannot yet promise transparent
+execution of arbitrary Linux tools on Android.
 
-The long-term goal is to support projects such as:
+## Next Milestone
 
-- Web-based Arduino IDEs
-- Mobile ESP32 development environments
-- Browser-based ESP32 flashing tools
-- Self-contained embedded development platforms
-- Android-native firmware development workflows
+The immediate milestone is a simple pipeline:
 
-Tested Environment
+`scan -> patch plan -> verify -> compile Blink`
 
-- Android (Termux)
-- ARM64 architecture
-- ESP32 core version 3.3.10
-- ESP32-S3 toolchain installation
-
-Example Result
-
-Successful installation:
-
-Platform esp32:esp32@3.3.10 installed
-
-Installed tools include:
-
-- esp-x32
-- esp-rv32
-- xtensa-esp-elf-gdb
-- riscv32-esp-elf-gdb
-- openocd-esp32
-- esptool_py
-- mkspiffs
-- mklittlefs
-- ESP32 libraries
-- ESP32-S3 libraries
-
-Building
-
-git clone https://github.com/ipodvideo87/arduino-cli-android.git
-cd arduino-cli-android
-
-go build -o arduino-cli .
-
-Android ARM64 build:
-
-CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build -buildvcs=false -o arduino-cli-android-arm64 .
-
-Android host compatibility targets modern 64-bit Android devices using Go `android/arm64`. When installing board package tools, Android ARM64 is matched to Linux ARM64 tool archives such as `aarch64-linux-gnu` and `arm64-linux-gnu`.
-
-Disclaimer
-
-This project is experimental and is not affiliated with Arduino SA.
-
-Use at your own risk. Android support is still under active investigation and development.
-
-Future Work
-
-- Complete Android platform support
-- Improve package installation compatibility
-- Validate sketch compilation on Android
-- Validate flashing ESP32 devices from Android
-- Integrate with web-based IDE projects
-- Upstream compatible improvements where possible
-
-License
-
-This project remains subject to the original Arduino CLI license and any licenses of included dependencies.
+That sequence should stay the focus until the runtime path is stable enough for broader use.

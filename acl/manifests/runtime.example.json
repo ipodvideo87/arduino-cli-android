@@ -1,0 +1,89 @@
+{
+  "schema_version": "1.0",
+  "runtime_id": "acl-runtime-aarch64-glibc-0.1",
+  "runtime_version": "0.1.0",
+  "architecture": "aarch64",
+  "supported_abis": [
+    "arm64-v8a"
+  ],
+  "loader": {
+    "name": "ld-linux-aarch64.so.1",
+    "path": "loader/ld-linux-aarch64.so.1",
+    "kind": "loader",
+    "required": true,
+    "sha256": "replace-me"
+  },
+  "libraries": [
+    {
+      "name": "libc.so.6",
+      "path": "lib/libc.so.6",
+      "kind": "library",
+      "required": true,
+      "sha256": "replace-me"
+    },
+    {
+      "name": "libdl.so.2",
+      "path": "lib/libdl.so.2",
+      "kind": "library",
+      "required": true,
+      "sha256": "replace-me"
+    },
+    {
+      "name": "libm.so.6",
+      "path": "lib/libm.so.6",
+      "kind": "library",
+      "required": true,
+      "sha256": "replace-me"
+    },
+    {
+      "name": "libpthread.so.0",
+      "path": "lib/libpthread.so.0",
+      "kind": "library",
+      "required": true,
+      "sha256": "replace-me"
+    },
+    {
+      "name": "librt.so.1",
+      "path": "lib/librt.so.1",
+      "kind": "library",
+      "required": true,
+      "sha256": "replace-me"
+    },
+    {
+      "name": "libz.so.1",
+      "path": "lib/libz.so.1",
+      "kind": "library",
+      "required": true,
+      "sha256": "replace-me"
+    }
+  ],
+  "hashes": {
+    "loader/ld-linux-aarch64.so.1": "replace-me",
+    "lib/libc.so.6": "replace-me",
+    "lib/libdl.so.2": "replace-me",
+    "lib/libm.so.6": "replace-me",
+    "lib/libpthread.so.0": "replace-me",
+    "lib/librt.so.1": "replace-me",
+    "lib/libz.so.1": "replace-me"
+  },
+  "compatibility_level": "experimental",
+  "created_at": "2026-06-19T00:00:00Z",
+  "build": {
+    "tool": "acl-runtime-builder",
+    "builder": "acl",
+    "source": "https://github.com/arduino/arduino-cli-android",
+    "source_version": "0.1.0",
+    "git_commit": "replace-me",
+    "go_version": "go1.24",
+    "built_at": "2026-06-19T00:00:00Z",
+    "host_os": "android",
+    "host_arch": "arm64",
+    "notes": "Example runtime manifest for ACL-native packages."
+  },
+  "extensions": {
+    "notes": {
+      "format": "extensible",
+      "message": "Additional runtime metadata can be added here."
+    }
+  }
+}

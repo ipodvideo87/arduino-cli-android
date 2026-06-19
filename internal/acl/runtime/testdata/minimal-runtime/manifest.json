@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0",
+  "runtime_id": "acl-test-runtime-template",
+  "runtime_version": "0.1.0-test",
+  "architecture": "template-arch",
+  "supported_abis": [
+    "template-abi"
+  ],
+  "loader": {
+    "name": "ld-linux-test.so",
+    "path": "loader/ld-linux-test.so",
+    "kind": "loader",
+    "required": true,
+    "sha256": "template-loader-hash"
+  },
+  "libraries": [
+    {
+      "name": "libacl-test.so",
+      "path": "lib/libacl-test.so",
+      "kind": "library",
+      "required": true,
+      "sha256": "template-library-hash"
+    }
+  ],
+  "hashes": {
+    "loader/ld-linux-test.so": "template-loader-hash",
+    "lib/libacl-test.so": "template-library-hash"
+  },
+  "compatibility_level": "experimental",
+  "created_at": "2026-06-19T00:00:00Z",
+  "build": {
+    "tool": "acl-runtime-manager-test",
+    "builder": "test",
+    "source": "testdata/minimal-runtime",
+    "source_version": "0.1.0-test",
+    "go_version": "go1.24",
+    "built_at": "2026-06-19T00:00:00Z",
+    "host_os": "test",
+    "host_arch": "test",
+    "notes": "Template manifest used to materialize minimal ACL runtime fixtures."
+  },
+  "extensions": {
+    "notes": {
+      "fixture": true,
+      "purpose": "Contract tests only"
+    }
+  }
+}
