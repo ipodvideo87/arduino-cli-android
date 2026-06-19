@@ -7,17 +7,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/arduino/arduino-cli/internal/acl/toolcompat"
 )
 
-var glibcSONames = map[string]struct{}{
-	"libc.so.6":       {},
-	"libpthread.so.0": {},
-	"libdl.so.2":      {},
-	"librt.so.1":      {},
-	"libm.so.6":       {},
-	"libstdc++.so.6":  {},
-	"libgcc_s.so.1":   {},
-	"libz.so.1":       {},
+type patchSpec struct {
+	setInterpreter bool
+	interpreter    string
+	rpath          string
 }
 
 // patchELFs walks an installed tree looking for host executables that ACL may
@@ -56,36 +53,51 @@ func patchExecutable(path, runtimeDir string) error {
 	}
 	defer f.Close()
 
-	if !shouldPatchELF(f) {
+	spec, shouldPatch := patchSpecForELF(f, runtimeDir)
+	if !shouldPatch {
 		return nil
 	}
 
-	return patchWithPatchelf(path, filepath.Join(runtimeDir, "ld-linux-aarch64.so.1"), buildRPath(runtimeDir))
+	return patchWithPatchelf(path, spec)
 }
 
-func shouldPatchELF(f *elf.File) bool {
-	if f.FileHeader.Machine != elf.EM_AARCH64 {
-		return false
-	}
-	if f.FileHeader.Type != elf.ET_EXEC && f.FileHeader.Type != elf.ET_DYN {
-		return false
-	}
-
+func patchSpecForELF(f *elf.File, runtimeDir string) (patchSpec, bool) {
 	interp, err := elfInterpreter(f)
-	if err == nil && filepath.Base(interp) == "ld-linux-aarch64.so.1" {
-		return true
+	if err != nil {
+		interp = ""
 	}
-
 	libs, err := f.ImportedLibraries()
 	if err != nil {
-		return false
+		return patchSpec{}, false
 	}
-	for _, lib := range libs {
-		if _, ok := glibcSONames[lib]; ok {
-			return true
-		}
+	fileType := strings.TrimPrefix(f.FileHeader.Type.String(), "ET_")
+	return patchSpecForELFFields(f.FileHeader.Machine, fileType, interp, libs, runtimeDir)
+}
+
+func patchSpecForELFFields(machine elf.Machine, fileType string, interp string, libs []string, runtimeDir string) (patchSpec, bool) {
+	if machine != elf.EM_AARCH64 {
+		return patchSpec{}, false
 	}
-	return false
+	if fileType != "EXEC" && fileType != "DYN" {
+		return patchSpec{}, false
+	}
+
+	class := toolcompat.PatchClassUnsupported
+	if fileType == "EXEC" || fileType == "DYN" {
+		class = toolcompat.PatchClassForELFFields(fileType, interp, libs)
+	}
+	switch class {
+	case toolcompat.PatchClassLoaderAndRPath:
+		return patchSpec{
+			setInterpreter: true,
+			interpreter:    filepath.Join(runtimeDir, "ld-linux-aarch64.so.1"),
+			rpath:          buildRPath(runtimeDir),
+		}, true
+	case toolcompat.PatchClassRPathOnly:
+		return patchSpec{rpath: buildRPath(runtimeDir)}, true
+	default:
+		return patchSpec{}, false
+	}
 }
 
 func elfInterpreter(f *elf.File) (string, error) {
@@ -113,8 +125,16 @@ func buildRPath(runtimeDir string) string {
 	}, ":")
 }
 
-func patchWithPatchelf(path, interpreter, rpath string) error {
-	cmd := exec.Command("patchelf", "--set-interpreter", interpreter, "--set-rpath", rpath, path)
+func patchWithPatchelf(path string, spec patchSpec) error {
+	args := []string{}
+	if spec.setInterpreter {
+		args = append(args, "--set-interpreter", spec.interpreter)
+	}
+	if spec.rpath != "" {
+		args = append(args, "--set-rpath", spec.rpath)
+	}
+	args = append(args, path)
+	cmd := exec.Command("patchelf", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		msg := strings.TrimSpace(string(output))

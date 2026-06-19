@@ -20,6 +20,13 @@ const (
 	CategoryScript            = "script"
 	CategoryUnknown           = "unknown"
 	CategoryUnsupported       = "unsupported"
+
+	PatchClassNone              = "none"
+	PatchClassLoaderAndRPath    = "loader-and-rpath"
+	PatchClassRPathOnly         = "rpath-only"
+	PatchClassRuntimeDependency = "runtime-dependency-only"
+	PatchClassScript            = "script-no-elf-patch"
+	PatchClassUnsupported       = "unsupported"
 )
 
 type Report struct {
@@ -41,6 +48,7 @@ type Entry struct {
 	RelativePath           string   `json:"relative_path"`
 	ExecutableType         string   `json:"executable_type"`
 	CompatibilityCategory  string   `json:"compatibility_category"`
+	PatchClass             string   `json:"patch_class"`
 	Architecture           string   `json:"architecture,omitempty"`
 	Interpreter            string   `json:"interpreter,omitempty"`
 	SharedLibraries        []string `json:"shared_libraries,omitempty"`
@@ -161,6 +169,7 @@ func (s *Scanner) inspectPath(root, path string, d fs.DirEntry) (Entry, bool, er
 		entry.LooksAndroidCompatible = looksAndroidCompatible(inspection)
 		entry.RequiresRuntime = entry.LooksLinuxGlibc && !entry.LooksAndroidCompatible
 		entry.CompatibilityCategory = classifyELF(entry)
+		entry.PatchClass = PatchClassForELFInspection(inspection)
 		if inspection.Interpreter == "" {
 			entry.Notes = append(entry.Notes, "ELF has no PT_INTERP entry")
 		}
@@ -168,23 +177,28 @@ func (s *Scanner) inspectPath(root, path string, d fs.DirEntry) (Entry, bool, er
 		entry.ExecutableType = "shell-script"
 		entry.Interpreter = readShebang(path)
 		entry.CompatibilityCategory = CategoryScript
+		entry.PatchClass = PatchClassScript
 		entry.Notes = append(entry.Notes, "script execution should be evaluated separately from ACL runtime execution")
 	case "python":
 		entry.ExecutableType = "python-script"
 		entry.Interpreter = readShebang(path)
 		entry.CompatibilityCategory = CategoryScript
+		entry.PatchClass = PatchClassScript
 		entry.Notes = append(entry.Notes, "Python script compatibility depends on a suitable Python host")
 	case "perl":
 		entry.ExecutableType = "perl-script"
 		entry.Interpreter = readShebang(path)
 		entry.CompatibilityCategory = CategoryScript
+		entry.PatchClass = PatchClassScript
 	case "java":
 		entry.ExecutableType = "java-archive"
 		entry.CompatibilityCategory = CategoryUnknown
+		entry.PatchClass = PatchClassUnsupported
 		entry.Notes = append(entry.Notes, "Java archives require a suitable Java runtime and launch path")
 	default:
 		entry.ExecutableType = kind
 		entry.CompatibilityCategory = CategoryUnsupported
+		entry.PatchClass = PatchClassUnsupported
 		entry.Notes = append(entry.Notes, "unrecognized executable type")
 	}
 
@@ -290,6 +304,39 @@ func classifyELF(entry Entry) string {
 	}
 }
 
+func PatchClassForELFInspection(inspection aclscan.Inspection) string {
+	if looksAndroidCompatible(inspection) {
+		return PatchClassNone
+	}
+	if !inspection.LooksLikeLinuxTarget {
+		return PatchClassUnsupported
+	}
+	return PatchClassForELFFields(inspection.FileType, inspection.Interpreter, inspection.ImportedLibraries)
+}
+
+func PatchClassForELFFields(fileType string, interpreter string, importedLibraries []string) string {
+	if interpreter != "" {
+		return PatchClassLoaderAndRPath
+	}
+	if fileType == "DYN" {
+		for _, lib := range importedLibraries {
+			if looksLikeGlibcLibrary(lib) {
+				return PatchClassRPathOnly
+			}
+		}
+	}
+	return PatchClassRuntimeDependency
+}
+
+func looksLikeGlibcLibrary(lib string) bool {
+	switch lib {
+	case "libc.so.6", "libpthread.so.0", "libdl.so.2", "librt.so.1", "libm.so.6", "libstdc++.so.6", "libgcc_s.so.1", "libz.so.1":
+		return true
+	default:
+		return false
+	}
+}
+
 func DefaultPackagesRoot() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -326,6 +373,7 @@ func FormatReport(report Report) string {
 		fmt.Fprintf(&b, "\n- %s\n", entry.RelativePath)
 		fmt.Fprintf(&b, "  type: %s\n", entry.ExecutableType)
 		fmt.Fprintf(&b, "  compatibility: %s\n", entry.CompatibilityCategory)
+		fmt.Fprintf(&b, "  patch class: %s\n", entry.PatchClass)
 		if entry.Architecture != "" {
 			fmt.Fprintf(&b, "  architecture: %s\n", entry.Architecture)
 		}

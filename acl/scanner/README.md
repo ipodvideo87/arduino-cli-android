@@ -33,6 +33,19 @@ Compatibility is currently determined by a conservative set of rules:
 - archive detection for Java `.jar` tools
 - executable-bit and file-shape checks to avoid treating ordinary data files as tools
 
+The scanner also assigns a patch class so later stages know what kind of ELF handling is
+appropriate:
+
+- `none`
+- `loader-and-rpath`
+- `rpath-only`
+- `runtime-dependency-only`
+- `script-no-elf-patch`
+- `unsupported`
+
+This keeps ACL from applying executable-only rewrites, such as interpreter patching, to
+shared libraries that should only be treated as runtime dependencies or RPATH targets.
+
 Compatibility classification is currently heuristic and intentionally conservative. It
 is meant to show what Arduino CLI has installed and which tools are likely runtime
 candidates, not to prove that execution is already safe.

@@ -54,6 +54,7 @@ func TestScanClassifiesScriptAndJavaAndELF(t *testing.T) {
 
 	require.Equal(t, "elf", entries["tool-elf"].ExecutableType)
 	require.Equal(t, CategoryAndroidCompatible, entries["tool-elf"].CompatibilityCategory)
+	require.Equal(t, PatchClassNone, entries["tool-elf"].PatchClass)
 }
 
 func TestScanBuildsLinuxRuntimeCandidate(t *testing.T) {
@@ -83,9 +84,21 @@ func TestScanBuildsLinuxRuntimeCandidate(t *testing.T) {
 	entry := report.Entries[0]
 	require.Equal(t, CategoryLinuxGlibc, entry.CompatibilityCategory)
 	require.True(t, entry.RequiresRuntime)
+	require.Equal(t, PatchClassLoaderAndRPath, entry.PatchClass)
 	require.Equal(t, "$ORIGIN/../lib", entry.RPath)
 	require.Equal(t, "$ORIGIN/runtime", entry.RunPath)
 	require.Contains(t, entry.SharedLibraries, "libc.so.6")
+}
+
+func TestPatchClassForSharedLibraryIsRPathOnly(t *testing.T) {
+	class := PatchClassForELFInspection(aclscan.Inspection{
+		IsELF:                true,
+		FileType:             "DYN",
+		Interpreter:          "",
+		ImportedLibraries:    []string{"libc.so.6"},
+		LooksLikeLinuxTarget: true,
+	})
+	require.Equal(t, PatchClassRPathOnly, class)
 }
 
 func TestScanSkipsNonExecutableFiles(t *testing.T) {

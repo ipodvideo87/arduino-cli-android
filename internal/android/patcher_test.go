@@ -1,6 +1,7 @@
 package android
 
 import (
+	"debug/elf"
 	"os"
 	"path/filepath"
 	"testing"
@@ -50,4 +51,26 @@ func TestPatchInstallTreeIgnoresScripts(t *testing.T) {
 	scriptPath := filepath.Join(root, "tool.sh")
 	require.NoError(t, os.WriteFile(scriptPath, []byte("#!/bin/sh\necho ok\n"), 0o755))
 	require.NoError(t, patchInstallTree(root, false, "android"))
+}
+
+func TestPatchSpecForELFSkipsNonAArch64(t *testing.T) {
+	spec, ok := patchSpecForELFFields(elf.EM_X86_64, "EXEC", "/lib64/ld-linux-x86-64.so.2", []string{"libc.so.6"}, "/tmp/runtime")
+	require.False(t, ok)
+	require.Equal(t, patchSpec{}, spec)
+}
+
+func TestPatchSpecForELFUsesInterpreterForExecutables(t *testing.T) {
+	spec, ok := patchSpecForELFFields(elf.EM_AARCH64, "EXEC", "/lib/ld-linux-aarch64.so.1", []string{"libc.so.6"}, "/tmp/runtime")
+	require.True(t, ok)
+	require.True(t, spec.setInterpreter)
+	require.Equal(t, filepath.Join("/tmp/runtime", "ld-linux-aarch64.so.1"), spec.interpreter)
+	require.Contains(t, spec.rpath, "/tmp/runtime")
+}
+
+func TestPatchSpecForELFSkipsInterpreterForSharedLibraries(t *testing.T) {
+	spec, ok := patchSpecForELFFields(elf.EM_AARCH64, "DYN", "", []string{"libc.so.6"}, "/tmp/runtime")
+	require.True(t, ok)
+	require.False(t, spec.setInterpreter)
+	require.Empty(t, spec.interpreter)
+	require.Contains(t, spec.rpath, "/tmp/runtime")
 }
