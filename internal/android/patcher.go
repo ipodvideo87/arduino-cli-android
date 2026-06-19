@@ -7,41 +7,42 @@ import (
 	"strings"
 )
 
-// PatchPlatformForAndroid patches an installed Arduino platform
-// so it can execute correctly under Android/Termux.
+// PatchPlatformForAndroid patches an installed platform tree using the ACL
+// integration entrypoint.
 func PatchPlatformForAndroid(root string) error {
-	// Nothing to do unless we're running on Android.
-	if runtime.GOOS != "android" {
+	return patchInstallTree(root, true, runtime.GOOS)
+}
+
+// PatchToolForAndroid patches an installed tool tree using the ACL integration
+// entrypoint.
+func PatchToolForAndroid(root string) error {
+	return patchInstallTree(root, false, runtime.GOOS)
+}
+
+func patchInstallTree(root string, patchPlatformTxt bool, goos string) error {
+	if goos != "android" {
 		return nil
 	}
+	runtimeDir, err := installRuntime(root)
+	if err != nil {
+		return err
+	}
 
-	// Walk the installed platform.
-	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
+	if patchPlatformTxt {
+		if err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() || filepath.Base(path) != "platform.txt" {
+				return nil
+			}
+			return patchPlatform(path)
+		}); err != nil {
 			return err
 		}
+	}
 
-		if info.IsDir() {
-			return nil
-		}
-
-		// Patch platform.txt
-		if filepath.Base(path) == "platform.txt" {
-			if err := patchPlatform(path); err != nil {
-				return err
-			}
-			return nil
-		}
-
-		// Patch executable binaries.
-		if info.Mode()&0111 != 0 {
-			if err := patchExecutable(path); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
+	return patchELFs(root, runtimeDir)
 }
 
 // patchPlatform modifies platform.txt for Android compatibility.
@@ -52,13 +53,7 @@ func patchPlatform(filename string) error {
 	}
 
 	text := string(data)
+	text = strings.ReplaceAll(text, "/usr/bin/env", "env")
 
-	// Replace hardcoded /usr/bin/env with env.
-	text = strings.ReplaceAll(
-		text,
-		"/usr/bin/env",
-		"env",
-	)
-
-	return os.WriteFile(filename, []byte(text), 0644)
+	return os.WriteFile(filename, []byte(text), 0o644)
 }

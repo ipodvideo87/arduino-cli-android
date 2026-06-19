@@ -22,6 +22,7 @@ import (
 	"net/url"
 
 	"github.com/arduino/arduino-cli/commands/cmderrors"
+	"github.com/arduino/arduino-cli/internal/android"
 	"github.com/arduino/arduino-cli/internal/arduino/cores"
 	"github.com/arduino/arduino-cli/internal/arduino/globals"
 	"github.com/arduino/arduino-cli/internal/arduino/resources"
@@ -195,6 +196,10 @@ func (pmb *Builder) installMissingProfileTool(ctx context.Context, toolRelease *
 	if err := toolResource.Install(pmb.DownloadDir, tmp, destDir, resources.IntegrityCheckFull); err != nil {
 		taskCB(&rpc.TaskProgress{Name: i18n.Tr("Error installing tool %s", toolRelease)})
 		return &cmderrors.FailedInstallError{Message: i18n.Tr("Error installing tool %s", toolRelease), Cause: err}
+	}
+	if err := android.PatchToolForAndroid(destDir.String()); err != nil {
+		taskCB(&rpc.TaskProgress{Name: i18n.Tr("Error patching tool %s for Android", toolRelease)})
+		return &cmderrors.FailedInstallError{Message: i18n.Tr("Error patching tool %s for Android", toolRelease), Cause: err}
 	}
 	taskCB(&rpc.TaskProgress{Completed: true})
 	return nil

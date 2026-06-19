@@ -21,12 +21,14 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/arduino/arduino-cli/commands/cmderrors"
 	"github.com/arduino/arduino-cli/commands/internal/instances"
 	f "github.com/arduino/arduino-cli/internal/algorithms"
+	"github.com/arduino/arduino-cli/internal/android"
 	"github.com/arduino/arduino-cli/internal/arduino/cores"
 	"github.com/arduino/arduino-cli/internal/arduino/cores/packagemanager"
 	"github.com/arduino/arduino-cli/internal/arduino/globals"
@@ -373,7 +375,7 @@ func (s *arduinoCoreServerImpl) runProgramAction(ctx context.Context, pme *packa
 	if uploadToolPlatform != nil {
 		uploadProperties.Merge(uploadToolPlatform.Properties)
 	}
-	uploadProperties.Set("runtime.os", properties.GetOSSuffix())
+	uploadProperties.Set("runtime.os", android.RuntimeOSSuffix(runtime.GOOS))
 	uploadProperties.Merge(boardPlatform.Properties)
 	uploadProperties.Merge(boardPlatform.RuntimeProperties())
 	uploadProperties.Merge(overrideProtocolProperties(action, port.Protocol, boardProperties))
