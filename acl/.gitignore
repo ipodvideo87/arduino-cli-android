@@ -1,0 +1,6 @@
+runtime/cache/
+runtime/staging/
+dist/
+*.log
+*.tmp
+*.bak

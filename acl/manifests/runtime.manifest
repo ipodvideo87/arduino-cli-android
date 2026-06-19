@@ -1,0 +1,6 @@
+name=Android Compatibility Layer
+short=ACL
+version=0.1.0
+platform=android
+arch=aarch64
+status=development
