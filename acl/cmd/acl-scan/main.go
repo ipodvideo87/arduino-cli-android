@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/arduino/arduino-cli/internal/acl/elfscan"
+	"github.com/arduino/arduino-cli/internal/acl/toolcompat"
 )
 
 const (
@@ -14,6 +15,7 @@ const (
 	exitOpen          = 3
 	exitNotELF        = 4
 	exitNoInterpreter = 5
+	exitCompat        = 6
 )
 
 type mode int
@@ -23,6 +25,8 @@ const (
 	modeDeps
 	modeInterpreter
 	modeSymbols
+	modeCompat
+	modeCompatJSON
 )
 
 func main() {
@@ -31,6 +35,33 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		printUsage()
 		os.Exit(exitUsage)
+	}
+
+	if runMode == modeCompat || runMode == modeCompatJSON {
+		root := file
+		if root == "" {
+			root, err = toolcompat.DefaultPackagesRoot()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(exitCompat)
+			}
+		}
+		report, err := toolcompat.NewScanner().Scan(root)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(exitCompat)
+		}
+		if runMode == modeCompatJSON {
+			data, err := report.JSON()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(exitCompat)
+			}
+			fmt.Println(string(data))
+		} else {
+			fmt.Print(toolcompat.FormatReport(report))
+		}
+		os.Exit(exitOK)
 	}
 
 	result, err := elfscan.Inspect(file)
@@ -62,7 +93,16 @@ func main() {
 }
 
 func parseArgs(args []string) (mode, string, error) {
+	if len(args) == 0 {
+		return modeScan, "", fmt.Errorf("acl-scan expects a file path, or a mode plus a file path")
+	}
 	if len(args) == 1 {
+		switch args[0] {
+		case "compat":
+			return modeCompat, "", nil
+		case "compat-json":
+			return modeCompatJSON, "", nil
+		}
 		return modeScan, args[0], nil
 	}
 
@@ -79,6 +119,10 @@ func parseArgs(args []string) (mode, string, error) {
 		return modeInterpreter, args[1], nil
 	case "symbols":
 		return modeSymbols, args[1], nil
+	case "compat":
+		return modeCompat, args[1], nil
+	case "compat-json":
+		return modeCompatJSON, args[1], nil
 	default:
 		return modeScan, "", fmt.Errorf("unknown mode %q", args[0])
 	}
@@ -86,4 +130,6 @@ func parseArgs(args []string) (mode, string, error) {
 
 func printUsage() {
 	fmt.Fprintln(os.Stderr, "Usage: acl-scan [scan|deps|interpreter|symbols] <elf-file>")
+	fmt.Fprintln(os.Stderr, "       acl-scan compat [packages-root]")
+	fmt.Fprintln(os.Stderr, "       acl-scan compat-json [packages-root]")
 }

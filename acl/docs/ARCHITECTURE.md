@@ -11,6 +11,7 @@ runtime packages.
 ## Runtime Flow
 
 - `scanner` inspects ELF files and extracts runtime requirements.
+- the scanner also inventories installed Arduino tool executables and classifies their compatibility.
 - `database` stores compatibility metadata and known signatures.
 - `builder` produces ACL-native runtime packages.
 - `patcher` prepares ELF binaries for a selected runtime.
@@ -20,6 +21,7 @@ runtime packages.
 - `launcher` will eventually start patched binaries inside the chosen runtime.
 - `internal/acl/runtime` manages installed runtime packages and selection state.
 - `internal/acl/builder` generates reproducible runtime packages and package metadata.
+- `acl/cmd/acl-runtime` exposes the runtime manager as a standalone control-plane CLI.
 - `acl/cmd/acl-build-runtime` exposes the builder as a manual packaging tool.
 
 ## Runtime Model
@@ -42,8 +44,29 @@ The runtime manager distinguishes these concepts:
 - selected runtime: the best compatible runtime chosen for a requested ABI/architecture
 - active runtime: the selected runtime recorded in `active.json`
 
-Minimal test fixtures are used to prove this lifecycle before a real ACL runtime builder
-is available.
+Minimal test fixtures are used to prove this lifecycle independently of any particular
+runtime payload.
+
+## Tool Compatibility Layer
+
+The first tool compatibility layer is focused on understanding the Arduino ecosystem,
+not executing it.
+
+`acl-scan compat` walks an Arduino packages directory, discovers executable candidates,
+classifies them, and records the metadata ACL needs for later execution work:
+
+- executable type
+- architecture
+- interpreter
+- shared library dependencies
+- RPATH/RUNPATH
+- hardcoded absolute paths
+- compatibility category
+
+Linux/glibc executables discovered by this layer become candidates for future
+runtime-managed execution. Native Android-compatible binaries, scripts, and unknown
+artifacts are reported separately so the repository can reason about them without
+pretending they are already supported.
 
 ## Hardening Guarantees
 
@@ -66,7 +89,8 @@ The first execution layer is intentionally narrow:
 - dry-run planning is the default
 - `--apply` is explicit and experimental
 - the planner reuses scanner output and runtime validation before building a plan
-- real execution backend support is still a later milestone
+- the first real execution backend invokes the selected runtime loader explicitly
+- execution proof on native Android is still a later milestone
 
 Android-native validation must still be performed from a fresh Termux environment after
 publishing changes. Proot execution is not proof of Android compatibility.
@@ -80,9 +104,10 @@ publishing changes. Proot execution is not proof of Android compatibility.
 
 ## Next Milestone
 
-The next implementation sprint should add a real ACL runtime builder that emits
-ACL-native runtime packages matching this contract. After that, execution support can be
-added without changing the package lifecycle model.
+The current builder already emits ACL-native runtime packages that match this contract.
+The next implementation milestone is to build packages from real runtime assets and then
+validate execution behavior against those packages without changing the package
+lifecycle model.
 
 ## Manual Build Flow
 

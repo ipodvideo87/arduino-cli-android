@@ -2,6 +2,8 @@
 
 An experimental fork of Arduino CLI with Android and Termux compatibility work.
 
+For the long-term project mission and intended end state, see [MISSION.md](MISSION.md).
+
 ## Project Goal
 
 Run Arduino CLI and its toolchain-dependent helpers directly on Android devices while keeping
@@ -13,6 +15,7 @@ the workflow understandable, testable, and as upstream-friendly as possible.
 - ESP32 board indexes and core packages install successfully.
 - Linux ARM64-compatible host handling is in place for the current toolchain flow.
 - ACL v0.1 can scan ELF files and report basic runtime metadata.
+- ACL can inventory installed Arduino package executables and produce structured compatibility reports.
 
 ## Current Broken or Experimental Features
 
@@ -39,6 +42,6 @@ execution of arbitrary Linux tools on Android.
 
 The immediate milestone is a simple pipeline:
 
-`scan -> patch plan -> verify -> compile Blink`
+`scan -> patch plan -> verify -> compile sketches`
 
 That sequence should stay the focus until the runtime path is stable enough for broader use.

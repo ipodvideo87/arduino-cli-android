@@ -21,12 +21,31 @@ selects the active runtime, and prints the execution plan by default.
 
 ## Current Status
 
-Execution planning exists. Real execution is still experimental and intentionally
-backend-limited in this sprint. A successful dry run does not prove Android-native
-compatibility.
+Execution planning exists, and the first real execution backend now exists behind
+`--apply`. This backend is still experimental and intentionally narrow in scope. It
+attempts explicit loader-based execution using the selected active runtime rather than
+claiming transparent Android compatibility.
+
+A successful dry run does not prove Android-native compatibility.
+
+## Apply Mode
+
+When `--apply` is used, `acl-exec` currently:
+
+- requires a valid active runtime
+- validates the target, loader, library search path, and cwd before launch
+- invokes the selected runtime loader explicitly
+- passes `--library-path` using the ACL runtime library directories
+- passes the target executable and argv through the loader command
+- captures stdout, stderr, and exit status where practical
+
+This is the first execution backend, not final proof that Linux-oriented tooling works
+correctly on Android.
 
 ## Validation Guidance
 
 Android execution must be validated from a fresh Termux clone outside proot. The current
-container environment is useful for testing the planner and failure handling, but it is
-not proof of device-native execution.
+container environment is useful for testing the planner, command construction, and
+failure handling, but it is not proof of device-native execution.
+
+Successful execution inside proot does not prove Android-native compatibility.

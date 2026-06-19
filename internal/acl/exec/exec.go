@@ -1,9 +1,11 @@
 package exec
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
+	osExec "os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -11,8 +13,6 @@ import (
 	aclscan "github.com/arduino/arduino-cli/internal/acl/elfscan"
 	aclruntime "github.com/arduino/arduino-cli/internal/acl/runtime"
 )
-
-var ErrBackendNotImplemented = errors.New("execution backend not implemented")
 
 type Request struct {
 	RuntimeRoot string
@@ -27,6 +27,7 @@ type ExecutionPlan struct {
 	Target            aclscan.Inspection
 	RuntimeID         string
 	RuntimePath       string
+	RuntimeArch       string
 	RuntimeValidation aclruntime.ValidationReport
 	LoaderPath        string
 	LibraryPaths      []string
@@ -50,12 +51,14 @@ type Result struct {
 type Planner struct {
 	runtimeRoot string
 	inspect     func(string) (aclscan.Inspection, error)
+	runCommand  func(*osExec.Cmd) (Result, error)
 }
 
 func NewPlanner(runtimeRoot string) *Planner {
 	return &Planner{
 		runtimeRoot: runtimeRoot,
 		inspect:     aclscan.Inspect,
+		runCommand:  runCommand,
 	}
 }
 
@@ -66,6 +69,7 @@ func NewPlannerWithInspector(runtimeRoot string, inspect func(string) (aclscan.I
 	return &Planner{
 		runtimeRoot: runtimeRoot,
 		inspect:     inspect,
+		runCommand:  runCommand,
 	}
 }
 
@@ -171,6 +175,7 @@ func (p *Planner) BuildPlan(req Request) (ExecutionPlan, error) {
 
 	plan.RuntimeID = rt.ID
 	plan.RuntimePath = rt.Path
+	plan.RuntimeArch = rt.Manifest.Architecture
 	plan.LoaderPath = loaderPath
 	plan.LibraryPaths = libraryPaths
 	plan.LibrarySearchPath = librarySearchPath
@@ -201,7 +206,105 @@ func (p *Planner) Run(req Request) (ExecutionPlan, Result, error) {
 	if !req.Apply {
 		return plan, Result{}, nil
 	}
-	return plan, Result{}, ErrBackendNotImplemented
+	result, err := p.executePlan(plan)
+	return plan, result, err
+}
+
+func (p *Planner) executePlan(plan ExecutionPlan) (Result, error) {
+	if !plan.Allowed {
+		return Result{ExitCode: 1}, errors.New("execution plan is not allowed")
+	}
+	if len(plan.Errors) > 0 {
+		return Result{ExitCode: 1}, fmt.Errorf("execution plan contains errors: %s", strings.Join(plan.Errors, "; "))
+	}
+	if strings.TrimSpace(plan.RuntimeID) == "" {
+		return Result{ExitCode: 1}, errors.New("execution plan is missing an active runtime")
+	}
+	if err := ensureRegularFile(plan.LoaderPath, "loader"); err != nil {
+		return Result{ExitCode: 1}, err
+	}
+	if err := ensureRegularFile(plan.TargetPath, "target"); err != nil {
+		return Result{ExitCode: 1}, err
+	}
+	target, err := p.inspect(plan.TargetPath)
+	if err != nil {
+		return Result{ExitCode: 1}, err
+	}
+	if !target.IsELF {
+		return Result{ExitCode: 1}, fmt.Errorf("target %q is not an ELF executable", plan.TargetPath)
+	}
+	if plan.RuntimeValidation.Status == aclruntime.StatusFail {
+		return Result{ExitCode: 1}, fmt.Errorf("runtime %q failed validation", plan.RuntimeID)
+	}
+	if !architectureCompatible(plan.RuntimeArch, target.Machine) {
+		return Result{ExitCode: 1}, fmt.Errorf("target architecture %q is incompatible with runtime architecture %q", target.Machine, plan.RuntimeArch)
+	}
+	if strings.TrimSpace(plan.Cwd) == "" {
+		return Result{ExitCode: 1}, errors.New("execution plan is missing cwd")
+	}
+	info, err := os.Stat(plan.Cwd)
+	if err != nil {
+		return Result{ExitCode: 1}, fmt.Errorf("cwd %q: %w", plan.Cwd, err)
+	}
+	if !info.IsDir() {
+		return Result{ExitCode: 1}, fmt.Errorf("cwd %q is not a directory", plan.Cwd)
+	}
+	if len(plan.Command) == 0 {
+		return Result{ExitCode: 1}, errors.New("execution plan is missing a command")
+	}
+	if err := ensureLibrarySearchPath(plan.LibrarySearchPath); err != nil {
+		return Result{ExitCode: 1}, err
+	}
+
+	cmd := osExec.Command(plan.Command[0], plan.Command[1:]...)
+	cmd.Dir = plan.Cwd
+	cmd.Env = append(os.Environ(), plan.Environment...)
+	return p.runCommand(cmd)
+}
+
+func ensureLibrarySearchPath(searchPath string) error {
+	if strings.TrimSpace(searchPath) == "" {
+		return errors.New("execution plan is missing library search paths")
+	}
+	for _, dir := range strings.Split(searchPath, ":") {
+		if strings.TrimSpace(dir) == "" {
+			return errors.New("execution plan contains an empty library search path")
+		}
+		info, err := os.Stat(dir)
+		if err != nil {
+			return fmt.Errorf("library search path %q: %w", dir, err)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("library search path %q is not a directory", dir)
+		}
+	}
+	return nil
+}
+
+func runCommand(cmd *osExec.Cmd) (Result, error) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	result := Result{
+		Stdout:   stdout.String(),
+		Stderr:   stderr.String(),
+		ExitCode: 0,
+	}
+	if err == nil {
+		return result, nil
+	}
+
+	var exitErr *osExec.ExitError
+	if errors.As(err, &exitErr) {
+		result.ExitCode = exitErr.ExitCode()
+		return result, fmt.Errorf("execution failed with exit code %d", result.ExitCode)
+	}
+
+	result.ExitCode = 1
+	return result, fmt.Errorf("execution failed to start: %w", err)
 }
 
 func validateTargetPath(raw string) (string, error) {

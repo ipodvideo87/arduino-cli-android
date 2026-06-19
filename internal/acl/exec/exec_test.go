@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	osExec "os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -150,6 +152,134 @@ func TestRunApplyDisabledByDefault(t *testing.T) {
 	require.Zero(t, result)
 }
 
+func TestRunApplyUsesBackendCommandAndPreservesCWD(t *testing.T) {
+	root := t.TempDir()
+	_, _ = installRuntimeFixture(t, root, "acl-exec-runtime", "stable")
+
+	target := mustExecutable(t)
+	customCwd := t.TempDir()
+	planner := NewPlanner(root)
+	var gotArgs []string
+	var gotEnv []string
+	var gotDir string
+	planner.runCommand = func(cmd *osExec.Cmd) (Result, error) {
+		gotArgs = append([]string(nil), cmd.Args...)
+		gotEnv = append([]string(nil), cmd.Env...)
+		gotDir = cmd.Dir
+		return Result{Stdout: "ok", ExitCode: 0}, nil
+	}
+
+	plan, result, err := planner.Run(Request{
+		RuntimeRoot: root,
+		TargetPath:  target,
+		Cwd:         customCwd,
+		Args:        []string{"one", "two"},
+		Apply:       true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "ok", result.Stdout)
+	require.Equal(t, customCwd, gotDir)
+	require.Equal(t, plan.Command, gotArgs)
+	require.Contains(t, gotEnv, "ACL_RUNTIME_ID="+plan.RuntimeID)
+	require.Contains(t, gotEnv, "LD_LIBRARY_PATH="+plan.LibrarySearchPath)
+}
+
+func TestRunApplyCapturesStdoutStderrAndExitCode(t *testing.T) {
+	target := mustExecutable(t)
+	loader := writeExecutableScript(t, `#!/usr/bin/env bash
+echo "loader-stdout:$PWD"
+echo "loader-stderr:$1:$2:$3" >&2
+exit 7
+`)
+	libDir := t.TempDir()
+	planner := NewPlanner(t.TempDir())
+	plan := ExecutionPlan{
+		TargetPath:        target,
+		Target:            aclscan.Inspection{Path: target, Exists: true, IsELF: true, Machine: hostArchitecture(t, target)},
+		RuntimeID:         "acl-exec-runtime",
+		RuntimeArch:       hostArchitecture(t, target),
+		RuntimeValidation: aclruntime.ValidationReport{RuntimeID: "acl-exec-runtime", Status: aclruntime.StatusPass},
+		LoaderPath:        loader,
+		LibrarySearchPath: libDir,
+		Cwd:               t.TempDir(),
+		Environment:       []string{"ACL_RUNTIME_ID=acl-exec-runtime", "LD_LIBRARY_PATH=" + libDir},
+		Command:           []string{loader, "--library-path", libDir, target, "--version"},
+		Allowed:           true,
+		Apply:             true,
+	}
+
+	result, err := planner.executePlan(plan)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "execution failed with exit code 7")
+	require.Equal(t, 7, result.ExitCode)
+	require.Contains(t, result.Stdout, "loader-stdout:")
+	require.Contains(t, result.Stderr, "loader-stderr:--library-path:"+libDir+":"+target)
+}
+
+func TestExecutePlanRejectsMissingLoader(t *testing.T) {
+	target := mustExecutable(t)
+	planner := NewPlanner(t.TempDir())
+	plan := ExecutionPlan{
+		TargetPath:        target,
+		Target:            aclscan.Inspection{Path: target, Exists: true, IsELF: true, Machine: hostArchitecture(t, target)},
+		RuntimeID:         "acl-exec-runtime",
+		RuntimeArch:       hostArchitecture(t, target),
+		RuntimeValidation: aclruntime.ValidationReport{RuntimeID: "acl-exec-runtime", Status: aclruntime.StatusPass},
+		LoaderPath:        filepath.Join(t.TempDir(), "missing-loader"),
+		LibrarySearchPath: t.TempDir(),
+		Cwd:               t.TempDir(),
+		Environment:       []string{"ACL_RUNTIME_ID=acl-exec-runtime"},
+		Command:           []string{filepath.Join(t.TempDir(), "missing-loader"), target},
+		Allowed:           true,
+		Apply:             true,
+	}
+
+	result, err := planner.executePlan(plan)
+	require.Error(t, err)
+	require.Equal(t, 1, result.ExitCode)
+	require.Contains(t, err.Error(), "missing loader")
+}
+
+func TestBuildPlanRejectsInvalidActiveRuntime(t *testing.T) {
+	root := t.TempDir()
+	installed, _ := installRuntimeFixture(t, root, "acl-exec-runtime", "stable")
+	require.NoError(t, os.Remove(filepath.Join(installed.Path, "lib", "libacl-test.so")))
+
+	target := mustExecutable(t)
+	planner := NewPlanner(root)
+	_, err := planner.BuildPlan(Request{
+		RuntimeRoot: root,
+		TargetPath:  target,
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "failed validation")
+}
+
+func TestExecutePlanRejectsMissingLibrarySearchPath(t *testing.T) {
+	target := mustExecutable(t)
+	loader := writeExecutableScript(t, "#!/usr/bin/env bash\nexit 0\n")
+	planner := NewPlanner(t.TempDir())
+	plan := ExecutionPlan{
+		TargetPath:        target,
+		Target:            aclscan.Inspection{Path: target, Exists: true, IsELF: true, Machine: hostArchitecture(t, target)},
+		RuntimeID:         "acl-exec-runtime",
+		RuntimeArch:       hostArchitecture(t, target),
+		RuntimeValidation: aclruntime.ValidationReport{RuntimeID: "acl-exec-runtime", Status: aclruntime.StatusPass},
+		LoaderPath:        loader,
+		LibrarySearchPath: "",
+		Cwd:               t.TempDir(),
+		Environment:       []string{"ACL_RUNTIME_ID=acl-exec-runtime"},
+		Command:           []string{loader, target},
+		Allowed:           true,
+		Apply:             true,
+	}
+
+	result, err := planner.executePlan(plan)
+	require.Error(t, err)
+	require.Equal(t, 1, result.ExitCode)
+	require.Contains(t, err.Error(), "missing library search paths")
+}
+
 func installRuntimeFixture(t *testing.T, root, runtimeID, compatibility string) (aclruntime.Runtime, string) {
 	t.Helper()
 
@@ -289,4 +419,11 @@ func sha256Hex(path string) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(sum.Sum(nil)), nil
+}
+
+func writeExecutableScript(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "loader.sh")
+	require.NoError(t, os.WriteFile(path, []byte(strings.TrimSpace(body)+"\n"), 0o755))
+	return path
 }

@@ -1,8 +1,8 @@
 # Runtime Status
 
 ACL runtime packages are ACL-owned artifacts, not copied Termux trees. The current
-runtime manager defines the storage contract and validation rules, but execution is
-still out of scope.
+runtime manager defines the storage contract and validation rules, and ACL now has a
+first experimental execution backend behind `acl-exec --apply`.
 
 ## Current Concern
 
@@ -13,8 +13,8 @@ The copied Termux/glibc runtime remains an investigation reference only.
   portability.
 - An ELF patch can succeed while execution still fails during loading.
 - Runtime portability must be verified separately from ELF patching.
-- Minimal test fixtures are used to prove the package lifecycle before a real runtime
-  builder exists.
+- Minimal test fixtures are used to prove the package lifecycle independently of any
+  particular runtime payload.
 
 ## Runtime Root Layout
 
@@ -127,16 +127,28 @@ The resulting package includes `manifest.json`, `metadata.json`, `checksums.json
 ## Proof Target
 
 The next proof target after this sprint is to build an ACL-native runtime package from
-real runtime assets, then rerun the same lifecycle tests against that package. The next
-execution proof after that is to patch `esptool`, run `esptool version`, and capture the
-exact linker/runtime error if execution still fails. Execution support comes later,
-after package management is proven separately from launch.
+real runtime assets using the current builder, then rerun the same lifecycle tests
+against that package. The next execution proof after that is to patch `esptool`, run
+`esptool version`, and capture the exact linker/runtime error if execution still fails.
+Execution support remains intentionally narrow until package management is proven
+separately from launch.
 
 ## Execution Planning
 
 `acl-exec` consumes the active runtime and the scanner output to build a plan before any
-attempted launch. Dry-run planning is the default. `--apply` is explicit and remains
-experimental until it is validated on a fresh Termux install outside proot.
+attempted launch. Dry-run planning is the default. `--apply` is explicit, uses the
+selected runtime loader directly, and remains experimental until it is validated on a
+fresh Termux install outside proot.
+
+Successful execution in proot is not proof of Android-native compatibility.
+
+## Tool Compatibility Integration
+
+The tool compatibility layer feeds the runtime manager indirectly. `acl-scan compat`
+identifies which installed Arduino tools look like Linux/glibc executables and therefore
+may require an ACL runtime. That report does not activate runtimes or execute tools by
+itself. It exists so future compatibility work can target real installed binaries with a
+clear record of what each tool appears to need.
 
 ## Security Assumptions
 

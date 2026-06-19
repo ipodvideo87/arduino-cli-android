@@ -10,6 +10,14 @@ import (
 	aclexec "github.com/arduino/arduino-cli/internal/acl/exec"
 )
 
+type plannerRunner interface {
+	Run(aclexec.Request) (aclexec.ExecutionPlan, aclexec.Result, error)
+}
+
+var newPlanner = func(runtimeRoot string) plannerRunner {
+	return aclexec.NewPlanner(runtimeRoot)
+}
+
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
@@ -30,7 +38,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	remaining := fs.Args()
-	planner := aclexec.NewPlanner(strings.TrimSpace(*runtimeRoot))
+	planner := newPlanner(strings.TrimSpace(*runtimeRoot))
 	plan, result, err := planner.Run(aclexec.Request{
 		RuntimeRoot: strings.TrimSpace(*runtimeRoot),
 		TargetPath:  strings.TrimSpace(*targetPath),
@@ -41,6 +49,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fmt.Fprint(stdout, formatPlan(plan))
 	if err != nil {
 		fmt.Fprintln(stderr, err)
+		if *apply && result.ExitCode != 0 {
+			return result.ExitCode
+		}
 		return 1
 	}
 	if *apply {

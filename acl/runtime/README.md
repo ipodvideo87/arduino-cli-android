@@ -51,7 +51,7 @@ Relative file paths are required. Absolute paths and path traversal are rejected
 - Execution is not part of this sprint.
 - Validation is intentionally strict enough to catch broken packages before launch.
 - Minimal fixtures in `internal/acl/runtime/testdata/minimal-runtime/` exist to prove
-  lifecycle behavior before any real runtime builder is available.
+  runtime-manager lifecycle behavior independently of any particular runtime payload.
 
 ## Example Commands
 
@@ -59,6 +59,7 @@ Relative file paths are required. Absolute paths and path traversal are rejected
 acl-runtime install <package-dir>
 acl-runtime list
 acl-runtime status
+acl-runtime validate <runtime-id>
 acl-runtime select --arch x86_64 --abi android-x86_64
 acl-runtime activate <runtime-id>
 acl-runtime deactivate
