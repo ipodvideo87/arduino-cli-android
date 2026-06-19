@@ -3,6 +3,7 @@
 An experimental fork of Arduino CLI with Android and Termux compatibility work.
 
 For the long-term project mission and intended end state, see [MISSION.md](MISSION.md).
+For the current progress snapshot, see [STATUS.md](STATUS.md).
 
 ## Project Goal
 
@@ -16,6 +17,7 @@ the workflow understandable, testable, and as upstream-friendly as possible.
 - Linux ARM64-compatible host handling is in place for the current toolchain flow.
 - ACL v0.1 can scan ELF files and report basic runtime metadata.
 - ACL can inventory installed Arduino package executables and produce structured compatibility reports.
+- ACL can validate scanned tool compatibility data before compile or execution work begins.
 
 ## Current Broken or Experimental Features
 
@@ -27,6 +29,7 @@ the workflow understandable, testable, and as upstream-friendly as possible.
 ## ACL Architecture
 
 - `scanner` inspects ELF files and extracts interpreter and dependency data.
+- `scanner` also validates compatibility classifications before ACL attempts runtime work.
 - `patcher` plans or applies safe ELF edits when the runtime requirements are known.
 - `verifier` checks runtime layout and file compatibility before launch.
 - `launcher` will eventually wrap the runtime and execute tools in a controlled environment.

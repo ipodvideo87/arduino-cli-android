@@ -150,6 +150,15 @@ may require an ACL runtime. That report does not activate runtimes or execute to
 itself. It exists so future compatibility work can target real installed binaries with a
 clear record of what each tool appears to need.
 
+`acl-scan validate-compat` uses the same scan output to check whether the installed
+package tree is internally consistent with ACL’s current patching rules. That step is a
+precondition for later execution or compilation work, because it catches mismatches
+between the scanner, runtime manager, and patching policy before any launch attempt.
+
+Validation PASS means the compatibility data currently satisfies ACL’s rules. It does
+not mean that the underlying tool actually executed on Android, and it does not prove
+that compilation or upload workflows are finished.
+
 ## Security Assumptions
 
 The manager assumes package authors are trusted to supply runtime assets and metadata.

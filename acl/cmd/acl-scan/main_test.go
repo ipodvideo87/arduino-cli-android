@@ -27,6 +27,20 @@ func TestParseArgsCompatJSONWithExplicitRoot(t *testing.T) {
 	require.Equal(t, "/tmp/packages", file)
 }
 
+func TestParseArgsValidateCompatDefaultsToArduinoPackagesRoot(t *testing.T) {
+	mode, file, err := parseArgs([]string{"validate-compat"})
+	require.NoError(t, err)
+	require.Equal(t, modeValidateCompat, mode)
+	require.Empty(t, file)
+}
+
+func TestParseArgsValidateCompatJSONWithExplicitRoot(t *testing.T) {
+	mode, file, err := parseArgs([]string{"validate-compat-json", "/tmp/packages"})
+	require.NoError(t, err)
+	require.Equal(t, modeValidateCompatJSON, mode)
+	require.Equal(t, "/tmp/packages", file)
+}
+
 func TestParseArgsRejectsUnknownMode(t *testing.T) {
 	_, _, err := parseArgs([]string{"unknown", "/tmp/file"})
 	require.Error(t, err)

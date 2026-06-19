@@ -27,6 +27,8 @@ const (
 	modeSymbols
 	modeCompat
 	modeCompatJSON
+	modeValidateCompat
+	modeValidateCompatJSON
 )
 
 func main() {
@@ -37,7 +39,7 @@ func main() {
 		os.Exit(exitUsage)
 	}
 
-	if runMode == modeCompat || runMode == modeCompatJSON {
+	if runMode == modeCompat || runMode == modeCompatJSON || runMode == modeValidateCompat || runMode == modeValidateCompatJSON {
 		root := file
 		if root == "" {
 			root, err = toolcompat.DefaultPackagesRoot()
@@ -46,7 +48,29 @@ func main() {
 				os.Exit(exitCompat)
 			}
 		}
-		report, err := toolcompat.NewScanner().Scan(root)
+		scanner := toolcompat.NewScanner()
+		if runMode == modeValidateCompat || runMode == modeValidateCompatJSON {
+			validation, err := scanner.Validate(root)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(exitCompat)
+			}
+			if runMode == modeValidateCompatJSON {
+				data, err := validation.JSON()
+				if err != nil {
+					fmt.Fprintln(os.Stderr, err)
+					os.Exit(exitCompat)
+				}
+				fmt.Println(string(data))
+			} else {
+				fmt.Print(toolcompat.FormatValidationReport(validation))
+			}
+			if validation.Summary.Passed {
+				os.Exit(exitOK)
+			}
+			os.Exit(exitCompat)
+		}
+		report, err := scanner.Scan(root)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(exitCompat)
@@ -102,6 +126,10 @@ func parseArgs(args []string) (mode, string, error) {
 			return modeCompat, "", nil
 		case "compat-json":
 			return modeCompatJSON, "", nil
+		case "validate-compat":
+			return modeValidateCompat, "", nil
+		case "validate-compat-json":
+			return modeValidateCompatJSON, "", nil
 		}
 		return modeScan, args[0], nil
 	}
@@ -123,6 +151,10 @@ func parseArgs(args []string) (mode, string, error) {
 		return modeCompat, args[1], nil
 	case "compat-json":
 		return modeCompatJSON, args[1], nil
+	case "validate-compat":
+		return modeValidateCompat, args[1], nil
+	case "validate-compat-json":
+		return modeValidateCompatJSON, args[1], nil
 	default:
 		return modeScan, "", fmt.Errorf("unknown mode %q", args[0])
 	}
@@ -132,4 +164,6 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "Usage: acl-scan [scan|deps|interpreter|symbols] <elf-file>")
 	fmt.Fprintln(os.Stderr, "       acl-scan compat [packages-root]")
 	fmt.Fprintln(os.Stderr, "       acl-scan compat-json [packages-root]")
+	fmt.Fprintln(os.Stderr, "       acl-scan validate-compat [packages-root]")
+	fmt.Fprintln(os.Stderr, "       acl-scan validate-compat-json [packages-root]")
 }

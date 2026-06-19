@@ -68,6 +68,15 @@ runtime-managed execution. Native Android-compatible binaries, scripts, and unkn
 artifacts are reported separately so the repository can reason about them without
 pretending they are already supported.
 
+`acl-scan validate-compat` runs the same scan and then checks the resulting
+classifications against ACL’s current consistency rules. Validation is the gate before
+execution or compilation work, because it proves that the scanner and patching policy
+agree on what each installed tool appears to be.
+
+Validation PASS means the installed tree matches the current rules. It does not prove
+that every tool executes successfully on Android, and it does not prove that sketch
+compilation or firmware upload already works.
+
 ## Hardening Guarantees
 
 The current hardening work proves that the runtime stack rejects common failure modes
@@ -101,6 +110,8 @@ publishing changes. Proot execution is not proof of Android compatibility.
 - Use ACL-managed runtime packages for Linux binaries that still require glibc semantics.
 - Validate runtime integrity before selection or activation.
 - Keep execution separate from package discovery and validation.
+- Keep compatibility validation separate from execution so failures stay observable and
+  reproducible.
 
 ## Next Milestone
 
