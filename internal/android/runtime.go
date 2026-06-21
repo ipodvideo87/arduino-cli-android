@@ -2,6 +2,7 @@ package android
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -50,9 +51,43 @@ func installRuntime(root string) (string, error) {
 		if info, err := entry.Info(); err == nil {
 			mode = info.Mode().Perm()
 		}
+		if entry.Name() == "ld-linux-aarch64.so.1" {
+			mode |= 0o111
+		}
 		if err := os.WriteFile(filepath.Join(runtimeDir, entry.Name()), data, mode); err != nil {
 			return "", err
 		}
 	}
+
+	if err := addRuntimeLinkAliases(runtimeDir); err != nil {
+		return "", err
+	}
 	return runtimeDir, nil
+}
+
+func addRuntimeLinkAliases(runtimeDir string) error {
+	aliases := map[string]string{
+		"libc.so":       "libc.so.6",
+		"libdl.so":      "libdl.so.2",
+		"libpthread.so": "libpthread.so.0",
+		"libm.so":       "libm.so.6",
+		"librt.so":      "librt.so.1",
+		"libz.so":       "libz.so.1",
+	}
+
+	for alias, target := range aliases {
+		aliasPath := filepath.Join(runtimeDir, alias)
+		targetPath := filepath.Join(runtimeDir, target)
+		if _, err := os.Stat(targetPath); err != nil {
+			continue
+		}
+		if err := os.Remove(aliasPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove runtime alias %q: %w", aliasPath, err)
+		}
+		if err := os.Symlink(target, aliasPath); err != nil && !os.IsExist(err) {
+			return fmt.Errorf("create runtime alias %q -> %q: %w", aliasPath, target, err)
+		}
+	}
+
+	return nil
 }

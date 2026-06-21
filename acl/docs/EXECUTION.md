@@ -39,6 +39,11 @@ When `--apply` is used, `acl-exec` currently:
 - passes the target executable and argv through the loader command
 - captures stdout, stderr, and exit status where practical
 
+The selected runtime must already be self-contained enough to satisfy the loader's
+library lookups on Android. A copied Termux loader that still falls back to the
+original glibc tree can reach `EACCES` or `invalid ELF header` failures before the
+target binary itself ever starts.
+
 This is the first execution backend, not final proof that Linux-oriented tooling works
 correctly on Android.
 

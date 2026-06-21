@@ -19,6 +19,13 @@ func TestInstallRuntimeCopiesEmbeddedFiles(t *testing.T) {
 	require.NoError(t, err)
 	require.FileExists(t, filepath.Join(runtimeDir, "ld-linux-aarch64.so.1"))
 	require.FileExists(t, filepath.Join(runtimeDir, "libc.so.6"))
+	info, err := os.Stat(filepath.Join(runtimeDir, "ld-linux-aarch64.so.1"))
+	require.NoError(t, err)
+	require.NotZero(t, info.Mode().Perm()&0o111)
+
+	linkInfo, err := os.Lstat(filepath.Join(runtimeDir, "libc.so"))
+	require.NoError(t, err)
+	require.True(t, linkInfo.Mode()&os.ModeSymlink != 0)
 }
 
 func TestPatchInstallTreePatchesPlatformTxtForAndroid(t *testing.T) {

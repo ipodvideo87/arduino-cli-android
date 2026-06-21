@@ -11,6 +11,8 @@ The copied Termux/glibc runtime remains an investigation reference only.
 - The glibc loader can contain hardcoded Termux paths.
 - Copying `ld-linux-aarch64.so.1` and companion libraries is not enough to prove
   portability.
+- The copied runtime may also need local linker aliases such as `libc.so` so the
+  loader does not fall back to the Termux glibc linker script.
 - An ELF patch can succeed while execution still fails during loading.
 - Runtime portability must be verified separately from ELF patching.
 - Minimal test fixtures are used to prove the package lifecycle independently of any

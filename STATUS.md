@@ -20,6 +20,8 @@ into reusable infrastructure for Linux-based development tools on Android.
 - Shared libraries are classified as `runtime-dependency-only` or `rpath-only`.
 - Shell scripts are classified as `script-no-elf-patch`.
 - Firmware images are ignored instead of being patched as host tools.
+- The Android runtime installer preserves the loader execute bit and installs local
+  linker aliases for the copied glibc runtime.
 - The ACL execution planner exists.
 - The initial execution backend exists behind `--apply`.
 - The ACL toolchain compatibility validation mode exists, is covered by unit tests, and now separates ignored resources from warnings.
