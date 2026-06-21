@@ -44,6 +44,10 @@ library lookups on Android. A copied Termux loader that still falls back to the
 original glibc tree can reach `EACCES` or `invalid ELF header` failures before the
 target binary itself ever starts.
 
+That is why direct execution of a patched host tool is still a blocker. The intended
+investigation path is `acl-exec`, which can pass an explicit loader and library search
+path, but that path still needs device validation.
+
 This is the first execution backend, not final proof that Linux-oriented tooling works
 correctly on Android.
 

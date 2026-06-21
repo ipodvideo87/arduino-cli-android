@@ -159,6 +159,28 @@ func TestValidateReportIgnoresFirmwareELFs(t *testing.T) {
 	require.Empty(t, validation.Findings)
 }
 
+func TestValidateReportIgnoresAclRuntimeAssets(t *testing.T) {
+	report := Report{
+		Root:    "/tmp/packages",
+		Summary: Summary{TotalEntries: 1},
+		Entries: []Entry{{
+			RelativePath:          "esp32/tools/esp-x32/2601/.acl/runtime/ld-linux-aarch64.so.1",
+			ExecutableType:        "elf",
+			CompatibilityCategory: CategoryLinuxGlibc,
+			PatchClass:            PatchClassLoaderAndRPath,
+			Architecture:          "AArch64",
+			Interpreter:           "/lib/ld-linux-aarch64.so.1",
+			RPath:                 "$ORIGIN/../lib",
+			RequiresRuntime:       true,
+		}},
+	}
+
+	validation := ValidateReport(report)
+	require.True(t, validation.Summary.Passed)
+	require.Equal(t, 1, validation.Summary.IgnoredCount)
+	require.Empty(t, validation.Findings)
+}
+
 func TestValidateReportWarnsOnUnsupportedHostExecutable(t *testing.T) {
 	report := Report{
 		Root:    "/tmp/packages",
@@ -179,6 +201,25 @@ func TestValidateReportWarnsOnUnsupportedHostExecutable(t *testing.T) {
 	require.Len(t, validation.Findings, 1)
 	require.Equal(t, ValidationSeverityWarning, validation.Findings[0].Severity)
 	require.Contains(t, strings.Join(validation.Findings[0].Messages, " "), "unsupported on Android")
+}
+
+func TestValidateReportWarnsOnWindowsExecutable(t *testing.T) {
+	report := Report{
+		Root:    "/tmp/packages",
+		Summary: Summary{TotalEntries: 1},
+		Entries: []Entry{{
+			RelativePath:          "esp32/hardware/esp32/3.3.10/tools/gen_insights_package.exe",
+			ExecutableType:        "windows-executable",
+			CompatibilityCategory: CategoryUnsupported,
+			PatchClass:            PatchClassUnsupported,
+		}},
+	}
+
+	validation := ValidateReport(report)
+	require.True(t, validation.Summary.Passed)
+	require.Equal(t, 1, validation.Summary.Warnings)
+	require.Equal(t, 0, validation.Summary.Errors)
+	require.Contains(t, strings.Join(validation.Findings[0].Messages, " "), "Windows executable")
 }
 
 func TestValidateReportWarnsOnIncompatibleArchitecture(t *testing.T) {

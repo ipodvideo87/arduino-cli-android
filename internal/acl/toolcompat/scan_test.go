@@ -81,6 +81,19 @@ func TestScanClassifiesStaticELF(t *testing.T) {
 	require.Equal(t, PatchClassUnsupported, report.Entries[0].PatchClass)
 }
 
+func TestScanClassifiesWindowsExecutable(t *testing.T) {
+	root := t.TempDir()
+	exe := filepath.Join(root, "gen_insights_package.exe")
+	require.NoError(t, os.WriteFile(exe, []byte("MZfake"), 0o755))
+
+	report, err := NewScanner().Scan(root)
+	require.NoError(t, err)
+	require.Len(t, report.Entries, 1)
+	require.Equal(t, "windows-executable", report.Entries[0].ExecutableType)
+	require.Equal(t, CategoryUnsupported, report.Entries[0].CompatibilityCategory)
+	require.Equal(t, PatchClassUnsupported, report.Entries[0].PatchClass)
+}
+
 func TestScanBuildsLinuxRuntimeCandidate(t *testing.T) {
 	root := t.TempDir()
 	elf := filepath.Join(root, "tool-elf")

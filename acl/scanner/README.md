@@ -26,6 +26,7 @@ installed Arduino packages tree, classify executable candidates, and report:
 - RPATH/RUNPATH
 - hardcoded absolute paths
 - compatibility category such as native Android compatible, Linux/glibc executable, static ELF, script, unknown, or unsupported
+- foreign Windows executables such as `.exe` files are classified separately and treated as unsupported host tooling
 
 Compatibility is currently determined by a conservative set of rules:
 
@@ -60,12 +61,18 @@ consistency rules. Validation is intentionally stricter than scanning: it looks 
 internal agreement between executable type, patch class, architecture, interpreter
 presence, and runtime dependencies before ACL tries to compile or execute anything.
 It ignores obvious docs, resources, and firmware artifacts, warns on real host tools
-that still need future compatibility work, and fails only when ACL finds a broken or
-inconsistent installed tool state.
+that still need future compatibility work, ignores ACL-owned `.acl/runtime` files, and
+fails only when ACL finds a broken or inconsistent installed tool state.
 
 `PASS` means the scanned package tree matched the current validation rules. It does not
 mean that every tool can execute on Android, and it does not prove that compilation,
 flashing, or end-to-end Arduino CLI workflows already work.
+
+`WARN` means the scan found a foreign or unsupported tool, such as a Windows `.exe`
+binary or a Linux host tool that still needs future compatibility work.
+
+`FAIL` means ACL found broken patching, inconsistent runtime metadata, or other state
+that ACL is responsible for fixing.
 
 Compatibility heuristics currently live in `internal/acl/toolcompat`. Future
 compatibility rules should be added there in a structured way first, and then promoted

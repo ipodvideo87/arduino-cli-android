@@ -13,6 +13,8 @@ The copied Termux/glibc runtime remains an investigation reference only.
   portability.
 - The copied runtime may also need local linker aliases such as `libc.so` so the
   loader does not fall back to the Termux glibc linker script.
+- The loader still contains hardcoded Termux glibc paths and can resolve `libc.so`
+  from the original Termux tree when a tool is launched directly.
 - An ELF patch can succeed while execution still fails during loading.
 - Runtime portability must be verified separately from ELF patching.
 - Minimal test fixtures are used to prove the package lifecycle independently of any
@@ -141,6 +143,10 @@ separately from launch.
 attempted launch. Dry-run planning is the default. `--apply` is explicit, uses the
 selected runtime loader directly, and remains experimental until it is validated on a
 fresh Termux install outside proot.
+
+Directly launching a patched host tool can still fail even when `validate-compat` passes.
+The current blocker is runtime library resolution inside the copied glibc loader, not
+installation or patch classification.
 
 Successful execution in proot is not proof of Android-native compatibility.
 

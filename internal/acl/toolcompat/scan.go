@@ -18,6 +18,7 @@ const (
 	CategoryAndroidCompatible = "native-android-compatible"
 	CategoryLinuxGlibc        = "linux-glibc-executable"
 	CategoryStaticELF         = "static-elf"
+	CategoryWindowsExecutable = "windows-executable"
 	CategoryScript            = "script"
 	CategoryUnknown           = "unknown"
 	CategoryUnsupported       = "unsupported"
@@ -196,6 +197,11 @@ func (s *Scanner) inspectPath(root, path string, d fs.DirEntry) (Entry, bool, er
 		entry.CompatibilityCategory = CategoryUnknown
 		entry.PatchClass = PatchClassUnsupported
 		entry.Notes = append(entry.Notes, "Java archives require a suitable Java runtime and launch path")
+	case "windows-executable":
+		entry.ExecutableType = "windows-executable"
+		entry.CompatibilityCategory = CategoryUnsupported
+		entry.PatchClass = PatchClassUnsupported
+		entry.Notes = append(entry.Notes, "Windows executables are foreign host tools on Android")
 	default:
 		entry.ExecutableType = kind
 		entry.CompatibilityCategory = CategoryUnsupported
@@ -243,6 +249,8 @@ func detectCandidateType(path string, mode fs.FileMode) (string, bool, error) {
 		if _, err := zip.OpenReader(path); err == nil {
 			return "java", true, nil
 		}
+	case strings.HasSuffix(trimmedName, ".exe"):
+		return "windows-executable", isExecutableBit, nil
 	case strings.HasSuffix(trimmedName, ".py"):
 		return "python", isExecutableBit, nil
 	case strings.HasSuffix(trimmedName, ".sh"):

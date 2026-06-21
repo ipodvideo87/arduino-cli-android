@@ -218,6 +218,14 @@ func validateScript(report *ValidationReport, entry Entry) {
 }
 
 func validateUnsupported(report *ValidationReport, entry Entry) {
+	if isAclRuntimeAsset(entry.RelativePath) {
+		report.Summary.IgnoredCount++
+		return
+	}
+	if isForeignExecutableEntry(entry) {
+		addWarning(report, entry, "foreign Windows executable is unsupported on Android")
+		return
+	}
 	if isHostToolPath(entry.RelativePath) {
 		message := unsupportedHostToolMessage(entry)
 		if incompatibleValidationArchitecture(entry) {
@@ -309,6 +317,9 @@ func isValidationIgnoredPath(relativePath string) bool {
 	path := strings.ToLower(filepath.ToSlash(relativePath))
 	base := strings.ToLower(filepath.Base(path))
 
+	if isAclRuntimeAsset(path) {
+		return true
+	}
 	if isDocumentationOrResourceFile(base) {
 		return true
 	}
@@ -341,6 +352,15 @@ func isFirmwareArtifact(path string) bool {
 		strings.Contains(path, "/tools/") &&
 		strings.Contains(path, "-libs/") &&
 		strings.Contains(path, "/bin/")
+}
+
+func isAclRuntimeAsset(path string) bool {
+	return strings.Contains(strings.ToLower(filepath.ToSlash(path)), "/.acl/runtime/")
+}
+
+func isForeignExecutableEntry(entry Entry) bool {
+	path := strings.ToLower(filepath.ToSlash(entry.RelativePath))
+	return strings.EqualFold(strings.TrimSpace(entry.ExecutableType), "windows-executable") || strings.HasSuffix(path, ".exe")
 }
 
 func incompatibleValidationArchitecture(entry Entry) bool {

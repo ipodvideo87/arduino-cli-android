@@ -22,6 +22,9 @@ into reusable infrastructure for Linux-based development tools on Android.
 - Firmware images are ignored instead of being patched as host tools.
 - The Android runtime installer preserves the loader execute bit and installs local
   linker aliases for the copied glibc runtime.
+- ACL-owned `.acl/runtime` files are ignored by compatibility validation.
+- Foreign Windows `.exe` tools are treated as unsupported warnings, not validation
+  failures.
 - The ACL execution planner exists.
 - The initial execution backend exists behind `--apply`.
 - The ACL toolchain compatibility validation mode exists, is covered by unit tests, and now separates ignored resources from warnings.
@@ -39,6 +42,8 @@ into reusable infrastructure for Linux-based development tools on Android.
 ## Known Blockers
 
 - Native Android execution still needs proof outside proot.
+- The copied glibc loader still resolves some libraries from the original Termux tree
+  when a patched tool is launched directly.
 - Successful proot execution does not prove Android-native compatibility.
 - A complete compile-and-upload loop has not yet been demonstrated.
 
