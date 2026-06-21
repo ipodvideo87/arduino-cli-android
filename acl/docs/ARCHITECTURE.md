@@ -64,8 +64,8 @@ classifies them, and records the metadata ACL needs for later execution work:
 - compatibility category
 
 Linux/glibc executables discovered by this layer become candidates for future
-runtime-managed execution. Native Android-compatible binaries, scripts, and unknown
-artifacts are reported separately so the repository can reason about them without
+runtime-managed execution. Static ELFs, native Android-compatible binaries, scripts, and
+unknown artifacts are reported separately so the repository can reason about them without
 pretending they are already supported.
 
 `acl-scan validate-compat` runs the same scan and then checks the resulting
@@ -75,7 +75,9 @@ agree on what each installed tool appears to be.
 
 Validation PASS means the installed tree matches the current rules. It does not prove
 that every tool executes successfully on Android, and it does not prove that sketch
-compilation or firmware upload already works.
+compilation or firmware upload already works. WARN means ACL found a real host tool that
+needs future compatibility work. FAIL means ACL found a broken or inconsistent installed
+tool state.
 
 ## Hardening Guarantees
 

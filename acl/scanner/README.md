@@ -25,7 +25,7 @@ installed Arduino packages tree, classify executable candidates, and report:
 - shared library dependencies
 - RPATH/RUNPATH
 - hardcoded absolute paths
-- compatibility category such as native Android compatible, Linux/glibc executable, script, unknown, or unsupported
+- compatibility category such as native Android compatible, Linux/glibc executable, static ELF, script, unknown, or unsupported
 
 Compatibility is currently determined by a conservative set of rules:
 
@@ -59,6 +59,9 @@ same scan and then check the resulting classifications against the current ACL
 consistency rules. Validation is intentionally stricter than scanning: it looks for
 internal agreement between executable type, patch class, architecture, interpreter
 presence, and runtime dependencies before ACL tries to compile or execute anything.
+It ignores obvious docs, resources, and firmware artifacts, warns on real host tools
+that still need future compatibility work, and fails only when ACL finds a broken or
+inconsistent installed tool state.
 
 `PASS` means the scanned package tree matched the current validation rules. It does not
 mean that every tool can execute on Android, and it does not prove that compilation,

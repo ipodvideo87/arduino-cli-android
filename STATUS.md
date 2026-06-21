@@ -22,13 +22,14 @@ into reusable infrastructure for Linux-based development tools on Android.
 - Firmware images are ignored instead of being patched as host tools.
 - The ACL execution planner exists.
 - The initial execution backend exists behind `--apply`.
-- The ACL toolchain compatibility validation mode exists and is covered by unit tests.
+- The ACL toolchain compatibility validation mode exists, is covered by unit tests, and now separates ignored resources from warnings.
 - Documentation policies are in place and kept aligned with implementation.
 
 ## Work In Progress
 
 - Validate the installed toolchain against real Arduino packages before the first
-  controlled compilation attempt.
+  controlled compilation attempt. The Termux ESP32 scan has already been used to tune the
+  compatibility validation policy, but Arduino sketch compilation is still unproven.
 - Prove a complete ESP32 toolchain compile end to end.
 - Validate firmware upload on real hardware.
 - Verify the full Arduino CLI workflow on native Android.

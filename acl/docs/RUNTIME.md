@@ -157,7 +157,9 @@ between the scanner, runtime manager, and patching policy before any launch atte
 
 Validation PASS means the compatibility data currently satisfies ACL’s rules. It does
 not mean that the underlying tool actually executed on Android, and it does not prove
-that compilation or upload workflows are finished.
+that compilation or upload workflows are finished. WARN means ACL found a real host tool
+that still needs future compatibility work. FAIL means ACL found a broken or inconsistent
+installed tool state.
 
 ## Security Assumptions
 

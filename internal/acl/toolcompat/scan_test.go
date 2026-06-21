@@ -57,6 +57,30 @@ func TestScanClassifiesScriptAndJavaAndELF(t *testing.T) {
 	require.Equal(t, PatchClassNone, entries["tool-elf"].PatchClass)
 }
 
+func TestScanClassifiesStaticELF(t *testing.T) {
+	root := t.TempDir()
+	elf := filepath.Join(root, "static-tool")
+	require.NoError(t, os.WriteFile(elf, []byte("\x7fELFfake"), 0o755))
+
+	scanner := NewScanner()
+	scanner.inspectELF = func(path string) (aclscan.Inspection, error) {
+		return aclscan.Inspection{
+			Path:                 path,
+			Exists:               true,
+			IsELF:                true,
+			Machine:              "Advanced Micro Devices X86-64",
+			FileType:             "EXEC",
+			LooksLikeLinuxTarget: false,
+		}, nil
+	}
+
+	report, err := scanner.Scan(root)
+	require.NoError(t, err)
+	require.Len(t, report.Entries, 1)
+	require.Equal(t, CategoryStaticELF, report.Entries[0].CompatibilityCategory)
+	require.Equal(t, PatchClassUnsupported, report.Entries[0].PatchClass)
+}
+
 func TestScanBuildsLinuxRuntimeCandidate(t *testing.T) {
 	root := t.TempDir()
 	elf := filepath.Join(root, "tool-elf")

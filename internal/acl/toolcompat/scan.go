@@ -17,6 +17,7 @@ import (
 const (
 	CategoryAndroidCompatible = "native-android-compatible"
 	CategoryLinuxGlibc        = "linux-glibc-executable"
+	CategoryStaticELF         = "static-elf"
 	CategoryScript            = "script"
 	CategoryUnknown           = "unknown"
 	CategoryUnsupported       = "unsupported"
@@ -299,9 +300,17 @@ func classifyELF(entry Entry) string {
 		return CategoryAndroidCompatible
 	case entry.LooksLinuxGlibc:
 		return CategoryLinuxGlibc
+	case isStaticELF(entry):
+		return CategoryStaticELF
 	default:
 		return CategoryUnknown
 	}
+}
+
+func isStaticELF(entry Entry) bool {
+	return strings.EqualFold(strings.TrimSpace(entry.ExecutableType), "elf") &&
+		strings.TrimSpace(entry.Interpreter) == "" &&
+		len(entry.SharedLibraries) == 0
 }
 
 func PatchClassForELFInspection(inspection aclscan.Inspection) string {

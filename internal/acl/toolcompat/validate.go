@@ -3,6 +3,7 @@ package toolcompat
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -25,7 +26,7 @@ type ValidationSummary struct {
 	ExecutableELFs           int  `json:"executable_elf_count"`
 	SharedLibraryRuntimeELFs int  `json:"shared_library_runtime_elf_count"`
 	ScriptCount              int  `json:"script_count"`
-	UnsupportedIgnoredCount  int  `json:"unsupported_ignored_count"`
+	IgnoredCount             int  `json:"ignored_count"`
 	Warnings                 int  `json:"warnings"`
 	Errors                   int  `json:"errors"`
 	Passed                   bool `json:"passed"`
@@ -53,6 +54,11 @@ func ValidateReport(report Report) ValidationReport {
 	}
 
 	for _, entry := range report.Entries {
+		if isValidationIgnored(entry) {
+			result.Summary.IgnoredCount++
+			continue
+		}
+
 		switch entry.PatchClass {
 		case PatchClassLoaderAndRPath:
 			result.Summary.ExecutableELFs++
@@ -107,7 +113,7 @@ func FormatValidationReport(report ValidationReport) string {
 	fmt.Fprintf(&b, "Executable ELF count: %d\n", report.Summary.ExecutableELFs)
 	fmt.Fprintf(&b, "Shared-library/runtime ELF count: %d\n", report.Summary.SharedLibraryRuntimeELFs)
 	fmt.Fprintf(&b, "Script count: %d\n", report.Summary.ScriptCount)
-	fmt.Fprintf(&b, "Unsupported ignored count: %d\n", report.Summary.UnsupportedIgnoredCount)
+	fmt.Fprintf(&b, "Ignored count: %d\n", report.Summary.IgnoredCount)
 	fmt.Fprintf(&b, "Warnings: %d\n", report.Summary.Warnings)
 	fmt.Fprintf(&b, "Errors: %d\n", report.Summary.Errors)
 	if report.Summary.Passed {
@@ -140,6 +146,11 @@ func FormatValidationReport(report ValidationReport) string {
 }
 
 func validateLoaderAndRPath(report *ValidationReport, entry Entry) {
+	if incompatibleValidationArchitecture(entry) {
+		addWarning(report, entry, fmt.Sprintf("incompatible architecture %q for an ACL-managed host tool", entry.Architecture))
+		return
+	}
+
 	ok := true
 	messages := []string{}
 	if !isELFEntry(entry) {
@@ -168,6 +179,11 @@ func validateLoaderAndRPath(report *ValidationReport, entry Entry) {
 }
 
 func validateRuntimeDependency(report *ValidationReport, entry Entry) {
+	if incompatibleValidationArchitecture(entry) {
+		addWarning(report, entry, fmt.Sprintf("incompatible architecture %q for an ACL-managed host tool", entry.Architecture))
+		return
+	}
+
 	ok := true
 	messages := []string{}
 	if !isELFEntry(entry) {
@@ -202,11 +218,37 @@ func validateScript(report *ValidationReport, entry Entry) {
 }
 
 func validateUnsupported(report *ValidationReport, entry Entry) {
-	if isHostExecutableCandidate(entry) {
-		addError(report, entry, "host executable could not be classified")
+	if isHostToolPath(entry.RelativePath) {
+		message := unsupportedHostToolMessage(entry)
+		if incompatibleValidationArchitecture(entry) {
+			message = fmt.Sprintf("%s (incompatible architecture %q)", message, entry.Architecture)
+		}
+		addWarning(report, entry, message)
 		return
 	}
-	report.Summary.UnsupportedIgnoredCount++
+	report.Summary.IgnoredCount++
+}
+
+func unsupportedHostToolMessage(entry Entry) string {
+	path := filepath.ToSlash(strings.ToLower(entry.RelativePath))
+	switch {
+	case strings.Contains(path, "mdns-discovery"):
+		return "builtin mdns-discovery host tool is currently unsupported on Android"
+	case strings.Contains(path, "serial-discovery"):
+		return "builtin serial-discovery host tool is currently unsupported on Android"
+	case strings.Contains(path, "serial-monitor"):
+		return "builtin serial-monitor host tool is currently unsupported on Android"
+	case strings.Contains(path, "dfu-util"):
+		return "dfu-util host tool is currently unsupported on Android"
+	case strings.Contains(path, "mkspiffs"):
+		return "mkspiffs host tool is currently unsupported on Android"
+	case entry.CompatibilityCategory == CategoryStaticELF:
+		return "static ELF host tool candidate needs future compatibility work"
+	case entry.CompatibilityCategory == CategoryLinuxGlibc:
+		return "Linux/glibc host tool candidate needs future compatibility work"
+	default:
+		return "host tool candidate is currently unsupported or unclassified"
+	}
 }
 
 func addWarning(report *ValidationReport, entry Entry, messages ...string) {
@@ -259,6 +301,52 @@ func writeFinding(b *strings.Builder, finding ValidationFinding) {
 	}
 }
 
+func isValidationIgnored(entry Entry) bool {
+	return isValidationIgnoredPath(entry.RelativePath)
+}
+
+func isValidationIgnoredPath(relativePath string) bool {
+	path := strings.ToLower(filepath.ToSlash(relativePath))
+	base := strings.ToLower(filepath.Base(path))
+
+	if isDocumentationOrResourceFile(base) {
+		return true
+	}
+	if isFirmwareArtifact(path) {
+		return true
+	}
+	return false
+}
+
+func isDocumentationOrResourceFile(base string) bool {
+	switch base {
+	case "license", "license.img", "readme":
+		return true
+	}
+	for _, suffix := range []string{".h", ".hpp", ".c", ".cpp", ".csv", ".md", ".txt", ".a"} {
+		if strings.HasSuffix(base, suffix) {
+			return true
+		}
+	}
+	for _, prefix := range []string{"license.", "readme."} {
+		if strings.HasPrefix(base, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func isFirmwareArtifact(path string) bool {
+	return strings.HasSuffix(path, ".elf") &&
+		strings.Contains(path, "/tools/") &&
+		strings.Contains(path, "-libs/") &&
+		strings.Contains(path, "/bin/")
+}
+
+func incompatibleValidationArchitecture(entry Entry) bool {
+	return isELFEntry(entry) && !isAArch64Machine(entry.Architecture)
+}
+
 func hasAnyRuntimePath(entry Entry) bool {
 	return strings.TrimSpace(entry.RPath) != "" || strings.TrimSpace(entry.RunPath) != ""
 }
@@ -272,14 +360,11 @@ func isScriptEntry(entry Entry) bool {
 }
 
 func isHostExecutableCandidate(entry Entry) bool {
-	switch strings.ToLower(strings.TrimSpace(entry.ExecutableType)) {
-	case "elf":
-		return isAArch64Machine(entry.Architecture)
-	case "binary":
-		return true
-	default:
-		return false
-	}
+	return isHostToolPath(entry.RelativePath)
+}
+
+func isHostToolPath(relativePath string) bool {
+	return strings.Contains(strings.ToLower(filepath.ToSlash(relativePath)), "/tools/")
 }
 
 func isAArch64Machine(machine string) bool {
