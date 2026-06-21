@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	aclscan "github.com/arduino/arduino-cli/internal/acl/elfscan"
@@ -92,6 +93,33 @@ func TestScanClassifiesWindowsExecutable(t *testing.T) {
 	require.Equal(t, "windows-executable", report.Entries[0].ExecutableType)
 	require.Equal(t, CategoryUnsupported, report.Entries[0].CompatibilityCategory)
 	require.Equal(t, PatchClassUnsupported, report.Entries[0].PatchClass)
+}
+
+func TestScanClassifiesRustLauncher(t *testing.T) {
+	root := t.TempDir()
+	elf := filepath.Join(root, "xtensa-esp32s3-elf-gcc")
+	require.NoError(t, os.WriteFile(elf, []byte("\x7fELFfake"), 0o755))
+
+	scanner := NewScanner()
+	scanner.inspectELF = func(path string) (aclscan.Inspection, error) {
+		return aclscan.Inspection{
+			Path:                  path,
+			Exists:                true,
+			IsELF:                 true,
+			Machine:               "AArch64",
+			Interpreter:           "/lib/ld-linux-aarch64.so.1",
+			ImportedLibraries:     []string{"libc.so.6"},
+			LooksLikeLinuxTarget:  true,
+			LooksLikeRustLauncher: true,
+		}, nil
+	}
+
+	report, err := scanner.Scan(root)
+	require.NoError(t, err)
+	require.Len(t, report.Entries, 1)
+	require.Equal(t, CategoryRustLauncher, report.Entries[0].ExecutableType)
+	require.Equal(t, CategoryLinuxGlibc, report.Entries[0].CompatibilityCategory)
+	require.Contains(t, strings.Join(report.Entries[0].Notes, " "), "Rust launcher wrapper")
 }
 
 func TestScanBuildsLinuxRuntimeCandidate(t *testing.T) {

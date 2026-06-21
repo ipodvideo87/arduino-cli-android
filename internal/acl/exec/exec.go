@@ -22,6 +22,10 @@ type Request struct {
 	Apply       bool
 }
 
+const (
+	LaunchModeDirectExec = "direct-exec"
+)
+
 type ExecutionPlan struct {
 	TargetPath        string
 	Target            aclscan.Inspection
@@ -32,6 +36,7 @@ type ExecutionPlan struct {
 	LoaderPath        string
 	LibraryPaths      []string
 	LibrarySearchPath string
+	LaunchMode        string
 	Argv              []string
 	Cwd               string
 	Environment       []string
@@ -170,7 +175,6 @@ func (p *Planner) BuildPlan(req Request) (ExecutionPlan, error) {
 		"ACL_RUNTIME_ID=" + rt.ID,
 		"ACL_RUNTIME_DIR=" + rt.Path,
 		"ACL_RUNTIME_LOADER=" + loaderPath,
-		"LD_LIBRARY_PATH=" + librarySearchPath,
 	}
 
 	plan.RuntimeID = rt.ID
@@ -182,7 +186,8 @@ func (p *Planner) BuildPlan(req Request) (ExecutionPlan, error) {
 	plan.Argv = argv
 	plan.Cwd = cwd
 	plan.Environment = env
-	plan.Command = append([]string{loaderPath, "--library-path", librarySearchPath, targetPath}, req.Args...)
+	plan.LaunchMode = LaunchModeDirectExec
+	plan.Command = append([]string{targetPath}, req.Args...)
 	plan.Allowed = true
 
 	if target.Interpreter == "" {
@@ -193,6 +198,9 @@ func (p *Planner) BuildPlan(req Request) (ExecutionPlan, error) {
 	}
 	if !target.LooksLikeLinuxTarget {
 		plan.Warnings = append(plan.Warnings, "target does not look like a glibc/Linux binary")
+	}
+	if target.LooksLikeRustLauncher {
+		plan.Warnings = append(plan.Warnings, "Rust launcher wrapper detected; direct kernel exec is required to preserve executable identity")
 	}
 
 	return plan, nil
@@ -219,9 +227,6 @@ func (p *Planner) executePlan(plan ExecutionPlan) (Result, error) {
 	}
 	if strings.TrimSpace(plan.RuntimeID) == "" {
 		return Result{ExitCode: 1}, errors.New("execution plan is missing an active runtime")
-	}
-	if err := ensureRegularFile(plan.LoaderPath, "loader"); err != nil {
-		return Result{ExitCode: 1}, err
 	}
 	if err := ensureRegularFile(plan.TargetPath, "target"); err != nil {
 		return Result{ExitCode: 1}, err
@@ -252,13 +257,9 @@ func (p *Planner) executePlan(plan ExecutionPlan) (Result, error) {
 	if len(plan.Command) == 0 {
 		return Result{ExitCode: 1}, errors.New("execution plan is missing a command")
 	}
-	if err := ensureLibrarySearchPath(plan.LibrarySearchPath); err != nil {
-		return Result{ExitCode: 1}, err
-	}
-
 	cmd := osExec.Command(plan.Command[0], plan.Command[1:]...)
 	cmd.Dir = plan.Cwd
-	cmd.Env = append(os.Environ(), plan.Environment...)
+	cmd.Env = sanitizeExecutionEnv(os.Environ(), plan.Environment)
 	return p.runCommand(cmd)
 }
 
@@ -305,6 +306,27 @@ func runCommand(cmd *osExec.Cmd) (Result, error) {
 
 	result.ExitCode = 1
 	return result, fmt.Errorf("execution failed to start: %w", err)
+}
+
+func sanitizeExecutionEnv(baseEnv []string, additions []string) []string {
+	env := make([]string, 0, len(baseEnv)+len(additions))
+	for _, kv := range baseEnv {
+		if isSanitizedLDVariable(kv) {
+			continue
+		}
+		env = append(env, kv)
+	}
+	for _, kv := range additions {
+		if isSanitizedLDVariable(kv) {
+			continue
+		}
+		env = append(env, kv)
+	}
+	return env
+}
+
+func isSanitizedLDVariable(kv string) bool {
+	return strings.HasPrefix(kv, "LD_PRELOAD=") || strings.HasPrefix(kv, "LD_LIBRARY_PATH=")
 }
 
 func validateTargetPath(raw string) (string, error) {

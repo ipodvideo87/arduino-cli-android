@@ -26,6 +26,7 @@ type Inspection struct {
 	Needed                 []string
 	HardcodedAbsolutePaths []string
 	LooksLikeLinuxTarget   bool
+	LooksLikeRustLauncher  bool
 	HasProgramInterpreter  bool
 }
 
@@ -62,6 +63,7 @@ func Inspect(path string) (Inspection, error) {
 	result.Needed = readDynamicStrings(f, elf.DT_NEEDED)
 	result.HardcodedAbsolutePaths = findInterestingAbsoluteStrings(path)
 	result.LooksLikeLinuxTarget = looksLikeLinuxTarget(result.SONAME, result.Interpreter, result.ImportedLibraries)
+	result.LooksLikeRustLauncher = looksLikeRustLauncher(path)
 
 	return result, nil
 }
@@ -184,6 +186,38 @@ func looksLikeLinuxTarget(soname, interpreter string, imports []string) bool {
 	}
 
 	return false
+}
+
+func looksLikeRustLauncher(path string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+
+	var (
+		foundPattern   bool
+		foundDynconfig bool
+		foundExecPath  bool
+	)
+	for _, s := range extractStrings(data) {
+		lower := strings.ToLower(s)
+		switch {
+		case strings.Contains(s, "XTENSA_GNU_CONFIG"):
+			foundDynconfig = true
+		case strings.Contains(lower, "called tool must have pattern"):
+			foundPattern = true
+		case strings.Contains(lower, "dynconfig for target"):
+			foundDynconfig = true
+		case strings.Contains(lower, "get executable path"):
+			foundExecPath = true
+		case strings.Contains(lower, "current exe has path"):
+			foundExecPath = true
+		case strings.Contains(lower, "execv errno"):
+			foundExecPath = true
+		}
+	}
+
+	return foundPattern && foundDynconfig && foundExecPath
 }
 
 func Format(ins Inspection) string {

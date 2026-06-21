@@ -140,13 +140,23 @@ separately from launch.
 ## Execution Planning
 
 `acl-exec` consumes the active runtime and the scanner output to build a plan before any
-attempted launch. Dry-run planning is the default. `--apply` is explicit, uses the
-selected runtime loader directly, and remains experimental until it is validated on a
-fresh Termux install outside proot.
+attempted launch. Dry-run planning is the default. `--apply` is explicit, launches the
+target directly, and remains experimental until it is validated on a fresh Termux
+install outside proot.
 
 Directly launching a patched host tool can still fail even when `validate-compat` passes.
-The current blocker is runtime library resolution inside the copied glibc loader, not
-installation or patch classification.
+The current blocker is wrapper-safe runtime launch on Android: the ESP32 Rust launcher
+wrappers need their own identity preserved, and explicit loader invocation can make the
+process identify as `ld` instead of the tool name. ACL now prefers direct kernel exec
+for patched executables so the kernel can hand control to the patched interpreter with
+the original executable identity intact.
+
+The remaining runtime-risk work is separate from validation:
+
+- the copied glibc loader still has to resolve its libraries correctly
+- `LD_PRELOAD` and `LD_LIBRARY_PATH` must not leak in from the outer shell
+- any future fallback to explicit loader invocation will need wrapper-aware handling
+- runtime portability must still be verified separately from ELF patching
 
 Successful execution in proot is not proof of Android-native compatibility.
 

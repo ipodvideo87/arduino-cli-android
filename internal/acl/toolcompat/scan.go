@@ -17,6 +17,7 @@ import (
 const (
 	CategoryAndroidCompatible = "native-android-compatible"
 	CategoryLinuxGlibc        = "linux-glibc-executable"
+	CategoryRustLauncher      = "rust-launcher"
 	CategoryStaticELF         = "static-elf"
 	CategoryWindowsExecutable = "windows-executable"
 	CategoryScript            = "script"
@@ -161,6 +162,10 @@ func (s *Scanner) inspectPath(root, path string, d fs.DirEntry) (Entry, bool, er
 			return Entry{}, false, err
 		}
 		entry.ExecutableType = "elf"
+		if inspection.LooksLikeRustLauncher {
+			entry.ExecutableType = CategoryRustLauncher
+			entry.Notes = append(entry.Notes, "Rust launcher wrapper; direct kernel exec preserves executable identity better than explicit loader invocation")
+		}
 		entry.Architecture = inspection.Machine
 		entry.Interpreter = inspection.Interpreter
 		entry.SharedLibraries = append([]string(nil), inspection.ImportedLibraries...)

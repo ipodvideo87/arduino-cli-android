@@ -42,8 +42,11 @@ into reusable infrastructure for Linux-based development tools on Android.
 ## Known Blockers
 
 - Native Android execution still needs proof outside proot.
-- The copied glibc loader still resolves some libraries from the original Termux tree
-  when a patched tool is launched directly.
+- The ESP32 Rust launcher wrappers still break under explicit loader invocation because
+  `/proc/self/exe` resolves to `ld`; ACL now prefers direct kernel exec for patched
+  executables, but that path still needs native proof.
+- The copied glibc loader still has to resolve its libraries without leaking Termux
+  `LD_PRELOAD` or `LD_LIBRARY_PATH` state from the shell environment.
 - Successful proot execution does not prove Android-native compatibility.
 - A complete compile-and-upload loop has not yet been demonstrated.
 

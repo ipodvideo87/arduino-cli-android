@@ -34,19 +34,18 @@ When `--apply` is used, `acl-exec` currently:
 
 - requires a valid active runtime
 - validates the target, loader, library search path, and cwd before launch
-- invokes the selected runtime loader explicitly
-- passes `--library-path` using the ACL runtime library directories
-- passes the target executable and argv through the loader command
+- launches the target directly so the kernel and PT_INTERP preserve executable identity
 - captures stdout, stderr, and exit status where practical
 
-The selected runtime must already be self-contained enough to satisfy the loader's
-library lookups on Android. A copied Termux loader that still falls back to the
-original glibc tree can reach `EACCES` or `invalid ELF header` failures before the
-target binary itself ever starts.
+This direct-kernel-exec strategy is deliberate. The ESP32 Rust launcher wrappers expect
+their own executable identity to remain intact, and explicit loader invocation changes
+what the process sees as `/proc/self/exe`. That is why the launcher path is now the
+preferred execution plan.
 
-That is why direct execution of a patched host tool is still a blocker. The intended
-investigation path is `acl-exec`, which can pass an explicit loader and library search
-path, but that path still needs device validation.
+The selected runtime still must be self-contained enough to satisfy the loader's
+library lookups on Android. A copied Termux loader that still falls back to the
+original glibc tree can still fail before the target binary itself starts, but that is
+now a runtime portability blocker rather than the default execution plan.
 
 This is the first execution backend, not final proof that Linux-oriented tooling works
 correctly on Android.

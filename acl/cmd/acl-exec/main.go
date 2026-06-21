@@ -85,6 +85,9 @@ func formatPlan(plan aclexec.ExecutionPlan) string {
 	if plan.Cwd != "" {
 		fmt.Fprintf(&b, "CWD: %s\n", plan.Cwd)
 	}
+	if plan.LaunchMode != "" {
+		fmt.Fprintf(&b, "Launch mode: %s\n", plan.LaunchMode)
+	}
 	if len(plan.Argv) > 0 {
 		fmt.Fprintf(&b, "Argv: %s\n", strings.Join(plan.Argv, " "))
 	}

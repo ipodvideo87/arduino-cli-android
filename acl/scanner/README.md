@@ -20,6 +20,9 @@ For tool compatibility reporting, `acl-scan compat` and `acl-scan compat-json` w
 installed Arduino packages tree, classify executable candidates, and report:
 
 - executable type such as ELF, shell script, Python, or Java archive
+- some ESP32 toolchain wrappers are Rust launchers; they are still ELF host tools, but
+  they are called out separately because explicit loader invocation can break their
+  executable identity
 - architecture
 - interpreter
 - shared library dependencies
@@ -69,7 +72,8 @@ mean that every tool can execute on Android, and it does not prove that compilat
 flashing, or end-to-end Arduino CLI workflows already work.
 
 `WARN` means the scan found a foreign or unsupported tool, such as a Windows `.exe`
-binary or a Linux host tool that still needs future compatibility work.
+binary, a Rust launcher wrapper that still needs wrapper-safe direct execution, or a
+Linux host tool that still needs future compatibility work.
 
 `FAIL` means ACL found broken patching, inconsistent runtime metadata, or other state
 that ACL is responsible for fixing.
