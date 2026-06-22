@@ -405,15 +405,37 @@ func TestBuildDiagnosticReportMatchesDirectExecPlan(t *testing.T) {
 	root := t.TempDir()
 	target := mustExecutable(t)
 	hostArch := hostArchitecture(t, target)
+	originalReader := procSelfRootReader
+	originalDetector := executionEnvironmentDetector
+	procSelfRootReader = func() string { return "/" }
+	executionEnvironmentDetector = func() EnvironmentDetection {
+		return EnvironmentDetection{
+			State:       EnvironmentStateNativeTermux,
+			Description: "native Termux detected",
+			Evidence: []string{
+				"TERMUX_VERSION=0.118.0",
+				"PREFIX=/data/data/com.termux/files/usr",
+				"TERMUX_PREFIX=/data/data/com.termux/files/usr",
+				"TERMUX_HOME=/data/data/com.termux/files/home",
+			},
+		}
+	}
+	t.Cleanup(func() {
+		procSelfRootReader = originalReader
+		executionEnvironmentDetector = originalDetector
+	})
 	t.Setenv("HOME", "/home/test")
 	t.Setenv("PATH", "/usr/bin:/bin")
 	t.Setenv("TMPDIR", "/tmp")
 	t.Setenv("ANDROID_ROOT", "/system")
 	t.Setenv("ANDROID_DATA", "/data")
 	t.Setenv("TERMUX_VERSION", "0.118.0")
+	t.Setenv("PREFIX", "/data/data/com.termux/files/usr")
+	t.Setenv("TERMUX__PREFIX", "/data/data/com.termux/files/usr")
+	t.Setenv("TERMUX__HOME", "/data/data/com.termux/files/home")
+	t.Setenv("TERMUX__ROOTFS_DIR", "/data/data/com.termux/files")
 	t.Setenv("ACL_RUNTIME_ROOT", root)
 	t.Setenv("LD_LIBRARY_PATH", "/tmp/termux-glibc")
-	t.Setenv("PROOT_NO_SECCOMP", "1")
 
 	planner := NewPlannerWithInspector(root, directExecInspection(target, hostArch))
 	plan, err := planner.BuildPlan(Request{
@@ -436,13 +458,20 @@ func TestBuildDiagnosticReportMatchesDirectExecPlan(t *testing.T) {
 	require.Equal(t, filepath.Base(target), report.Target.Basename)
 	require.True(t, report.Target.Exists)
 	require.Equal(t, TargetClassAndroidNative, report.Target.TargetClass)
+	require.Equal(t, string(EnvironmentStateNativeTermux), report.Environment.State)
+	require.Equal(t, "native Termux detected", report.Environment.Description)
+	require.Equal(t, "configured", report.Environment.RuntimeRootSource)
+	require.Equal(t, root, report.Environment.RuntimeRoot)
 	require.True(t, report.Execution.DirectExecution)
 	require.False(t, report.Execution.ExplicitLoader)
 	require.Empty(t, report.Execution.LoaderPath)
 	require.Contains(t, report.Environment.SanitizedSummary, "removed")
 	require.Contains(t, strings.Join(report.Environment.Removed, " "), "LD_LIBRARY_PATH=/tmp/termux-glibc")
-	require.Contains(t, strings.Join(report.Environment.Removed, " "), "PROOT_NO_SECCOMP=1")
-	require.Contains(t, report.Environment.Indicators, "TERMUX_VERSION")
+	require.Contains(t, strings.Join(report.Environment.Indicators, " "), "TERMUX_VERSION=0.118.0")
+	require.Contains(t, strings.Join(report.Environment.Indicators, " "), "TERMUX_PREFIX=/data/data/com.termux/files/usr")
+	require.Contains(t, strings.Join(report.Environment.Indicators, " "), "TERMUX_HOME=/data/data/com.termux/files/home")
+	require.NotContains(t, strings.Join(report.Environment.Indicators, " "), "PROOT")
+	require.NotContains(t, strings.Join(report.Hints, " "), "PRoot/proot-distro")
 	require.Equal(t, []string{target, "--verbose"}, report.Runtime.Argv)
 	require.Equal(t, hostArch, report.TargetData.Machine)
 	require.True(t, report.Result.Started == false)
@@ -450,8 +479,96 @@ func TestBuildDiagnosticReportMatchesDirectExecPlan(t *testing.T) {
 	require.Nil(t, report.Result.ExitCode)
 }
 
+func TestBuildDiagnosticReportDetectsDefaultRuntimeRoot(t *testing.T) {
+	target := mustExecutable(t)
+	hostArch := hostArchitecture(t, target)
+	t.Setenv("HOME", "/home/test")
+	t.Setenv("PREFIX", "/data/data/com.termux/files/usr")
+	t.Setenv("ACL_RUNTIME_ROOT", "")
+
+	originalDetector := executionEnvironmentDetector
+	executionEnvironmentDetector = func() EnvironmentDetection {
+		return EnvironmentDetection{
+			State:       EnvironmentStateUnknown,
+			Description: "environment unknown",
+		}
+	}
+	t.Cleanup(func() {
+		executionEnvironmentDetector = originalDetector
+	})
+
+	plan := ExecutionPlan{
+		TargetPath: target,
+		Target: aclscan.Inspection{
+			Path:                 target,
+			IsELF:                true,
+			Machine:              hostArch,
+			FileType:             "EXEC",
+			LooksLikeLinuxTarget: false,
+		},
+		LaunchMode: LaunchModeDirectExec,
+		Argv:       []string{target},
+	}
+
+	report := BuildDiagnosticReport(plan, Request{TargetPath: target}, Result{})
+	require.Equal(t, "/home/test/.arduino-cli-android/acl-runtime", report.Environment.RuntimeRoot)
+	require.Equal(t, "detected", report.Environment.RuntimeRootSource)
+	require.Equal(t, "environment unknown", report.Environment.Description)
+}
+
+func TestBuildDiagnosticReportClassifiesProotEnvironment(t *testing.T) {
+	env := detectExecutionEnvironmentFromEnv([]string{
+		"TERMUX_VERSION=0.118.0",
+		"PREFIX=/data/data/com.termux/files/usr",
+		"TERMUX_PREFIX=/data/data/com.termux/files/usr",
+		"HOME=/data/data/com.termux/files/home",
+		"TERMUX_HOME=/data/data/com.termux/files/home",
+		"PROOT_NO_SECCOMP=1",
+		"QEMU_LD_PREFIX=/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/debian",
+	}, "/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/debian")
+	require.Equal(t, EnvironmentStateProot, env.State)
+	require.Equal(t, "PRoot/proot-distro detected", env.Description)
+	require.Contains(t, strings.Join(env.Evidence, " "), "PROOT_*")
+	require.Contains(t, strings.Join(env.Evidence, " "), "TERMUX_PREFIX=/data/data/com.termux/files/usr")
+	require.Contains(t, strings.Join(env.Evidence, " "), "TERMUX_HOME=/data/data/com.termux/files/home")
+	require.Contains(t, strings.Join(env.Evidence, " "), "/proc/self/root=")
+}
+
+func TestDetectExecutionEnvironmentUnknown(t *testing.T) {
+	env := detectExecutionEnvironmentFromEnv([]string{
+		"HOME=/home/test",
+		"PATH=/usr/bin:/bin",
+		"LANG=C",
+	}, "/")
+
+	require.Equal(t, EnvironmentStateUnknown, env.State)
+	require.Equal(t, "environment unknown", env.Description)
+	require.Empty(t, env.Evidence)
+}
+
 func TestBuildDiagnosticReportIncludesStartFailureEvidence(t *testing.T) {
 	target := "/tmp/missing-tool"
+	originalReader := procSelfRootReader
+	originalDetector := executionEnvironmentDetector
+	procSelfRootReader = func() string { return "/" }
+	executionEnvironmentDetector = func() EnvironmentDetection {
+		return EnvironmentDetection{
+			State:       EnvironmentStateUnknown,
+			Description: "environment unknown",
+		}
+	}
+	t.Cleanup(func() {
+		procSelfRootReader = originalReader
+		executionEnvironmentDetector = originalDetector
+	})
+	t.Setenv("TERMUX_VERSION", "")
+	t.Setenv("PREFIX", "/usr")
+	t.Setenv("HOME", "/home/test")
+	t.Setenv("TERMUX__PREFIX", "")
+	t.Setenv("TERMUX__HOME", "")
+	t.Setenv("TERMUX__ROOTFS_DIR", "")
+	t.Setenv("PROOT_NO_SECCOMP", "")
+	t.Setenv("QEMU_LD_PREFIX", "")
 	report := BuildDiagnosticReport(ExecutionPlan{
 		TargetPath:  target,
 		TargetClass: TargetClassRustLauncher,
@@ -471,7 +588,7 @@ func TestBuildDiagnosticReportIncludesStartFailureEvidence(t *testing.T) {
 		Errno:      "no such file or directory",
 	})
 
-	require.Contains(t, strings.Join(report.Hints, " "), "proot/chroot/container")
+	require.Contains(t, strings.Join(report.Hints, " "), "environment could not be classified")
 	require.Contains(t, strings.Join(report.Hints, " "), "Rust launcher wrappers need direct kernel exec")
 	require.Equal(t, "no such file or directory", report.Result.Errno)
 	require.Equal(t, 1, *report.Result.ExitCode)

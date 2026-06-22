@@ -376,7 +376,7 @@ func isELFEntry(entry Entry) bool {
 	case "elf", CategoryRustLauncher:
 		return true
 	default:
-		return false
+		return strings.EqualFold(strings.TrimSpace(entry.CompatibilityCategory), CategoryRustLauncher)
 	}
 }
 

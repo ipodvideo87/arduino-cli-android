@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	aclscan "github.com/arduino/arduino-cli/internal/acl/elfscan"
+	aclruntime "github.com/arduino/arduino-cli/internal/acl/runtime"
 )
 
 type DiagnosticReport struct {
@@ -39,12 +40,15 @@ type ExecutionDiagnostics struct {
 }
 
 type EnvironmentDiagnostics struct {
-	RuntimeRoot      string   `json:"runtime_root,omitempty"`
-	CWD              string   `json:"cwd,omitempty"`
-	Kept             []string `json:"kept,omitempty"`
-	Removed          []string `json:"removed,omitempty"`
-	Indicators       []string `json:"indicators,omitempty"`
-	SanitizedSummary string   `json:"sanitized_summary"`
+	RuntimeRoot       string   `json:"runtime_root,omitempty"`
+	RuntimeRootSource string   `json:"runtime_root_source,omitempty"`
+	CWD               string   `json:"cwd,omitempty"`
+	State             string   `json:"state"`
+	Description       string   `json:"description"`
+	Kept              []string `json:"kept,omitempty"`
+	Removed           []string `json:"removed,omitempty"`
+	Indicators        []string `json:"indicators,omitempty"`
+	SanitizedSummary  string   `json:"sanitized_summary"`
 }
 
 type RuntimeDiagnostics struct {
@@ -93,8 +97,14 @@ func FormatDiagnosticReport(r DiagnosticReport) string {
 	if r.Environment.RuntimeRoot != "" {
 		fmt.Fprintf(&b, "Runtime root: %s\n", r.Environment.RuntimeRoot)
 	}
+	if r.Environment.RuntimeRootSource != "" {
+		fmt.Fprintf(&b, "Runtime root source: %s\n", r.Environment.RuntimeRootSource)
+	}
 	if r.Environment.CWD != "" {
 		fmt.Fprintf(&b, "CWD: %s\n", r.Environment.CWD)
+	}
+	if r.Environment.Description != "" {
+		fmt.Fprintf(&b, "Environment state: %s\n", r.Environment.Description)
 	}
 	if r.Runtime.PTInterp != "" {
 		fmt.Fprintf(&b, "PT_INTERP: %s\n", r.Runtime.PTInterp)
@@ -126,7 +136,7 @@ func FormatDiagnosticReport(r DiagnosticReport) string {
 		}
 	}
 	if len(r.Environment.Indicators) > 0 {
-		fmt.Fprintln(&b, "Container indicators:")
+		fmt.Fprintln(&b, "Environment evidence:")
 		for _, indicator := range r.Environment.Indicators {
 			fmt.Fprintf(&b, "  - %s\n", indicator)
 		}
@@ -178,10 +188,8 @@ func BuildDiagnosticReport(plan ExecutionPlan, req Request, result Result) Diagn
 	}
 
 	_, audit := sanitizeExecutionEnvWithAudit(os.Environ(), plan.Environment)
-	runtimeRoot := plan.RuntimeRoot
-	if runtimeRoot == "" {
-		runtimeRoot = planRuntimeRootFromPlan(plan)
-	}
+	envDetection := executionEnvironmentDetector()
+	runtimeRoot, runtimeRootSource := resolveRuntimeRootForReport(plan)
 
 	var exitCodePtr *int
 	if req.Apply {
@@ -206,12 +214,15 @@ func BuildDiagnosticReport(plan ExecutionPlan, req Request, result Result) Diagn
 			DirectExecDescription: directExecutionDescription(plan.Target),
 		},
 		Environment: EnvironmentDiagnostics{
-			RuntimeRoot:      runtimeRoot,
-			CWD:              plan.Cwd,
-			Kept:             append([]string(nil), audit.Kept...),
-			Removed:          append([]string(nil), audit.Removed...),
-			Indicators:       append([]string(nil), audit.Indicators...),
-			SanitizedSummary: audit.SanitizedSummary,
+			RuntimeRoot:       runtimeRoot,
+			RuntimeRootSource: runtimeRootSource,
+			CWD:               plan.Cwd,
+			State:             string(envDetection.State),
+			Description:       envDetection.Description,
+			Kept:              append([]string(nil), audit.Kept...),
+			Removed:           append([]string(nil), audit.Removed...),
+			Indicators:        append([]string(nil), envDetection.Evidence...),
+			SanitizedSummary:  audit.SanitizedSummary,
 		},
 		Runtime: RuntimeDiagnostics{
 			PTInterp: plan.Target.Interpreter,
@@ -233,7 +244,7 @@ func BuildDiagnosticReport(plan ExecutionPlan, req Request, result Result) Diagn
 			StartError: result.StartError,
 			Started:    req.Apply && result.StartError == "",
 		},
-		Hints: buildLikelyCauseHints(plan, result, exists, execPerm, audit.Indicators),
+		Hints: buildLikelyCauseHints(plan, result, exists, execPerm, envDetection),
 	}
 	return d
 }
@@ -245,6 +256,19 @@ func planRuntimeRootFromPlan(plan ExecutionPlan) string {
 		}
 	}
 	return ""
+}
+
+func resolveRuntimeRootForReport(plan ExecutionPlan) (string, string) {
+	if root := strings.TrimSpace(plan.RuntimeRoot); root != "" {
+		return root, "configured"
+	}
+	if root := strings.TrimSpace(planRuntimeRootFromPlan(plan)); root != "" {
+		return root, "plan-environment"
+	}
+	if root, err := aclruntime.DefaultRoot(); err == nil && strings.TrimSpace(root) != "" {
+		return root, "detected"
+	}
+	return "", "unknown"
 }
 
 func splitExecutionEnv(env []string) (removed []string, kept []string) {
@@ -263,38 +287,175 @@ func summarizeSanitizedEnvironment(kept, removed, indicators []string) string {
 	parts = append(parts, fmt.Sprintf("%d kept", len(kept)))
 	parts = append(parts, fmt.Sprintf("%d removed", len(removed)))
 	if len(indicators) > 0 {
-		parts = append(parts, fmt.Sprintf("%d indicators", len(indicators)))
+		parts = append(parts, fmt.Sprintf("%d evidence items", len(indicators)))
 	}
 	return strings.Join(parts, ", ")
 }
 
-func detectExecutionIndicators() []string {
-	var indicators []string
-	checks := []struct {
-		name string
-		ok   bool
-	}{
-		{"TERMUX_VERSION", strings.TrimSpace(os.Getenv("TERMUX_VERSION")) != ""},
-		{"PREFIX", strings.TrimSpace(os.Getenv("PREFIX")) != ""},
-		{"PROOT", hasAnyEnvPrefix("PROOT_")},
-		{"QEMU", hasAnyEnvPrefix("QEMU_")},
-		{"CHROOT", strings.TrimSpace(os.Getenv("CHROOT")) != ""},
-	}
-	for _, check := range checks {
-		if check.ok {
-			indicators = append(indicators, check.name)
-		}
-	}
-	return indicators
+type EnvironmentState string
+
+const (
+	EnvironmentStateUnknown      EnvironmentState = "unknown"
+	EnvironmentStateNativeTermux EnvironmentState = "native-termux"
+	EnvironmentStateProot        EnvironmentState = "proot"
+)
+
+type EnvironmentDetection struct {
+	State       EnvironmentState
+	Description string
+	Evidence    []string
 }
 
-func hasAnyEnvPrefix(prefix string) bool {
-	for _, kv := range os.Environ() {
-		if strings.HasPrefix(kv, prefix) {
+var procSelfRootReader = currentProcSelfRoot
+var executionEnvironmentDetector = detectExecutionEnvironment
+
+func detectExecutionEnvironment() EnvironmentDetection {
+	return detectExecutionEnvironmentFromEnv(os.Environ(), procSelfRootReader())
+}
+
+func detectExecutionEnvironmentFromEnv(env []string, procSelfRoot string) EnvironmentDetection {
+	values := make(map[string]string, len(env))
+	for _, kv := range env {
+		key := kv
+		value := ""
+		if idx := strings.IndexByte(kv, '='); idx >= 0 {
+			key = kv[:idx]
+			value = kv[idx+1:]
+		}
+		values[key] = value
+	}
+
+	var termuxEvidence []string
+	var prootEvidence []string
+
+	addTermuxEvidence := func(label, value string) {
+		if value == "" {
+			termuxEvidence = append(termuxEvidence, label)
+			return
+		}
+		termuxEvidence = append(termuxEvidence, fmt.Sprintf("%s=%s", label, value))
+	}
+
+	if v := strings.TrimSpace(values["TERMUX_VERSION"]); v != "" {
+		addTermuxEvidence("TERMUX_VERSION", v)
+	}
+	if v := strings.TrimSpace(values["PREFIX"]); isNativeTermuxPrefix(v) {
+		addTermuxEvidence("PREFIX", v)
+	}
+	if v := strings.TrimSpace(values["TERMUX_PREFIX"]); isNativeTermuxPrefix(v) {
+		addTermuxEvidence("TERMUX_PREFIX", v)
+	}
+	if v := strings.TrimSpace(values["HOME"]); isNativeTermuxHome(v) {
+		addTermuxEvidence("HOME", v)
+	}
+	if v := strings.TrimSpace(values["TERMUX_HOME"]); isNativeTermuxHome(v) {
+		addTermuxEvidence("TERMUX_HOME", v)
+	}
+	if v := strings.TrimSpace(values["TERMUX__PREFIX"]); isNativeTermuxPrefix(v) {
+		addTermuxEvidence("TERMUX__PREFIX", v)
+	}
+	if v := strings.TrimSpace(values["TERMUX__ROOTFS_DIR"]); v != "" && strings.Contains(v, "/data/data/com.termux/files") {
+		addTermuxEvidence("TERMUX__ROOTFS_DIR", v)
+	}
+	if v := strings.TrimSpace(values["TERMUX_MAIN_PACKAGE_FORMAT"]); v != "" {
+		addTermuxEvidence("TERMUX_MAIN_PACKAGE_FORMAT", v)
+	}
+	if v := strings.TrimSpace(values["TERMUX__HOME"]); isNativeTermuxHome(v) {
+		addTermuxEvidence("TERMUX__HOME", v)
+	}
+
+	if hasAnyEnvPrefixInValues(values, "PROOT_") {
+		prootEvidence = append(prootEvidence, "PROOT_*")
+	}
+	if hasAnyEnvPrefixInValues(values, "QEMU_") {
+		prootEvidence = append(prootEvidence, "QEMU_*")
+	}
+	if strings.TrimSpace(values["CHROOT"]) != "" {
+		prootEvidence = append(prootEvidence, "CHROOT")
+	}
+	if rootEvidence := prootRootEvidence(procSelfRoot); rootEvidence != "" {
+		prootEvidence = append(prootEvidence, rootEvidence)
+	}
+	if rootfsEvidence := prootRootfsEnvEvidence(values); rootfsEvidence != "" {
+		prootEvidence = append(prootEvidence, rootfsEvidence)
+	}
+
+	switch {
+	case len(prootEvidence) > 0:
+		return EnvironmentDetection{
+			State:       EnvironmentStateProot,
+			Description: "PRoot/proot-distro detected",
+			Evidence:    dedupeStrings(append(termuxEvidence, prootEvidence...)),
+		}
+	case len(termuxEvidence) > 0:
+		return EnvironmentDetection{
+			State:       EnvironmentStateNativeTermux,
+			Description: "native Termux detected",
+			Evidence:    dedupeStrings(termuxEvidence),
+		}
+	default:
+		return EnvironmentDetection{
+			State:       EnvironmentStateUnknown,
+			Description: "environment unknown",
+		}
+	}
+}
+
+func currentProcSelfRoot() string {
+	root, err := os.Readlink("/proc/self/root")
+	if err != nil {
+		return ""
+	}
+	return root
+}
+
+func hasAnyEnvPrefixInValues(values map[string]string, prefix string) bool {
+	for key := range values {
+		if strings.HasPrefix(key, prefix) {
 			return true
 		}
 	}
 	return false
+}
+
+func isNativeTermuxPrefix(value string) bool {
+	value = filepath.Clean(strings.TrimSpace(value))
+	return strings.HasPrefix(value, "/data/data/com.termux/files/usr")
+}
+
+func isNativeTermuxHome(value string) bool {
+	value = filepath.Clean(strings.TrimSpace(value))
+	return strings.HasPrefix(value, "/data/data/com.termux/files/home")
+}
+
+func prootRootEvidence(procSelfRoot string) string {
+	root := strings.TrimSpace(procSelfRoot)
+	if root == "" || root == "/" {
+		return ""
+	}
+	lower := strings.ToLower(root)
+	switch {
+	case strings.Contains(lower, "proot-distro"),
+		strings.Contains(lower, "/installed-rootfs/"),
+		strings.Contains(lower, "/rootfs/"),
+		strings.Contains(lower, "ubuntu"),
+		strings.Contains(lower, "debian"),
+		strings.Contains(lower, "alpine"),
+		strings.Contains(lower, "fedora"),
+		strings.Contains(lower, "arch"):
+		return "/proc/self/root=" + root
+	default:
+		return ""
+	}
+}
+
+func prootRootfsEnvEvidence(values map[string]string) string {
+	for _, key := range []string{"PROOT_ROOTFS", "TERMUX__ROOTFS_DIR"} {
+		if v := strings.TrimSpace(values[key]); v != "" && (strings.Contains(strings.ToLower(v), "proot-distro") || strings.Contains(strings.ToLower(v), "rootfs")) {
+			return key + "=" + v
+		}
+	}
+	return ""
 }
 
 func directExecutionDescription(ins aclscan.Inspection) string {
@@ -323,7 +484,7 @@ func likelyTargetSource(plan ExecutionPlan) string {
 	}
 }
 
-func buildLikelyCauseHints(plan ExecutionPlan, result Result, exists, execPerm bool, indicators []string) []string {
+func buildLikelyCauseHints(plan ExecutionPlan, result Result, exists, execPerm bool, env EnvironmentDetection) []string {
 	var hints []string
 	if !exists {
 		hints = append(hints, "target path does not exist")
@@ -331,8 +492,13 @@ func buildLikelyCauseHints(plan ExecutionPlan, result Result, exists, execPerm b
 	if exists && !execPerm {
 		hints = append(hints, "target is not marked executable")
 	}
-	if len(indicators) > 0 {
-		hints = append(hints, "execution appears to be inside proot/chroot/container-like environment; native Termux evidence is still required")
+	switch env.State {
+	case EnvironmentStateNativeTermux:
+		// Native Termux is the target runtime; do not suggest container-like evidence is required.
+	case EnvironmentStateProot:
+		hints = append(hints, "execution appears to be inside PRoot/proot-distro or chroot-like environment")
+	case EnvironmentStateUnknown:
+		hints = append(hints, "environment could not be classified as native Termux or PRoot/proot-distro")
 	}
 	if plan.TargetClass == TargetClassRustLauncher && result.StartError != "" {
 		hints = append(hints, "Rust launcher wrappers need direct kernel exec; inspect wrapper-specific /proc/self/exe behavior and target resolution")

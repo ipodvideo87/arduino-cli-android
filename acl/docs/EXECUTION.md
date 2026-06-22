@@ -35,8 +35,9 @@ Only Linux ELF binaries that actually need the copied ACL runtime go through the
 `acl-exec` prints a structured diagnostic report for both dry-run and `--apply`.
 That report is meant to support:
 
-- `✅ Verified in PRoot` evidence for planning, environment sanitization, and report shape
-- `⚠ Requires native Termux validation` evidence for direct execution of patched binaries and Rust launcher wrappers
+- `native Termux detected` evidence when the session is running in Termux with Termux paths and no proot/chroot markers
+- `PRoot/proot-distro detected` evidence when proot-style markers or rootfs evidence are present
+- `environment unknown` when the session does not provide enough evidence to classify it
 
 The diagnostic report includes the target, selected strategy, runtime information,
 sanitized environment audit, execution result, and likely-cause hints. It is designed

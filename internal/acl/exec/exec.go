@@ -377,8 +377,8 @@ func sanitizeExecutionEnvWithAudit(baseEnv []string, additions []string) ([]stri
 	}
 	audit.KeptCount = len(audit.Kept)
 	audit.RemovedCount = len(audit.Removed)
-	audit.Indicators = detectExecutionIndicators()
-	audit.SanitizedSummary = fmt.Sprintf("%d kept, %d removed, %d indicators", audit.KeptCount, audit.RemovedCount, len(audit.Indicators))
+	audit.Indicators = detectExecutionEnvironment().Evidence
+	audit.SanitizedSummary = fmt.Sprintf("%d kept, %d removed, %d evidence items", audit.KeptCount, audit.RemovedCount, len(audit.Indicators))
 	return env, audit
 }
 
