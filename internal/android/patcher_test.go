@@ -60,6 +60,24 @@ func TestPatchInstallTreeIgnoresScripts(t *testing.T) {
 	require.NoError(t, patchInstallTree(root, false, "android"))
 }
 
+func TestPatchInstallTreeRepairsMissingExecuteBitsForExecutableFiles(t *testing.T) {
+	root := t.TempDir()
+	hostExe, err := os.Executable()
+	require.NoError(t, err)
+
+	elfPath := filepath.Join(root, "bin", "xtensa-esp-elf-gcc")
+	require.NoError(t, os.MkdirAll(filepath.Dir(elfPath), 0o755))
+	copyFile(t, hostExe, elfPath, 0o600)
+
+	scriptPath := filepath.Join(root, "bin", "tool.sh")
+	require.NoError(t, os.WriteFile(scriptPath, []byte("#!/bin/sh\necho ok\n"), 0o600))
+
+	require.NoError(t, patchInstallTree(root, false, "android"))
+
+	requireExecutableMode(t, elfPath)
+	requireExecutableMode(t, scriptPath)
+}
+
 func TestPatchSpecForELFSkipsNonAArch64(t *testing.T) {
 	spec, ok := patchSpecForELFFields(elf.EM_X86_64, "EXEC", "/lib64/ld-linux-x86-64.so.2", []string{"libc.so.6"}, "/tmp/runtime")
 	require.False(t, ok)
@@ -80,4 +98,18 @@ func TestPatchSpecForELFSkipsInterpreterForSharedLibraries(t *testing.T) {
 	require.False(t, spec.setInterpreter)
 	require.Empty(t, spec.interpreter)
 	require.Contains(t, spec.rpath, "/tmp/runtime")
+}
+
+func copyFile(t *testing.T, src, dst string, mode os.FileMode) {
+	t.Helper()
+	data, err := os.ReadFile(src)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(dst, data, mode))
+}
+
+func requireExecutableMode(t *testing.T, path string) {
+	t.Helper()
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	require.NotZero(t, info.Mode()&0o111, "expected executable bits for %s", path)
 }

@@ -78,6 +78,11 @@ assets, so ACL now preserves source file modes during runtime packaging and runt
 installation, and validate-compat reports executable or script candidates that arrive
 without `+x`.
 
+For the ESP32 clean-install failure specifically, the key fix sits in the Android
+package install path: after `core install`, ACL now repairs missing execute bits on
+executable/script payloads before ELF patching so backend delegates such as
+`bin/xtensa-esp-elf-gcc` do not stay stranded at `0600`.
+
 ## Validation Guidance
 
 Android execution must be validated from a fresh Termux clone outside proot. The current

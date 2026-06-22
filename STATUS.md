@@ -35,6 +35,7 @@ into reusable infrastructure for Linux-based development tools on Android.
 - ACL package building and runtime installation now preserve executable file modes instead of rewriting everything through a default `0644` create path.
 - ACL compatibility validation now reports executable and script candidates that are missing execute bits.
 - Runtime and package tests now cover executable-mode preservation through builder packaging, runtime installation, and build-runtime CLI packaging.
+- Android tool/platform installation now repairs missing execute bits on executable and script payloads before ELF patching, so delegated launcher backends survive a clean `core install`.
 - The ACL toolchain compatibility validation mode exists, is covered by unit tests, and now separates ignored resources from warnings.
 - Documentation policies are in place and kept aligned with implementation.
 

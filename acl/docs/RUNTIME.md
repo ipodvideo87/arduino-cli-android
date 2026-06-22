@@ -112,6 +112,10 @@ The runtime builder and installer also preserve file mode bits now. That matters
 launcher wrappers, scripts, and other platform-specific executables whose package
 format must keep the original `+x` state intact all the way into the installed runtime.
 
+On the Arduino core installer path, Android post-install patching now repairs missing
+execute bits on executable and script payloads before ELF rewriting. That keeps backend
+delegates from being left behind with `0600`/`0700`-style modes after a clean install.
+
 ## Manual Package Build
 
 Use the builder CLI to create a package from source assets:

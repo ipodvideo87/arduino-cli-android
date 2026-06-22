@@ -58,7 +58,16 @@ func patchExecutable(path, runtimeDir string) error {
 		return nil
 	}
 
-	return patchWithPatchelf(path, spec)
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	originalMode := info.Mode()
+
+	if err := patchWithPatchelf(path, spec); err != nil {
+		return err
+	}
+	return os.Chmod(path, originalMode)
 }
 
 func patchSpecForELF(f *elf.File, runtimeDir string) (patchSpec, bool) {
