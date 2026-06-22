@@ -1,30 +1,53 @@
 # ACL Execution
 
-ACL execution starts with planning, not launch. `acl-exec` inspects a target ELF binary,
-selects the active runtime, and prints the execution plan by default.
+ACL execution starts with planning, not launch. `acl-exec` classifies the target ELF
+and then chooses between direct execution and an explicit ACL loader strategy.
 
 ## Modes
 
 - dry-run: plan only, no execution
 - `--apply`: explicit experimental execution path
 
+## Decision Matrix
+
+`acl-exec` now makes the target class explicit:
+
+- `android-native-elf` and `linux-direct-elf` use direct kernel execution
+- `rust-launcher` uses direct kernel execution so the wrapper keeps its own identity
+- `patched-linux-elf` uses the explicit ACL loader strategy
+
+The direct path is the default for Rust launcher wrappers and Android-native binaries.
+Only Linux ELF binaries that actually need the copied ACL runtime go through the loader.
+
 ## What the Plan Contains
 
 - target path and ELF metadata
-- active runtime ID and path
-- loader path
-- runtime library paths
+- target class and launch mode
+- active runtime data when the explicit-loader path is selected
+- loader path and runtime library paths when required
 - argv
 - cwd
 - environment additions
 - warnings, errors, and whether execution is allowed
 
+## Diagnostics
+
+`acl-exec` prints a structured diagnostic report for both dry-run and `--apply`.
+That report is meant to support:
+
+- `✅ Verified in PRoot` evidence for planning, environment sanitization, and report shape
+- `⚠ Requires native Termux validation` evidence for direct execution of patched binaries and Rust launcher wrappers
+
+The diagnostic report includes the target, selected strategy, runtime information,
+sanitized environment audit, execution result, and likely-cause hints. It is designed
+to make native failures actionable without mixing ad hoc prints into the execution code.
+
 ## Current Status
 
 Execution planning exists, and the first real execution backend now exists behind
-`--apply`. This backend is still experimental and intentionally narrow in scope. It
-attempts explicit loader-based execution using the selected active runtime rather than
-claiming transparent Android compatibility.
+`--apply`. The backend is intentionally narrow in scope. It now executes Rust launcher
+wrappers and Android-native ELF binaries directly, while reserving the ACL loader for
+patched Linux ELF binaries that still require it.
 
 A successful dry run does not prove Android-native compatibility.
 
@@ -32,20 +55,18 @@ A successful dry run does not prove Android-native compatibility.
 
 When `--apply` is used, `acl-exec` currently:
 
-- requires a valid active runtime
-- validates the target, loader, library search path, and cwd before launch
-- launches the target directly so the kernel and PT_INTERP preserve executable identity
+- keeps the selected runtime only when the explicit-loader path is needed
+- validates the target, runtime, loader, library search path, and cwd before launch
+- executes direct-target binaries without forcing them through the loader
 - captures stdout, stderr, and exit status where practical
 
-This direct-kernel-exec strategy is deliberate. The ESP32 Rust launcher wrappers expect
-their own executable identity to remain intact, and explicit loader invocation changes
-what the process sees as `/proc/self/exe`. That is why the launcher path is now the
-preferred execution plan.
+This strategy avoids the `/proc/self/exe` identity problem that broke the ESP32 Rust
+launcher wrappers under explicit loader invocation.
 
 The selected runtime still must be self-contained enough to satisfy the loader's
-library lookups on Android. A copied Termux loader that still falls back to the
-original glibc tree can still fail before the target binary itself starts, but that is
-now a runtime portability blocker rather than the default execution plan.
+library lookups on Android when the loader strategy is chosen. A copied Termux loader
+that still falls back to the original glibc tree can still fail before the target binary
+itself starts, but that is now limited to explicit-loader launches.
 
 This is the first execution backend, not final proof that Linux-oriented tooling works
 correctly on Android.

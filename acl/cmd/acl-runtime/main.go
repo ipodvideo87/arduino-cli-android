@@ -30,7 +30,7 @@ func newRootCommand() *cobra.Command {
 		return aclruntime.NewManager(root)
 	}
 
-	cmd.PersistentFlags().StringVar(&root, "root", "", "ACL runtime store root (defaults to ACL_RUNTIME_ROOT or the user config dir)")
+	cmd.PersistentFlags().StringVar(&root, "root", "", "ACL runtime store root (defaults to ACL_RUNTIME_ROOT, HOME, PREFIX, or ./acl-runtime)")
 	cmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Print JSON output")
 
 	cmd.AddCommand(&cobra.Command{

@@ -27,6 +27,11 @@ into reusable infrastructure for Linux-based development tools on Android.
   failures.
 - The ACL execution planner exists.
 - The initial execution backend exists behind `--apply`.
+- ACL execution now distinguishes direct execution for Rust launcher wrappers and Android-native ELF from explicit-loader execution for patched Linux ELF binaries.
+- ACL execution now sanitizes the launch environment to remove LD, QEMU, and PROOT leakage while preserving normal Termux and Android variables.
+- ACL runtime discovery now prefers `ACL_RUNTIME_ROOT`, then `HOME/.arduino-cli-android/acl-runtime`, then `PREFIX/opt/arduino-cli-android/acl-runtime`, then `./acl-runtime`.
+- ACL execution now emits structured diagnostics for dry-run and `--apply` so native Termux failures can be triaged with target, runtime, environment, and result evidence.
+- `validate-compat` now treats Rust launcher wrappers as ELF executables again.
 - The ACL toolchain compatibility validation mode exists, is covered by unit tests, and now separates ignored resources from warnings.
 - Documentation policies are in place and kept aligned with implementation.
 

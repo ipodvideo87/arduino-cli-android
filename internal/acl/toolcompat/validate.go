@@ -372,7 +372,12 @@ func hasAnyRuntimePath(entry Entry) bool {
 }
 
 func isELFEntry(entry Entry) bool {
-	return strings.EqualFold(strings.TrimSpace(entry.ExecutableType), "elf")
+	switch strings.ToLower(strings.TrimSpace(entry.ExecutableType)) {
+	case "elf", CategoryRustLauncher:
+		return true
+	default:
+		return false
+	}
 }
 
 func isScriptEntry(entry Entry) bool {

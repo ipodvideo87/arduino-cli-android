@@ -82,6 +82,48 @@ func TestRuntimeManagerInstallDiscoverValidateAndSelect(t *testing.T) {
 	require.NotEmpty(t, FormatValidation(report))
 }
 
+func TestDefaultRootPriorityOrder(t *testing.T) {
+	originalWD, err := os.Getwd()
+	require.NoError(t, err)
+
+	homeDir := t.TempDir()
+	prefixDir := t.TempDir()
+	cwdDir := t.TempDir()
+	envRoot := t.TempDir()
+
+	t.Setenv("HOME", homeDir)
+	t.Setenv("PREFIX", prefixDir)
+	t.Setenv("ACL_RUNTIME_ROOT", envRoot)
+
+	require.NoError(t, os.Chdir(cwdDir))
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(originalWD))
+	})
+
+	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".arduino-cli-android", "acl-runtime"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(prefixDir, "opt", "arduino-cli-android", "acl-runtime"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(cwdDir, "acl-runtime"), 0o755))
+
+	root, err := DefaultRoot()
+	require.NoError(t, err)
+	require.Equal(t, filepath.Clean(envRoot), filepath.Clean(root))
+
+	t.Setenv("ACL_RUNTIME_ROOT", "")
+	root, err = DefaultRoot()
+	require.NoError(t, err)
+	require.Equal(t, filepath.Clean(filepath.Join(homeDir, ".arduino-cli-android", "acl-runtime")), filepath.Clean(root))
+
+	require.NoError(t, os.RemoveAll(filepath.Join(homeDir, ".arduino-cli-android", "acl-runtime")))
+	root, err = DefaultRoot()
+	require.NoError(t, err)
+	require.Equal(t, filepath.Clean(filepath.Join(prefixDir, "opt", "arduino-cli-android", "acl-runtime")), filepath.Clean(root))
+
+	require.NoError(t, os.RemoveAll(filepath.Join(prefixDir, "opt", "arduino-cli-android", "acl-runtime")))
+	root, err = DefaultRoot()
+	require.NoError(t, err)
+	require.Equal(t, filepath.Clean(filepath.Join(cwdDir, "acl-runtime")), filepath.Clean(root))
+}
+
 func writeManifest(t *testing.T, path string, manifest Manifest) {
 	t.Helper()
 	data, err := json.MarshalIndent(manifest, "", "  ")

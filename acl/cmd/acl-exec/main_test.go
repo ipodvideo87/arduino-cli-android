@@ -48,8 +48,8 @@ func TestRunDryRunDefault(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	rc := run([]string{"--runtime-root", t.TempDir(), "--target", "/tmp/tool", "--", "--version"}, &stdout, &stderr)
 	require.Equal(t, 0, rc)
-	require.Contains(t, stdout.String(), "ACL Execution Planner")
-	require.Contains(t, stdout.String(), "Apply mode: false")
+	require.Contains(t, stdout.String(), "ACL Execution Diagnostics")
+	require.Contains(t, stdout.String(), "Planner strategy:")
 	require.Empty(t, stderr.String())
 }
 
@@ -75,6 +75,6 @@ func TestRunApplyReturnsBackendExitCode(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	rc := run([]string{"--runtime-root", t.TempDir(), "--target", "/tmp/tool", "--apply", "--", "--version"}, &stdout, &stderr)
 	require.Equal(t, 17, rc)
-	require.Contains(t, stdout.String(), "Apply mode: true")
+	require.Contains(t, stdout.String(), "ACL Execution Diagnostics")
 	require.Contains(t, stderr.String(), "execution failed with exit code 17")
 }

@@ -8,6 +8,9 @@ The runtime manager sits alongside that pipeline as the control plane for instal
 runtimes. It does not execute binaries; it discovers, validates, selects, and tracks
 runtime packages.
 
+For a more detailed description of where code belongs across ACL and Arduino CLI, see
+[LAYERING.md](LAYERING.md).
+
 ## Runtime Flow
 
 - `scanner` inspects ELF files and extracts runtime requirements.
@@ -100,7 +103,9 @@ The first execution layer is intentionally narrow:
 - dry-run planning is the default
 - `--apply` is explicit and experimental
 - the planner reuses scanner output and runtime validation before building a plan
-- the first real execution backend invokes the selected runtime loader explicitly
+- the planner now distinguishes direct kernel exec from explicit loader execution
+- Rust launcher wrappers and Android-native ELF use direct execution
+- patched Linux ELF binaries still use the selected runtime loader explicitly
 - execution proof on native Android is still a later milestone
 
 Android-native validation must still be performed from a fresh Termux environment after

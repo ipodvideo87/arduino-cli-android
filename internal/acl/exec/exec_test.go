@@ -19,12 +19,11 @@ import (
 )
 
 func TestBuildPlanDryRun(t *testing.T) {
-	root := t.TempDir()
-	_, _ = installRuntimeFixture(t, root, "acl-exec-runtime", "stable")
-
 	target := mustExecutable(t)
+	hostArch := hostArchitecture(t, target)
 	cwd := filepath.Dir(target)
-	planner := NewPlanner(root)
+	root := t.TempDir()
+	planner := NewPlannerWithInspector(root, directExecInspection(target, hostArch))
 	plan, err := planner.BuildPlan(Request{
 		RuntimeRoot: root,
 		TargetPath:  target,
@@ -37,16 +36,13 @@ func TestBuildPlanDryRun(t *testing.T) {
 	require.Equal(t, "--board", plan.Argv[1])
 	require.Equal(t, "esp32", plan.Argv[2])
 	require.Equal(t, cwd, plan.Cwd)
-	require.NotEmpty(t, plan.RuntimeID)
-	require.NotEmpty(t, plan.LoaderPath)
-	require.NotEmpty(t, plan.LibraryPaths)
+	require.Empty(t, plan.RuntimeID)
+	require.Empty(t, plan.LoaderPath)
+	require.Empty(t, plan.LibraryPaths)
+	require.Equal(t, TargetClassAndroidNative, plan.TargetClass)
 	require.Equal(t, LaunchModeDirectExec, plan.LaunchMode)
-	require.Contains(t, plan.Environment, "ACL_RUNTIME_ID="+plan.RuntimeID)
 	require.Contains(t, plan.Environment, "ACL_RUNTIME_ROOT="+root)
-	require.NotContains(t, plan.Environment, "LD_LIBRARY_PATH="+plan.LibrarySearchPath)
-	require.Equal(t, filepath.Join(plan.RuntimePath, "loader", "ld-linux-test.so"), plan.LoaderPath)
-	require.Equal(t, 1, len(plan.LibraryPaths))
-	require.Equal(t, filepath.Join(plan.RuntimePath, "lib", "libacl-test.so"), plan.LibraryPaths[0])
+	require.Equal(t, []string{target, "--board", "esp32"}, plan.Command)
 }
 
 func TestBuildPlanRejectsMissingTarget(t *testing.T) {
@@ -71,8 +67,9 @@ func TestBuildPlanRejectsNonELF(t *testing.T) {
 
 func TestBuildPlanRejectsMissingActiveRuntime(t *testing.T) {
 	target := mustExecutable(t)
-	planner := NewPlanner(t.TempDir())
-	_, err := planner.BuildPlan(Request{RuntimeRoot: t.TempDir(), TargetPath: target})
+	hostArch := hostArchitecture(t, target)
+	planner := NewPlannerWithInspector(t.TempDir(), explicitLoaderInspection(target, hostArch))
+	_, err := planner.BuildPlan(Request{TargetPath: target})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no active runtime")
 }
@@ -83,31 +80,23 @@ func TestBuildPlanRejectsIncompatibleRuntime(t *testing.T) {
 
 	target := mustExecutable(t)
 	planner := NewPlannerWithInspector(root, func(string) (aclscan.Inspection, error) {
-		return aclscan.Inspection{
-			Path:                 target,
-			Exists:               true,
-			IsELF:                true,
-			Machine:              "ARM",
-			FileType:             "EXEC",
-			LooksLikeLinuxTarget: true,
-		}, nil
+		return explicitLoaderInspectionWithMachine(target, "ARM"), nil
 	})
-	plan, err := planner.BuildPlan(Request{
+	_, err := planner.BuildPlan(Request{
 		RuntimeRoot: root,
 		TargetPath:  target,
 	})
 	require.Error(t, err)
-	require.False(t, plan.Allowed)
 	require.Contains(t, err.Error(), "incompatible")
 }
 
 func TestBuildPlanConstructsEnvironmentAndPreservesArgv(t *testing.T) {
 	root := t.TempDir()
-	_, _ = installRuntimeFixture(t, root, "acl-exec-runtime", "stable")
 
 	target := mustExecutable(t)
+	hostArch := hostArchitecture(t, target)
 	customCwd := t.TempDir()
-	planner := NewPlanner(root)
+	planner := NewPlannerWithInspector(root, directExecInspection(target, hostArch))
 	plan, err := planner.BuildPlan(Request{
 		RuntimeRoot: root,
 		TargetPath:  target,
@@ -117,30 +106,16 @@ func TestBuildPlanConstructsEnvironmentAndPreservesArgv(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{target, "one", "two"}, plan.Argv)
 	require.Equal(t, customCwd, plan.Cwd)
-	require.Contains(t, plan.Environment, "ACL_RUNTIME_ID="+plan.RuntimeID)
-	require.Contains(t, plan.Environment, "ACL_RUNTIME_DIR="+plan.RuntimePath)
-	require.Contains(t, plan.Environment, "ACL_RUNTIME_LOADER="+plan.LoaderPath)
-	require.NotContains(t, plan.Environment, "LD_LIBRARY_PATH="+plan.LibrarySearchPath)
+	require.Equal(t, TargetClassAndroidNative, plan.TargetClass)
 	require.Equal(t, LaunchModeDirectExec, plan.LaunchMode)
+	require.Contains(t, plan.Environment, "ACL_RUNTIME_ROOT="+root)
 }
 
 func TestBuildPlanWarnsOnRustLauncherAndUsesDirectExec(t *testing.T) {
 	root := t.TempDir()
-	_, _ = installRuntimeFixture(t, root, "acl-exec-runtime", "stable")
-
 	target := mustExecutable(t)
-	planner := NewPlannerWithInspector(root, func(string) (aclscan.Inspection, error) {
-		return aclscan.Inspection{
-			Path:                  target,
-			Exists:                true,
-			IsELF:                 true,
-			Machine:               hostArchitecture(t, target),
-			FileType:              "EXEC",
-			Interpreter:           "/lib64/ld-linux-aarch64.so.1",
-			LooksLikeLinuxTarget:  true,
-			LooksLikeRustLauncher: true,
-		}, nil
-	})
+	hostArch := hostArchitecture(t, target)
+	planner := NewPlannerWithInspector(root, rustLauncherInspection(target, hostArch))
 
 	plan, err := planner.BuildPlan(Request{
 		RuntimeRoot: root,
@@ -148,9 +123,38 @@ func TestBuildPlanWarnsOnRustLauncherAndUsesDirectExec(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, LaunchModeDirectExec, plan.LaunchMode)
-	require.Equal(t, []string{target}, plan.Command[:1])
+	require.Equal(t, TargetClassRustLauncher, plan.TargetClass)
+	require.Empty(t, plan.LoaderPath)
+	require.Equal(t, []string{target}, plan.Command)
 	require.NotEmpty(t, plan.Warnings)
 	require.Contains(t, strings.Join(plan.Warnings, " "), "Rust launcher")
+}
+
+func TestBuildPlanUsesExplicitLoaderForPatchedLinuxELF(t *testing.T) {
+	root := t.TempDir()
+	installed, _ := installRuntimeFixture(t, root, "acl-exec-runtime", "stable")
+
+	target := mustExecutable(t)
+	hostArch := hostArchitecture(t, target)
+	planner := NewPlannerWithInspector(root, explicitLoaderInspection(target, hostArch))
+
+	plan, err := planner.BuildPlan(Request{
+		RuntimeRoot: root,
+		TargetPath:  target,
+		Args:        []string{"--version"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, LaunchModeExplicitLoader, plan.LaunchMode)
+	require.Equal(t, TargetClassPatchedLinux, plan.TargetClass)
+	require.NotEmpty(t, plan.RuntimeID)
+	require.Equal(t, installed.ID, plan.RuntimeID)
+	require.NotEmpty(t, plan.LoaderPath)
+	require.NotEmpty(t, plan.LibrarySearchPath)
+	require.Equal(t, filepath.Join(plan.RuntimePath, "loader", "ld-linux-test.so"), plan.LoaderPath)
+	require.Contains(t, plan.Environment, "ACL_RUNTIME_ID="+plan.RuntimeID)
+	require.Contains(t, plan.Environment, "ACL_RUNTIME_DIR="+plan.RuntimePath)
+	require.Contains(t, plan.Environment, "ACL_RUNTIME_LOADER="+plan.LoaderPath)
+	require.Equal(t, []string{plan.LoaderPath, "--library-path", plan.LibrarySearchPath, target, "--version"}, plan.Command)
 }
 
 func TestBuildPlanRejectsUnsafeCWD(t *testing.T) {
@@ -186,11 +190,23 @@ func TestRunApplyDisabledByDefault(t *testing.T) {
 
 func TestRunApplyUsesBackendCommandAndPreservesCWD(t *testing.T) {
 	root := t.TempDir()
-	_, _ = installRuntimeFixture(t, root, "acl-exec-runtime", "stable")
 
 	target := mustExecutable(t)
+	hostArch := hostArchitecture(t, target)
 	customCwd := t.TempDir()
-	planner := NewPlanner(root)
+	t.Setenv("HOME", "/home/test")
+	t.Setenv("PATH", "/usr/bin:/bin")
+	t.Setenv("TMPDIR", "/tmp")
+	t.Setenv("ANDROID_ROOT", "/system")
+	t.Setenv("ANDROID_DATA", "/data")
+	t.Setenv("TERMUX_VERSION", "0.118.0")
+	t.Setenv("ACL_RUNTIME_ROOT", root)
+	t.Setenv("LD_LIBRARY_PATH", "/tmp/termux-glibc")
+	t.Setenv("LD_PRELOAD", "/tmp/boom.so")
+	t.Setenv("LD_AUDIT", "/tmp/audit.so")
+	t.Setenv("QEMU_LD_PREFIX", "/tmp/qemu")
+	t.Setenv("PROOT_NO_SECCOMP", "1")
+	planner := NewPlannerWithInspector(root, directExecInspection(target, hostArch))
 	var gotArgs []string
 	var gotEnv []string
 	var gotDir string
@@ -212,9 +228,18 @@ func TestRunApplyUsesBackendCommandAndPreservesCWD(t *testing.T) {
 	require.Equal(t, "ok", result.Stdout)
 	require.Equal(t, customCwd, gotDir)
 	require.Equal(t, plan.Command, gotArgs)
-	require.Contains(t, gotEnv, "ACL_RUNTIME_ID="+plan.RuntimeID)
-	require.NotContains(t, gotEnv, "LD_LIBRARY_PATH="+plan.LibrarySearchPath)
+	require.Contains(t, gotEnv, "ACL_RUNTIME_ROOT="+root)
+	require.Contains(t, gotEnv, "HOME=/home/test")
+	require.Contains(t, gotEnv, "PATH=/usr/bin:/bin")
+	require.Contains(t, gotEnv, "TMPDIR=/tmp")
+	require.Contains(t, gotEnv, "ANDROID_ROOT=/system")
+	require.Contains(t, gotEnv, "ANDROID_DATA=/data")
+	require.Contains(t, gotEnv, "TERMUX_VERSION=0.118.0")
+	require.NotContains(t, gotEnv, "LD_LIBRARY_PATH=")
 	require.NotContains(t, gotEnv, "LD_PRELOAD=")
+	require.NotContains(t, gotEnv, "LD_AUDIT=")
+	require.NotContains(t, gotEnv, "QEMU_LD_PREFIX=")
+	require.NotContains(t, gotEnv, "PROOT_NO_SECCOMP=")
 }
 
 func TestRunApplyCapturesStdoutStderrAndExitCode(t *testing.T) {
@@ -296,7 +321,8 @@ func TestBuildPlanRejectsInvalidActiveRuntime(t *testing.T) {
 	require.NoError(t, os.Remove(filepath.Join(installed.Path, "lib", "libacl-test.so")))
 
 	target := mustExecutable(t)
-	planner := NewPlanner(root)
+	hostArch := hostArchitecture(t, target)
+	planner := NewPlannerWithInspector(root, explicitLoaderInspection(target, hostArch))
 	_, err := planner.BuildPlan(Request{
 		RuntimeRoot: root,
 		TargetPath:  target,
@@ -335,6 +361,121 @@ func TestExecutePlanDirectExecDoesNotRequireLibrarySearchPath(t *testing.T) {
 	result, err := planner.executePlan(plan)
 	require.NoError(t, err)
 	require.Equal(t, 0, result.ExitCode)
+}
+
+func TestSanitizeExecutionEnvDropsLeakyVariables(t *testing.T) {
+	baseEnv := []string{
+		"HOME=/home/user",
+		"PATH=/usr/bin",
+		"TMPDIR=/tmp",
+		"ANDROID_ROOT=/system",
+		"ANDROID_DATA=/data",
+		"TERMUX_VERSION=0.118.0",
+		"ACL_RUNTIME_ROOT=/data/data/com.termux/files/home/.arduino-cli-android/acl-runtime",
+		"LD_LIBRARY_PATH=/tmp/termux-glibc",
+		"LD_PRELOAD=/tmp/boom.so",
+		"LD_AUDIT=/tmp/audit.so",
+		"QEMU_LD_PREFIX=/tmp/qemu",
+		"PROOT_NO_SECCOMP=1",
+	}
+	additions := []string{
+		"ACL_RUNTIME_ID=acl-exec-runtime",
+		"LD_PRELOAD=/tmp/override.so",
+		"QEMU_CPU=host",
+	}
+
+	env := sanitizeExecutionEnv(baseEnv, additions)
+	require.Contains(t, env, "HOME=/home/user")
+	require.Contains(t, env, "PATH=/usr/bin")
+	require.Contains(t, env, "TMPDIR=/tmp")
+	require.Contains(t, env, "ANDROID_ROOT=/system")
+	require.Contains(t, env, "ANDROID_DATA=/data")
+	require.Contains(t, env, "TERMUX_VERSION=0.118.0")
+	require.Contains(t, env, "ACL_RUNTIME_ROOT=/data/data/com.termux/files/home/.arduino-cli-android/acl-runtime")
+	require.Contains(t, env, "ACL_RUNTIME_ID=acl-exec-runtime")
+	require.NotContains(t, env, "LD_LIBRARY_PATH=/tmp/termux-glibc")
+	require.NotContains(t, env, "LD_PRELOAD=/tmp/boom.so")
+	require.NotContains(t, env, "LD_AUDIT=/tmp/audit.so")
+	require.NotContains(t, env, "QEMU_LD_PREFIX=/tmp/qemu")
+	require.NotContains(t, env, "PROOT_NO_SECCOMP=1")
+	require.NotContains(t, env, "QEMU_CPU=host")
+}
+
+func TestBuildDiagnosticReportMatchesDirectExecPlan(t *testing.T) {
+	root := t.TempDir()
+	target := mustExecutable(t)
+	hostArch := hostArchitecture(t, target)
+	t.Setenv("HOME", "/home/test")
+	t.Setenv("PATH", "/usr/bin:/bin")
+	t.Setenv("TMPDIR", "/tmp")
+	t.Setenv("ANDROID_ROOT", "/system")
+	t.Setenv("ANDROID_DATA", "/data")
+	t.Setenv("TERMUX_VERSION", "0.118.0")
+	t.Setenv("ACL_RUNTIME_ROOT", root)
+	t.Setenv("LD_LIBRARY_PATH", "/tmp/termux-glibc")
+	t.Setenv("PROOT_NO_SECCOMP", "1")
+
+	planner := NewPlannerWithInspector(root, directExecInspection(target, hostArch))
+	plan, err := planner.BuildPlan(Request{
+		RuntimeRoot: root,
+		TargetPath:  target,
+		Cwd:         filepath.Dir(target),
+		Args:        []string{"--verbose"},
+	})
+	require.NoError(t, err)
+
+	report := BuildDiagnosticReport(plan, Request{
+		RuntimeRoot: root,
+		TargetPath:  target,
+		Cwd:         filepath.Dir(target),
+		Args:        []string{"--verbose"},
+		Apply:       false,
+	}, Result{})
+
+	require.Equal(t, target, report.Target.Path)
+	require.Equal(t, filepath.Base(target), report.Target.Basename)
+	require.True(t, report.Target.Exists)
+	require.Equal(t, TargetClassAndroidNative, report.Target.TargetClass)
+	require.True(t, report.Execution.DirectExecution)
+	require.False(t, report.Execution.ExplicitLoader)
+	require.Empty(t, report.Execution.LoaderPath)
+	require.Contains(t, report.Environment.SanitizedSummary, "removed")
+	require.Contains(t, strings.Join(report.Environment.Removed, " "), "LD_LIBRARY_PATH=/tmp/termux-glibc")
+	require.Contains(t, strings.Join(report.Environment.Removed, " "), "PROOT_NO_SECCOMP=1")
+	require.Contains(t, report.Environment.Indicators, "TERMUX_VERSION")
+	require.Equal(t, []string{target, "--verbose"}, report.Runtime.Argv)
+	require.Equal(t, hostArch, report.TargetData.Machine)
+	require.True(t, report.Result.Started == false)
+	require.Empty(t, report.Result.StartError)
+	require.Nil(t, report.Result.ExitCode)
+}
+
+func TestBuildDiagnosticReportIncludesStartFailureEvidence(t *testing.T) {
+	target := "/tmp/missing-tool"
+	report := BuildDiagnosticReport(ExecutionPlan{
+		TargetPath:  target,
+		TargetClass: TargetClassRustLauncher,
+		LaunchMode:  LaunchModeDirectExec,
+		Target: aclscan.Inspection{
+			Path:                  target,
+			IsELF:                 true,
+			LooksLikeRustLauncher: true,
+			LooksLikeLinuxTarget:  true,
+			Interpreter:           "/lib64/ld-linux-aarch64.so.1",
+			ImportedLibraries:     []string{"libc.so.6"},
+		},
+		Argv: []string{target, "--version"},
+	}, Request{TargetPath: target, Apply: true}, Result{
+		ExitCode:   1,
+		StartError: "execution failed to start: fork/exec /tmp/missing-tool: no such file or directory",
+		Errno:      "no such file or directory",
+	})
+
+	require.Contains(t, strings.Join(report.Hints, " "), "proot/chroot/container")
+	require.Contains(t, strings.Join(report.Hints, " "), "Rust launcher wrappers need direct kernel exec")
+	require.Equal(t, "no such file or directory", report.Result.Errno)
+	require.Equal(t, 1, *report.Result.ExitCode)
+	require.False(t, report.Result.Started)
 }
 
 func installRuntimeFixture(t *testing.T, root, runtimeID, compatibility string) (aclruntime.Runtime, string) {
@@ -462,6 +603,52 @@ func mustExecutable(t *testing.T) string {
 	exe, err := os.Executable()
 	require.NoError(t, err)
 	return exe
+}
+
+func directExecInspection(target, machine string) func(string) (aclscan.Inspection, error) {
+	return func(string) (aclscan.Inspection, error) {
+		return aclscan.Inspection{
+			Path:                 target,
+			Exists:               true,
+			IsELF:                true,
+			Machine:              machine,
+			FileType:             "EXEC",
+			LooksLikeLinuxTarget: false,
+		}, nil
+	}
+}
+
+func rustLauncherInspection(target, machine string) func(string) (aclscan.Inspection, error) {
+	return func(string) (aclscan.Inspection, error) {
+		return aclscan.Inspection{
+			Path:                  target,
+			Exists:                true,
+			IsELF:                 true,
+			Machine:               machine,
+			FileType:              "EXEC",
+			Interpreter:           "/lib64/ld-linux-aarch64.so.1",
+			LooksLikeLinuxTarget:  true,
+			LooksLikeRustLauncher: true,
+		}, nil
+	}
+}
+
+func explicitLoaderInspection(target, machine string) func(string) (aclscan.Inspection, error) {
+	return func(string) (aclscan.Inspection, error) {
+		return explicitLoaderInspectionWithMachine(target, machine), nil
+	}
+}
+
+func explicitLoaderInspectionWithMachine(target, machine string) aclscan.Inspection {
+	return aclscan.Inspection{
+		Path:                 target,
+		Exists:               true,
+		IsELF:                true,
+		Machine:              machine,
+		FileType:             "EXEC",
+		Interpreter:          "/lib64/ld-linux-aarch64.so.1",
+		LooksLikeLinuxTarget: true,
+	}
 }
 
 func sha256Hex(path string) (string, error) {

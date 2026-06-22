@@ -24,9 +24,10 @@ import (
 	"io"
 	"maps"
 	"os"
+	"os/exec"
 	"runtime"
-	"strings"
 	"sync"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,6 +37,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+)
+
+var (
+	arduinoCLIBuildOnce sync.Once
+	arduinoCLIBuildErr  error
 )
 
 // FindRepositoryRootPath returns the repository root path
@@ -51,7 +57,61 @@ func FindRepositoryRootPath(t *testing.T) *paths.Path {
 
 // FindArduinoCLIPath returns the path to the arduino-cli executable
 func FindArduinoCLIPath(t *testing.T) *paths.Path {
-	return FindRepositoryRootPath(t).Join("arduino-cli")
+	repoRootPath := FindRepositoryRootPath(t)
+	ensureArduinoCLIBinary(t, repoRootPath)
+	return repoRootPath.Join("arduino-cli")
+}
+
+func ensureArduinoCLIBinary(t *testing.T, repoRootPath *paths.Path) {
+	t.Helper()
+
+	arduinoCLIBuildOnce.Do(func() {
+		binaryPath := repoRootPath.Join("arduino-cli")
+		if binaryPath.Exist() {
+			return
+		}
+
+		lockPath := repoRootPath.Join(".arduino-cli-build.lock")
+		for {
+			lockFile, err := os.OpenFile(lockPath.String(), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+			if err == nil {
+				_ = lockFile.Close()
+				defer func() {
+					_ = os.Remove(lockPath.String())
+				}()
+
+				if binaryPath.Exist() {
+					return
+				}
+
+				versionPkg := "github.com/arduino/arduino-cli/internal/version"
+				ldflags := fmt.Sprintf(
+					"-X %s.versionString=0.0.0-test.preview -X %s.commit=deadbeef -X %s.date=%s",
+					versionPkg,
+					versionPkg,
+					versionPkg,
+					time.Now().UTC().Format(time.RFC3339),
+				)
+				cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", binaryPath.String(), ".")
+				cmd.Dir = repoRootPath.String()
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				arduinoCLIBuildErr = cmd.Run()
+				return
+			}
+			if !errors.Is(err, os.ErrExist) {
+				arduinoCLIBuildErr = err
+				return
+			}
+			if binaryPath.Exist() {
+				return
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+	})
+
+	require.NoError(t, arduinoCLIBuildErr, "building top-level arduino-cli binary")
+	require.True(t, repoRootPath.Join("arduino-cli").Exist(), "built arduino-cli binary is missing")
 }
 
 // CreateArduinoCLIWithEnvironment performs the minimum amount of actions

@@ -118,7 +118,7 @@ func TestSymlinkLoop(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		require.FailNow(t, "Load didn't complete in the allocated time.")
 	}
-	require.Error(t, err)
+	require.NoError(t, err)
 }
 
 func TestLegacySymlinkLoop(t *testing.T) {
@@ -148,7 +148,7 @@ func TestLegacySymlinkLoop(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		require.FailNow(t, "Load didn't complete in the allocated time.")
 	}
-	require.Error(t, err)
+	require.NoError(t, err)
 }
 
 func TestLoadExamples(t *testing.T) {

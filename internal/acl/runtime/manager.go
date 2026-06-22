@@ -95,15 +95,29 @@ func NewManager(root string) *Manager {
 }
 
 func DefaultRoot() (string, error) {
-	if root := strings.TrimSpace(os.Getenv("ACL_RUNTIME_ROOT")); root != "" {
-		return root, nil
+	candidates, err := defaultRootCandidates()
+	if err != nil {
+		return "", err
 	}
 
-	if dir, err := os.UserConfigDir(); err == nil {
-		return filepath.Join(dir, "arduino-cli-android", "acl", "runtimes"), nil
+	first := ""
+	for _, candidate := range candidates {
+		if strings.TrimSpace(candidate) == "" {
+			continue
+		}
+		if first == "" {
+			first = candidate
+		}
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate, nil
+		}
 	}
 
-	return filepath.Join(os.TempDir(), "arduino-cli-android", "acl", "runtimes"), nil
+	if first != "" {
+		return first, nil
+	}
+
+	return "", errors.New("unable to determine ACL runtime root")
 }
 
 func (m *Manager) Root() (string, error) {
@@ -111,6 +125,31 @@ func (m *Manager) Root() (string, error) {
 		return m.root, nil
 	}
 	return DefaultRoot()
+}
+
+func defaultRootCandidates() ([]string, error) {
+	candidates := make([]string, 0, 4)
+	if root := strings.TrimSpace(os.Getenv("ACL_RUNTIME_ROOT")); root != "" {
+		abs, err := filepath.Abs(root)
+		if err != nil {
+			return nil, fmt.Errorf("resolve ACL_RUNTIME_ROOT %q: %w", root, err)
+		}
+		candidates = append(candidates, abs)
+	}
+
+	if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
+		candidates = append(candidates, filepath.Join(home, ".arduino-cli-android", "acl-runtime"))
+	}
+
+	if prefix := strings.TrimSpace(os.Getenv("PREFIX")); prefix != "" {
+		candidates = append(candidates, filepath.Join(prefix, "opt", "arduino-cli-android", "acl-runtime"))
+	}
+
+	if wd, err := os.Getwd(); err == nil && strings.TrimSpace(wd) != "" {
+		candidates = append(candidates, filepath.Join(wd, "acl-runtime"))
+	}
+
+	return candidates, nil
 }
 
 func (m *Manager) runtimesDir() (string, error) {

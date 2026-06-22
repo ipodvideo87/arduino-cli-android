@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 
 	aclscan "github.com/arduino/arduino-cli/internal/acl/elfscan"
 	aclruntime "github.com/arduino/arduino-cli/internal/acl/runtime"
@@ -23,12 +24,20 @@ type Request struct {
 }
 
 const (
-	LaunchModeDirectExec = "direct-exec"
+	LaunchModeDirectExec     = "direct-exec"
+	LaunchModeExplicitLoader = "explicit-loader"
+
+	TargetClassAndroidNative = "android-native-elf"
+	TargetClassRustLauncher  = "rust-launcher"
+	TargetClassLinuxDirect   = "linux-direct-elf"
+	TargetClassPatchedLinux  = "patched-linux-elf"
 )
 
 type ExecutionPlan struct {
 	TargetPath        string
 	Target            aclscan.Inspection
+	TargetClass       string
+	RuntimeRoot       string
 	RuntimeID         string
 	RuntimePath       string
 	RuntimeArch       string
@@ -48,9 +57,11 @@ type ExecutionPlan struct {
 }
 
 type Result struct {
-	Stdout   string
-	Stderr   string
-	ExitCode int
+	Stdout     string
+	Stderr     string
+	ExitCode   int
+	StartError string
+	Errno      string
 }
 
 type Planner struct {
@@ -83,14 +94,6 @@ func (p *Planner) BuildPlan(req Request) (ExecutionPlan, error) {
 		TargetPath: strings.TrimSpace(req.TargetPath),
 		Apply:      req.Apply,
 	}
-	runtimeRoot := strings.TrimSpace(req.RuntimeRoot)
-	if runtimeRoot == "" {
-		runtimeRoot = strings.TrimSpace(p.runtimeRoot)
-	}
-	if runtimeRoot == "" {
-		plan.Errors = append(plan.Errors, "missing runtime root")
-		return plan, errors.New("missing runtime root")
-	}
 
 	targetPath, err := validateTargetPath(req.TargetPath)
 	if err != nil {
@@ -111,97 +114,119 @@ func (p *Planner) BuildPlan(req Request) (ExecutionPlan, error) {
 	}
 	plan.Target = target
 
-	mgr := aclruntime.NewManager(runtimeRoot)
-	activeID, err := mgr.ActiveRuntimeID()
-	if err != nil {
-		plan.Errors = append(plan.Errors, err.Error())
-		return plan, err
-	}
-	if strings.TrimSpace(activeID) == "" {
-		err := errors.New("no active runtime is selected")
-		plan.Errors = append(plan.Errors, err.Error())
-		return plan, err
-	}
-
-	rt, err := mgr.Load(activeID)
-	if err != nil {
-		plan.Errors = append(plan.Errors, err.Error())
-		return plan, err
-	}
-	report, err := mgr.ValidateRuntime(rt)
-	if err != nil {
-		plan.Errors = append(plan.Errors, err.Error())
-		return plan, err
-	}
-	plan.RuntimeValidation = report
-	if report.Status == aclruntime.StatusFail {
-		err := fmt.Errorf("active runtime %q failed validation", activeID)
-		plan.Errors = append(plan.Errors, err.Error())
-		return plan, err
-	}
-
-	if !architectureCompatible(rt.Manifest.Architecture, target.Machine) {
-		err := fmt.Errorf("target architecture %q is incompatible with runtime architecture %q", target.Machine, rt.Manifest.Architecture)
-		plan.Errors = append(plan.Errors, err.Error())
-		return plan, err
-	}
-
-	if len(rt.Manifest.Loader.Path) == 0 {
-		err := errors.New("active runtime is missing a loader")
-		plan.Errors = append(plan.Errors, err.Error())
-		return plan, err
-	}
-	loaderPath := filepath.Join(rt.Path, rt.Manifest.Loader.Path)
-	if err := ensureRegularFile(loaderPath, "loader"); err != nil {
-		plan.Errors = append(plan.Errors, err.Error())
-		return plan, err
-	}
-
-	libraryPaths, librarySearchPath, err := collectRuntimeLibraries(rt)
-	if err != nil {
-		plan.Errors = append(plan.Errors, err.Error())
-		return plan, err
-	}
-
 	cwd, err := resolveCWD(req.Cwd, targetPath)
 	if err != nil {
 		plan.Errors = append(plan.Errors, err.Error())
 		return plan, err
 	}
 
-	argv := append([]string{targetPath}, req.Args...)
-	env := []string{
-		"ACL_RUNTIME_ROOT=" + runtimeRoot,
-		"ACL_RUNTIME_ID=" + rt.ID,
-		"ACL_RUNTIME_DIR=" + rt.Path,
-		"ACL_RUNTIME_LOADER=" + loaderPath,
+	runtimeRoot := strings.TrimSpace(req.RuntimeRoot)
+	if runtimeRoot == "" {
+		runtimeRoot = strings.TrimSpace(p.runtimeRoot)
+	}
+	if runtimeRoot != "" {
+		plan.RuntimeRoot = runtimeRoot
+		plan.Environment = append(plan.Environment, "ACL_RUNTIME_ROOT="+runtimeRoot)
 	}
 
-	plan.RuntimeID = rt.ID
-	plan.RuntimePath = rt.Path
-	plan.RuntimeArch = rt.Manifest.Architecture
-	plan.LoaderPath = loaderPath
-	plan.LibraryPaths = libraryPaths
-	plan.LibrarySearchPath = librarySearchPath
+	argv := append([]string{targetPath}, req.Args...)
 	plan.Argv = argv
 	plan.Cwd = cwd
-	plan.Environment = env
-	plan.LaunchMode = LaunchModeDirectExec
-	plan.Command = append([]string{targetPath}, req.Args...)
 	plan.Allowed = true
 
-	if target.Interpreter == "" {
-		plan.Warnings = append(plan.Warnings, "target has no PT_INTERP entry")
-	}
-	if len(target.HardcodedAbsolutePaths) > 0 {
-		plan.Warnings = append(plan.Warnings, "target contains hardcoded absolute paths")
-	}
-	if !target.LooksLikeLinuxTarget {
-		plan.Warnings = append(plan.Warnings, "target does not look like a glibc/Linux binary")
-	}
 	if target.LooksLikeRustLauncher {
 		plan.Warnings = append(plan.Warnings, "Rust launcher wrapper detected; direct kernel exec is required to preserve executable identity")
 	}
+
+	if shouldUseExplicitLoader(target) {
+		plan.TargetClass = TargetClassPatchedLinux
+		if runtimeRoot == "" {
+			runtimeRoot, err = aclruntime.DefaultRoot()
+			if err != nil {
+				plan.Errors = append(plan.Errors, err.Error())
+				return plan, err
+			}
+			plan.RuntimeRoot = runtimeRoot
+			plan.Environment = append(plan.Environment, "ACL_RUNTIME_ROOT="+runtimeRoot)
+		}
+
+		mgr := aclruntime.NewManager(runtimeRoot)
+		activeID, err := mgr.ActiveRuntimeID()
+		if err != nil {
+			plan.Errors = append(plan.Errors, err.Error())
+			return plan, err
+		}
+		if strings.TrimSpace(activeID) == "" {
+			err := errors.New("no active runtime is selected")
+			plan.Errors = append(plan.Errors, err.Error())
+			return plan, err
+		}
+
+		rt, err := mgr.Load(activeID)
+		if err != nil {
+			plan.Errors = append(plan.Errors, err.Error())
+			return plan, err
+		}
+		report, err := mgr.ValidateRuntime(rt)
+		if err != nil {
+			plan.Errors = append(plan.Errors, err.Error())
+			return plan, err
+		}
+		plan.RuntimeValidation = report
+		if report.Status == aclruntime.StatusFail {
+			err := fmt.Errorf("active runtime %q failed validation", activeID)
+			plan.Errors = append(plan.Errors, err.Error())
+			return plan, err
+		}
+
+		if !architectureCompatible(rt.Manifest.Architecture, target.Machine) {
+			err := fmt.Errorf("target architecture %q is incompatible with runtime architecture %q", target.Machine, rt.Manifest.Architecture)
+			plan.Errors = append(plan.Errors, err.Error())
+			return plan, err
+		}
+
+		if len(rt.Manifest.Loader.Path) == 0 {
+			err := errors.New("active runtime is missing a loader")
+			plan.Errors = append(plan.Errors, err.Error())
+			return plan, err
+		}
+		loaderPath := filepath.Join(rt.Path, rt.Manifest.Loader.Path)
+		if err := ensureRegularFile(loaderPath, "loader"); err != nil {
+			plan.Errors = append(plan.Errors, err.Error())
+			return plan, err
+		}
+
+		libraryPaths, librarySearchPath, err := collectRuntimeLibraries(rt)
+		if err != nil {
+			plan.Errors = append(plan.Errors, err.Error())
+			return plan, err
+		}
+
+		plan.RuntimeID = rt.ID
+		plan.RuntimePath = rt.Path
+		plan.RuntimeArch = rt.Manifest.Architecture
+		plan.LoaderPath = loaderPath
+		plan.LibraryPaths = libraryPaths
+		plan.LibrarySearchPath = librarySearchPath
+		plan.Environment = append(plan.Environment,
+			"ACL_RUNTIME_ID="+rt.ID,
+			"ACL_RUNTIME_DIR="+rt.Path,
+			"ACL_RUNTIME_LOADER="+loaderPath,
+		)
+		plan.LaunchMode = LaunchModeExplicitLoader
+		plan.Command = append([]string{loaderPath, "--library-path", librarySearchPath, targetPath}, req.Args...)
+		return plan, nil
+	}
+
+	if target.LooksLikeRustLauncher {
+		plan.TargetClass = TargetClassRustLauncher
+	} else if target.LooksLikeLinuxTarget {
+		plan.TargetClass = TargetClassLinuxDirect
+	} else {
+		plan.TargetClass = TargetClassAndroidNative
+	}
+	plan.LaunchMode = LaunchModeDirectExec
+	plan.Command = append([]string{targetPath}, req.Args...)
 
 	return plan, nil
 }
@@ -225,9 +250,6 @@ func (p *Planner) executePlan(plan ExecutionPlan) (Result, error) {
 	if len(plan.Errors) > 0 {
 		return Result{ExitCode: 1}, fmt.Errorf("execution plan contains errors: %s", strings.Join(plan.Errors, "; "))
 	}
-	if strings.TrimSpace(plan.RuntimeID) == "" {
-		return Result{ExitCode: 1}, errors.New("execution plan is missing an active runtime")
-	}
 	if err := ensureRegularFile(plan.TargetPath, "target"); err != nil {
 		return Result{ExitCode: 1}, err
 	}
@@ -237,12 +259,6 @@ func (p *Planner) executePlan(plan ExecutionPlan) (Result, error) {
 	}
 	if !target.IsELF {
 		return Result{ExitCode: 1}, fmt.Errorf("target %q is not an ELF executable", plan.TargetPath)
-	}
-	if plan.RuntimeValidation.Status == aclruntime.StatusFail {
-		return Result{ExitCode: 1}, fmt.Errorf("runtime %q failed validation", plan.RuntimeID)
-	}
-	if !architectureCompatible(plan.RuntimeArch, target.Machine) {
-		return Result{ExitCode: 1}, fmt.Errorf("target architecture %q is incompatible with runtime architecture %q", target.Machine, plan.RuntimeArch)
 	}
 	if strings.TrimSpace(plan.Cwd) == "" {
 		return Result{ExitCode: 1}, errors.New("execution plan is missing cwd")
@@ -257,9 +273,24 @@ func (p *Planner) executePlan(plan ExecutionPlan) (Result, error) {
 	if len(plan.Command) == 0 {
 		return Result{ExitCode: 1}, errors.New("execution plan is missing a command")
 	}
+	if plan.LaunchMode == LaunchModeExplicitLoader {
+		if strings.TrimSpace(plan.RuntimeID) == "" {
+			return Result{ExitCode: 1}, errors.New("execution plan is missing an active runtime")
+		}
+		if plan.RuntimeValidation.Status == aclruntime.StatusFail {
+			return Result{ExitCode: 1}, fmt.Errorf("runtime %q failed validation", plan.RuntimeID)
+		}
+		if !architectureCompatible(plan.RuntimeArch, target.Machine) {
+			return Result{ExitCode: 1}, fmt.Errorf("target architecture %q is incompatible with runtime architecture %q", target.Machine, plan.RuntimeArch)
+		}
+		if err := ensureLibrarySearchPath(plan.LibrarySearchPath); err != nil {
+			return Result{ExitCode: 1}, err
+		}
+	}
+	env, _ := sanitizeExecutionEnvWithAudit(os.Environ(), plan.Environment)
 	cmd := osExec.Command(plan.Command[0], plan.Command[1:]...)
 	cmd.Dir = plan.Cwd
-	cmd.Env = sanitizeExecutionEnv(os.Environ(), plan.Environment)
+	cmd.Env = env
 	return p.runCommand(cmd)
 }
 
@@ -305,28 +336,95 @@ func runCommand(cmd *osExec.Cmd) (Result, error) {
 	}
 
 	result.ExitCode = 1
+	result.StartError = err.Error()
+	result.Errno = errnoFromError(err)
 	return result, fmt.Errorf("execution failed to start: %w", err)
 }
 
+type EnvironmentAudit struct {
+	BaseCount        int
+	KeptCount        int
+	RemovedCount     int
+	Kept             []string
+	Removed          []string
+	Indicators       []string
+	SanitizedSummary string
+}
+
 func sanitizeExecutionEnv(baseEnv []string, additions []string) []string {
-	env := make([]string, 0, len(baseEnv)+len(additions))
-	for _, kv := range baseEnv {
-		if isSanitizedLDVariable(kv) {
-			continue
-		}
-		env = append(env, kv)
-	}
-	for _, kv := range additions {
-		if isSanitizedLDVariable(kv) {
-			continue
-		}
-		env = append(env, kv)
-	}
+	env, _ := sanitizeExecutionEnvWithAudit(baseEnv, additions)
 	return env
 }
 
-func isSanitizedLDVariable(kv string) bool {
-	return strings.HasPrefix(kv, "LD_PRELOAD=") || strings.HasPrefix(kv, "LD_LIBRARY_PATH=")
+func sanitizeExecutionEnvWithAudit(baseEnv []string, additions []string) ([]string, EnvironmentAudit) {
+	env := make([]string, 0, len(baseEnv)+len(additions))
+	audit := EnvironmentAudit{BaseCount: len(baseEnv)}
+	for _, kv := range baseEnv {
+		if isSanitizedExecutionVariable(kv) {
+			audit.Removed = append(audit.Removed, kv)
+			continue
+		}
+		audit.Kept = append(audit.Kept, kv)
+		env = append(env, kv)
+	}
+	for _, kv := range additions {
+		if isSanitizedExecutionVariable(kv) {
+			audit.Removed = append(audit.Removed, kv)
+			continue
+		}
+		audit.Kept = append(audit.Kept, kv)
+		env = append(env, kv)
+	}
+	audit.KeptCount = len(audit.Kept)
+	audit.RemovedCount = len(audit.Removed)
+	audit.Indicators = detectExecutionIndicators()
+	audit.SanitizedSummary = fmt.Sprintf("%d kept, %d removed, %d indicators", audit.KeptCount, audit.RemovedCount, len(audit.Indicators))
+	return env, audit
+}
+
+func errnoFromError(err error) string {
+	if err == nil {
+		return ""
+	}
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		return errno.Error()
+	}
+	var pathErr *os.PathError
+	if errors.As(err, &pathErr) {
+		if errno, ok := pathErr.Err.(syscall.Errno); ok {
+			return errno.Error()
+		}
+		return pathErr.Err.Error()
+	}
+	return ""
+}
+
+func isSanitizedExecutionVariable(kv string) bool {
+	key := kv
+	if idx := strings.IndexByte(kv, '='); idx >= 0 {
+		key = kv[:idx]
+	}
+	switch {
+	case key == "LD_PRELOAD",
+		key == "LD_LIBRARY_PATH",
+		key == "LD_AUDIT",
+		strings.HasPrefix(key, "QEMU_"),
+		strings.HasPrefix(key, "PROOT_"):
+		return true
+	default:
+		return false
+	}
+}
+
+func shouldUseExplicitLoader(target aclscan.Inspection) bool {
+	if target.LooksLikeRustLauncher {
+		return false
+	}
+	if !target.LooksLikeLinuxTarget {
+		return false
+	}
+	return strings.TrimSpace(target.Interpreter) != ""
 }
 
 func validateTargetPath(raw string) (string, error) {

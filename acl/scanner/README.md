@@ -22,7 +22,8 @@ installed Arduino packages tree, classify executable candidates, and report:
 - executable type such as ELF, shell script, Python, or Java archive
 - some ESP32 toolchain wrappers are Rust launchers; they are still ELF host tools, but
   they are called out separately because explicit loader invocation can break their
-  executable identity
+  executable identity and they must still be treated as ELF executables during
+  validation
 - architecture
 - interpreter
 - shared library dependencies

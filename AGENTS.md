@@ -70,7 +70,11 @@ Do not claim a milestone is complete until it has been verified through real-wor
 
 ## Documentation Maintenance
 - When architecture, tooling, workflows, runtime behavior, supported platforms, commands, validation procedures, or engineering decisions change, update the corresponding documentation within the same change whenever practical.
-- Review and update the relevant documents, including `README`, `ARCHITECTURE.md`, `RUNTIME.md`, `ROADMAP.md`, `STATUS.md`, ADRs, and any other affected documentation.
+- Review and update the relevant documents, including `README`, `ARCHITECTURE.md`, `RUNTIME.md`, `ROADMAP.md`, `STATUS.md`, ADRs, `acl/docs/LAYERING.md`, and any other affected documentation.
+
+## ACL Code Placement
+- Read `acl/docs/LAYERING.md` before deciding where new ACL-related code belongs.
+- Keep layer boundaries explicit when adding or moving ACL behavior.
 
 ## Repository Notes
 - ACL work lives under `acl/`.
