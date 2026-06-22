@@ -186,11 +186,12 @@ The validation pass now also records permission evidence from scanned files so i
 report executables or scripts that lost their execute bit during packaging or install.
 That makes permission regressions visible before they turn into native launch failures.
 
-OpenOCD is treated differently from compile-required toolchain binaries: it is a
-debug/JTAG-only host tool on Android, so ACL marks it unsupported and skips Android
-patching for its tool package. That keeps `arduino-cli core install esp32:esp32`
-strict for compiler and linker runtime closure while allowing optional debug tooling
-to install without blocking a clean compile-only workflow.
+OpenOCD and ESP32 GDB are treated differently from compile-required toolchain
+binaries: they are debug/JTAG-only host tools on Android, so ACL marks them
+unsupported and skips Android patching for their tool packages. That keeps
+`arduino-cli core install esp32:esp32` strict for compiler and linker runtime
+closure while allowing optional debug tooling to install without blocking a clean
+compile-only workflow.
 
 Validation PASS means the compatibility data currently satisfies ACL’s rules. It does
 not mean that the underlying tool actually executed on Android, and it does not prove

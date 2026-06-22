@@ -60,6 +60,9 @@ func isOptionalAndroidDebugToolRoot(root string) bool {
 	if strings.Contains(clean, "/openocd-esp32/") {
 		return true
 	}
+	if strings.Contains(clean, "/gdb/") {
+		return true
+	}
 	toolDir := filepath.Base(filepath.Dir(filepath.Clean(root)))
 	return toolcompat.IsAndroidUnsupportedDebugToolPath(toolDir)
 }

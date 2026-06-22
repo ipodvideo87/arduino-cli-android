@@ -106,6 +106,11 @@ func TestIsOptionalAndroidDebugToolRootMatchesOpenOCDPackageLayout(t *testing.T)
 	require.True(t, isOptionalAndroidDebugToolRoot(root))
 }
 
+func TestIsOptionalAndroidDebugToolRootMatchesESP32GDBPackageLayout(t *testing.T) {
+	root := filepath.Join("/data/data/com.termux/files/home/.arduino15/packages/esp32/tools/riscv32-esp-elf-gdb/16.3_20250913")
+	require.True(t, isOptionalAndroidDebugToolRoot(root))
+}
+
 func TestEnsureRuntimeDependenciesAvailableAcceptsCompleteRuntime(t *testing.T) {
 	runtimeDir := t.TempDir()
 	for _, name := range []string{"libc.so.6", "libdl.so.2", "libm.so.6"} {

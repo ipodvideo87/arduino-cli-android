@@ -188,7 +188,7 @@ func (s *Scanner) inspectPath(root, path string, d fs.DirEntry) (Entry, bool, er
 		if IsAndroidUnsupportedDebugToolPath(entry.RelativePath) {
 			entry.CompatibilityCategory = CategoryUnsupported
 			entry.PatchClass = PatchClassUnsupported
-			entry.Notes = append(entry.Notes, "OpenOCD is optional debug tooling and currently unsupported on Android")
+			entry.Notes = append(entry.Notes, "debug tooling is currently unsupported on Android")
 		}
 		if inspection.Interpreter == "" {
 			entry.Notes = append(entry.Notes, "ELF has no PT_INTERP entry")
@@ -331,7 +331,7 @@ func looksAndroidCompatible(inspection aclscan.Inspection) bool {
 // debug-only host tool that ACL currently leaves unsupported on Android.
 func IsAndroidUnsupportedDebugToolPath(relativePath string) bool {
 	path := strings.ToLower(filepath.ToSlash(relativePath))
-	return strings.Contains(path, "openocd")
+	return strings.Contains(path, "openocd") || strings.Contains(path, "gdb")
 }
 
 func classifyELF(entry Entry) string {

@@ -283,6 +283,8 @@ func unsupportedHostToolMessage(entry Entry) string {
 		return "builtin serial-monitor host tool is currently unsupported on Android"
 	case strings.Contains(path, "openocd"):
 		return "OpenOCD debug tool is currently unsupported on Android"
+	case strings.Contains(path, "gdb"):
+		return "ESP32 GDB debug tool is currently unsupported on Android"
 	case strings.Contains(path, "dfu-util"):
 		return "dfu-util host tool is currently unsupported on Android"
 	case strings.Contains(path, "mkspiffs"):

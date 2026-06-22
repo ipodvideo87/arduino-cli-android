@@ -351,6 +351,26 @@ func TestValidateReportWarnsOnOpenOCDHostExecutable(t *testing.T) {
 	require.Contains(t, strings.Join(validation.Findings[0].Messages, " "), "unsupported on Android")
 }
 
+func TestValidateReportWarnsOnESP32GDBHostExecutable(t *testing.T) {
+	report := Report{
+		Root:    "/tmp/packages",
+		Summary: Summary{TotalEntries: 1},
+		Entries: []Entry{{
+			RelativePath:          "esp32/tools/riscv32-esp-elf-gdb/16.3_20250913/bin/riscv32-esp-elf-gdb",
+			ExecutableType:        "elf",
+			CompatibilityCategory: CategoryUnsupported,
+			PatchClass:            PatchClassUnsupported,
+			Architecture:          "AArch64",
+		}},
+	}
+
+	validation := ValidateReport(report)
+	require.True(t, validation.Summary.Passed)
+	require.Equal(t, 1, validation.Summary.Warnings)
+	require.Contains(t, strings.Join(validation.Findings[0].Messages, " "), "GDB")
+	require.Contains(t, strings.Join(validation.Findings[0].Messages, " "), "unsupported on Android")
+}
+
 func TestValidateReportWarnsOnWindowsExecutable(t *testing.T) {
 	report := Report{
 		Root:    "/tmp/packages",

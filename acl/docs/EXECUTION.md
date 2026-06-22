@@ -79,9 +79,9 @@ installation, and validate-compat reports executable or script candidates that a
 without `+x`.
 
 Android package install policy also distinguishes required compile tools from optional
-debug tooling. OpenOCD is currently treated as unsupported on Android because it is a
-debug/JTAG-only host tool; its tool package is left unpatched so a clean core install
-can complete without needing libusb-backed debug runtime closure.
+debug tooling. OpenOCD and ESP32 GDB are currently treated as unsupported on Android
+because they are debug/JTAG-only host tools; their tool packages are left unpatched
+so a clean core install can complete without needing debug runtime closure.
 
 For the ESP32 clean-install failure specifically, the key fix sits in the Android
 package install path: after `core install`, ACL now repairs missing execute bits on

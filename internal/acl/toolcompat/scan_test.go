@@ -218,6 +218,34 @@ func TestScanClassifiesOpenOCDAsUnsupportedOnAndroid(t *testing.T) {
 	require.Contains(t, strings.Join(report.Entries[0].Notes, " "), "unsupported on Android")
 }
 
+func TestScanClassifiesESP32GDBAsUnsupportedOnAndroid(t *testing.T) {
+	root := t.TempDir()
+	elf := filepath.Join(root, "tools", "riscv32-esp-elf-gdb", "16.3_20250913", "bin", "riscv32-esp-elf-gdb")
+	require.NoError(t, os.MkdirAll(filepath.Dir(elf), 0o755))
+	require.NoError(t, os.WriteFile(elf, []byte("\x7fELFfake"), 0o755))
+
+	scanner := NewScanner()
+	scanner.inspectELF = func(path string) (aclscan.Inspection, error) {
+		return aclscan.Inspection{
+			Path:                 path,
+			Exists:               true,
+			IsELF:                true,
+			Machine:              "AArch64",
+			FileType:             "EXEC",
+			Interpreter:          "/lib/ld-linux-aarch64.so.1",
+			ImportedLibraries:    []string{"libc.so.6", "libpython3.13.so.1.0"},
+			LooksLikeLinuxTarget: true,
+		}, nil
+	}
+
+	report, err := scanner.Scan(root)
+	require.NoError(t, err)
+	require.Len(t, report.Entries, 1)
+	require.Equal(t, CategoryUnsupported, report.Entries[0].CompatibilityCategory)
+	require.Equal(t, PatchClassUnsupported, report.Entries[0].PatchClass)
+	require.Contains(t, strings.Join(report.Entries[0].Notes, " "), "unsupported on Android")
+}
+
 func TestPatchClassForSharedLibraryIsRPathOnly(t *testing.T) {
 	class := PatchClassForELFInspection(aclscan.Inspection{
 		IsELF:                true,
