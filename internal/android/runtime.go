@@ -62,6 +62,12 @@ func installRuntime(root string) (string, error) {
 	if err := addRuntimeLinkAliases(runtimeDir); err != nil {
 		return "", err
 	}
+	if err := completeRuntimeClosure(root, runtimeDir, runtimeSourceRoots()); err != nil {
+		return "", err
+	}
+	if err := addRuntimeLinkAliases(runtimeDir); err != nil {
+		return "", err
+	}
 	return runtimeDir, nil
 }
 

@@ -20,6 +20,7 @@ func TestInstallRuntimeCopiesEmbeddedFiles(t *testing.T) {
 	require.FileExists(t, filepath.Join(runtimeDir, "ld-linux-aarch64.so.1"))
 	require.FileExists(t, filepath.Join(runtimeDir, "libc.so.6"))
 	require.FileExists(t, filepath.Join(runtimeDir, "libm.so.6"))
+	require.FileExists(t, filepath.Join(runtimeDir, "libgcc_s.so.1"))
 	info, err := os.Stat(filepath.Join(runtimeDir, "ld-linux-aarch64.so.1"))
 	require.NoError(t, err)
 	require.NotZero(t, info.Mode().Perm()&0o111)
