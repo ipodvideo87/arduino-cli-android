@@ -13,8 +13,22 @@ func scrubUnsafeLoaderEnvForNativeTermux() []string {
 		return nil
 	}
 
-	removed := make([]string, 0, 3)
-	for _, key := range []string{"LD_LIBRARY_PATH", "LD_PRELOAD", "LD_AUDIT"} {
+	removed := make([]string, 0, 12)
+	for _, key := range []string{
+		"LD_LIBRARY_PATH",
+		"LD_PRELOAD",
+		"LD_AUDIT",
+		"GCC_EXEC_PREFIX",
+		"COMPILER_PATH",
+		"GCC_SPECS",
+		"LIBRARY_PATH",
+		"CPATH",
+		"C_INCLUDE_PATH",
+		"CPLUS_INCLUDE_PATH",
+		"OBJC_INCLUDE_PATH",
+		"OBJCPLUS_INCLUDE_PATH",
+		"LD_RUN_PATH",
+	} {
 		if value, ok := os.LookupEnv(key); ok && strings.TrimSpace(value) != "" {
 			removed = append(removed, key+"="+value)
 			_ = os.Unsetenv(key)

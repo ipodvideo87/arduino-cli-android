@@ -19,6 +19,7 @@ func TestInstallRuntimeCopiesEmbeddedFiles(t *testing.T) {
 	require.NoError(t, err)
 	require.FileExists(t, filepath.Join(runtimeDir, "ld-linux-aarch64.so.1"))
 	require.FileExists(t, filepath.Join(runtimeDir, "libc.so.6"))
+	require.FileExists(t, filepath.Join(runtimeDir, "libm.so.6"))
 	info, err := os.Stat(filepath.Join(runtimeDir, "ld-linux-aarch64.so.1"))
 	require.NoError(t, err)
 	require.NotZero(t, info.Mode().Perm()&0o111)
@@ -85,6 +86,28 @@ func TestPatchInstallTreeSkipsEmptyFiles(t *testing.T) {
 	require.NoError(t, os.WriteFile(empty, nil, 0o600))
 
 	require.NoError(t, patchInstallTree(root, false, "android"))
+}
+
+func TestEnsureRuntimeDependenciesAvailableAcceptsCompleteRuntime(t *testing.T) {
+	runtimeDir := t.TempDir()
+	for _, name := range []string{"libc.so.6", "libdl.so.2", "libm.so.6"} {
+		require.NoError(t, os.WriteFile(filepath.Join(runtimeDir, name), []byte("x"), 0o644))
+	}
+
+	err := ensureRuntimeDependenciesAvailable("/tmp/cc1plus", runtimeDir, []string{"libc.so.6", "libdl.so.2", "libm.so.6"})
+	require.NoError(t, err)
+}
+
+func TestEnsureRuntimeDependenciesAvailableReportsMissingLibrary(t *testing.T) {
+	runtimeDir := t.TempDir()
+	for _, name := range []string{"libc.so.6", "libdl.so.2"} {
+		require.NoError(t, os.WriteFile(filepath.Join(runtimeDir, name), []byte("x"), 0o644))
+	}
+
+	err := ensureRuntimeDependenciesAvailable("/tmp/cc1plus", runtimeDir, []string{"libc.so.6", "libdl.so.2", "libm.so.6"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "/tmp/cc1plus")
+	require.Contains(t, err.Error(), "libm.so.6")
 }
 
 func TestPatchExecutableWrapsFilePathOnMalformedELF(t *testing.T) {

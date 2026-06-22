@@ -58,6 +58,14 @@ func patchExecutable(path, runtimeDir string) error {
 		return nil
 	}
 
+	libs, err := f.ImportedLibraries()
+	if err != nil {
+		return fmt.Errorf("read imports %s: %w", path, err)
+	}
+	if err := ensureRuntimeDependenciesAvailable(path, runtimeDir, libs); err != nil {
+		return err
+	}
+
 	info, err := os.Stat(path)
 	if err != nil {
 		return fmt.Errorf("stat %s: %w", path, err)
@@ -68,6 +76,26 @@ func patchExecutable(path, runtimeDir string) error {
 		return err
 	}
 	return os.Chmod(path, originalMode)
+}
+
+func ensureRuntimeDependenciesAvailable(path, runtimeDir string, libs []string) error {
+	missing := make([]string, 0)
+	for _, lib := range libs {
+		lib = strings.TrimSpace(lib)
+		if lib == "" {
+			continue
+		}
+		candidate := filepath.Join(runtimeDir, filepath.Base(lib))
+		if info, err := os.Lstat(candidate); err == nil && !info.IsDir() {
+			continue
+		}
+		missing = append(missing, lib)
+	}
+
+	if len(missing) == 0 {
+		return nil
+	}
+	return fmt.Errorf("runtime dependency closure incomplete for %s: missing %s in %s", path, strings.Join(missing, ", "), runtimeDir)
 }
 
 func patchSpecForELF(f *elf.File, runtimeDir string) (patchSpec, bool) {
