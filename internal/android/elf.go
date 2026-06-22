@@ -22,7 +22,7 @@ type patchSpec struct {
 func patchELFs(root, runtimeDir string) error {
 	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return fmt.Errorf("walk %s: %w", path, err)
 		}
 		if info.IsDir() {
 			if path == runtimeDir {
@@ -41,7 +41,7 @@ func patchELFs(root, runtimeDir string) error {
 func patchExecutable(path, runtimeDir string) error {
 	isElf, err := isELF(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("detect ELF %s: %w", path, err)
 	}
 	if !isElf {
 		return nil
@@ -49,7 +49,7 @@ func patchExecutable(path, runtimeDir string) error {
 
 	f, err := elf.Open(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("open ELF %s: %w", path, err)
 	}
 	defer f.Close()
 
@@ -60,7 +60,7 @@ func patchExecutable(path, runtimeDir string) error {
 
 	info, err := os.Stat(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("stat %s: %w", path, err)
 	}
 	originalMode := info.Mode()
 
@@ -116,7 +116,7 @@ func elfInterpreter(f *elf.File) (string, error) {
 		}
 		data := make([]byte, prog.Filesz)
 		if _, err := prog.ReadAt(data, 0); err != nil {
-			return "", err
+			return "", fmt.Errorf("read PT_INTERP: %w", err)
 		}
 		return strings.TrimRight(string(data), "\x00"), nil
 	}
@@ -165,7 +165,7 @@ func isELF(path string) (bool, error) {
 
 	header := make([]byte, 4)
 	if _, err := f.Read(header); err != nil {
-		return false, err
+		return false, fmt.Errorf("read %s: %w", path, err)
 	}
 
 	return header[0] == 0x7f &&

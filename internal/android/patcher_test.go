@@ -78,6 +78,26 @@ func TestPatchInstallTreeRepairsMissingExecuteBitsForExecutableFiles(t *testing.
 	requireExecutableMode(t, scriptPath)
 }
 
+func TestPatchInstallTreeSkipsEmptyFiles(t *testing.T) {
+	root := t.TempDir()
+	empty := filepath.Join(root, "bin", "empty")
+	require.NoError(t, os.MkdirAll(filepath.Dir(empty), 0o755))
+	require.NoError(t, os.WriteFile(empty, nil, 0o600))
+
+	require.NoError(t, patchInstallTree(root, false, "android"))
+}
+
+func TestPatchExecutableWrapsFilePathOnMalformedELF(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "bin", "broken")
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte("\x7fELF"), 0o755))
+
+	err := patchExecutable(path, filepath.Join(root, ".acl", "runtime"))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), path)
+}
+
 func TestPatchSpecForELFSkipsNonAArch64(t *testing.T) {
 	spec, ok := patchSpecForELFFields(elf.EM_X86_64, "EXEC", "/lib64/ld-linux-x86-64.so.2", []string{"libc.so.6"}, "/tmp/runtime")
 	require.False(t, ok)

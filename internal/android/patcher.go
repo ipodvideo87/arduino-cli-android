@@ -2,6 +2,7 @@ package android
 
 import (
 	"debug/elf"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -92,7 +93,13 @@ func looksExecutableByContent(path string) (bool, error) {
 	header := make([]byte, 4)
 	n, err := file.Read(header)
 	if err != nil && n == 0 {
+		if err == io.EOF {
+			return false, nil
+		}
 		return false, err
+	}
+	if n == 0 {
+		return false, nil
 	}
 	if n >= 4 && header[0] == 0x7f && header[1] == 'E' && header[2] == 'L' && header[3] == 'F' {
 		elfFile, err := elf.NewFile(file)
