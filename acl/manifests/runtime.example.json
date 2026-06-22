@@ -36,6 +36,13 @@
       "sha256": "replace-me"
     },
     {
+      "name": "libgcc_s.so.1",
+      "path": "lib/libgcc_s.so.1",
+      "kind": "library",
+      "required": true,
+      "sha256": "replace-me"
+    },
+    {
       "name": "libpthread.so.0",
       "path": "lib/libpthread.so.0",
       "kind": "library",
@@ -62,6 +69,7 @@
     "lib/libc.so.6": "replace-me",
     "lib/libdl.so.2": "replace-me",
     "lib/libm.so.6": "replace-me",
+    "lib/libgcc_s.so.1": "replace-me",
     "lib/libpthread.so.0": "replace-me",
     "lib/librt.so.1": "replace-me",
     "lib/libz.so.1": "replace-me"

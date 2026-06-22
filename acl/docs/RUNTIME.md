@@ -130,6 +130,7 @@ acl-build-runtime \
   --loader /path/to/ld-linux-aarch64.so.1 \
   --lib /path/to/libc.so.6 \
   --lib /path/to/libdl.so.2 \
+  --lib /path/to/libgcc_s.so.1 \
   --output /tmp/acl-runtime-package
 ```
 
