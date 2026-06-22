@@ -122,6 +122,39 @@ func TestScanClassifiesRustLauncher(t *testing.T) {
 	require.Contains(t, strings.Join(report.Entries[0].Notes, " "), "Rust launcher wrapper")
 }
 
+func TestScanCopiesRustLauncherDelegateTargets(t *testing.T) {
+	root := t.TempDir()
+	elf := filepath.Join(root, "xtensa-esp32s3-elf-gcc")
+	require.NoError(t, os.WriteFile(elf, []byte("\x7fELFfake"), 0o755))
+
+	scanner := NewScanner()
+	scanner.inspectELF = func(path string) (aclscan.Inspection, error) {
+		return aclscan.Inspection{
+			Path:                  path,
+			Exists:                true,
+			IsELF:                 true,
+			Machine:               "AArch64",
+			Interpreter:           "/lib/ld-linux-aarch64.so.1",
+			ImportedLibraries:     []string{"libc.so.6"},
+			LooksLikeLinuxTarget:  true,
+			LooksLikeRustLauncher: true,
+			LauncherDelegateTargets: []aclscan.LauncherDelegateTarget{{
+				Path:       filepath.Join(root, "xtensa-esp32s3-elf-gcc.real"),
+				Exists:     true,
+				Executable: true,
+				Mode:       "-rwxr-xr-x",
+				Source:     "basename-variant",
+			}},
+		}, nil
+	}
+
+	report, err := scanner.Scan(root)
+	require.NoError(t, err)
+	require.Len(t, report.Entries, 1)
+	require.Len(t, report.Entries[0].LauncherDelegateTargets, 1)
+	require.Equal(t, filepath.Join(root, "xtensa-esp32s3-elf-gcc.real"), report.Entries[0].LauncherDelegateTargets[0].Path)
+}
+
 func TestScanBuildsLinuxRuntimeCandidate(t *testing.T) {
 	root := t.TempDir()
 	elf := filepath.Join(root, "tool-elf")

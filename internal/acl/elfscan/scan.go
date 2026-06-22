@@ -6,28 +6,40 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
 var ErrNotELF = errors.New("not an ELF file")
 
 type Inspection struct {
-	Path                   string
-	Exists                 bool
-	IsELF                  bool
-	Class                  string
-	Machine                string
-	FileType               string
-	SONAME                 string
-	Interpreter            string
-	RPath                  string
-	RunPath                string
-	ImportedLibraries      []string
-	Needed                 []string
-	HardcodedAbsolutePaths []string
-	LooksLikeLinuxTarget   bool
-	LooksLikeRustLauncher  bool
-	HasProgramInterpreter  bool
+	Path                    string
+	Exists                  bool
+	IsELF                   bool
+	Class                   string
+	Machine                 string
+	FileType                string
+	SONAME                  string
+	Interpreter             string
+	RPath                   string
+	RunPath                 string
+	ImportedLibraries       []string
+	Needed                  []string
+	HardcodedAbsolutePaths  []string
+	LauncherDelegateTargets []LauncherDelegateTarget
+	LooksLikeLinuxTarget    bool
+	LooksLikeRustLauncher   bool
+	HasProgramInterpreter   bool
+}
+
+type LauncherDelegateTarget struct {
+	Path          string `json:"path"`
+	Exists        bool   `json:"exists"`
+	Executable    bool   `json:"executable"`
+	Mode          string `json:"mode,omitempty"`
+	Symlink       bool   `json:"symlink"`
+	SymlinkTarget string `json:"symlink_target,omitempty"`
+	Source        string `json:"source,omitempty"`
 }
 
 func Inspect(path string) (Inspection, error) {
@@ -64,6 +76,9 @@ func Inspect(path string) (Inspection, error) {
 	result.HardcodedAbsolutePaths = findInterestingAbsoluteStrings(path)
 	result.LooksLikeLinuxTarget = looksLikeLinuxTarget(result.SONAME, result.Interpreter, result.ImportedLibraries)
 	result.LooksLikeRustLauncher = looksLikeRustLauncher(path)
+	if result.LooksLikeRustLauncher {
+		result.LauncherDelegateTargets = findRustLauncherDelegateTargets(path)
+	}
 
 	return result, nil
 }
@@ -220,6 +235,111 @@ func looksLikeRustLauncher(path string) bool {
 	return foundPattern && foundDynconfig && foundExecPath
 }
 
+func findRustLauncherDelegateTargets(path string) []LauncherDelegateTarget {
+	seen := map[string]struct{}{}
+	var targets []LauncherDelegateTarget
+
+	addCandidate := func(candidate, source string) {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			return
+		}
+		candidate = filepath.Clean(candidate)
+		if candidate == "." || candidate == string(filepath.Separator) {
+			return
+		}
+		if _, ok := seen[candidate]; ok {
+			return
+		}
+		seen[candidate] = struct{}{}
+		targets = append(targets, inspectLauncherDelegateTarget(candidate, source))
+	}
+
+	if linkTarget, err := os.Readlink(path); err == nil {
+		if !filepath.IsAbs(linkTarget) {
+			linkTarget = filepath.Join(filepath.Dir(path), linkTarget)
+		}
+		addCandidate(linkTarget, "symlink-target")
+	}
+
+	if data, err := os.ReadFile(path); err == nil {
+		for _, s := range extractStrings(data) {
+			if candidate := normalizeLauncherDelegateCandidate(s); candidate != "" {
+				addCandidate(candidate, "embedded-path")
+			}
+		}
+	}
+
+	base := filepath.Base(path)
+	dir := filepath.Dir(path)
+	for _, suffix := range []string{".real", ".backend", ".bin", "-real", "-backend"} {
+		addCandidate(filepath.Join(dir, base+suffix), "basename-variant")
+	}
+
+	return targets
+}
+
+func normalizeLauncherDelegateCandidate(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || !strings.HasPrefix(value, "/") {
+		return ""
+	}
+
+	lower := strings.ToLower(value)
+	switch {
+	case strings.HasSuffix(lower, ".so"),
+		strings.HasSuffix(lower, ".so.1"),
+		strings.HasSuffix(lower, ".a"),
+		strings.HasSuffix(lower, ".h"),
+		strings.HasSuffix(lower, ".md"),
+		strings.HasSuffix(lower, ".txt"),
+		strings.HasSuffix(lower, ".json"),
+		strings.HasSuffix(lower, ".csv"),
+		strings.HasSuffix(lower, ".ini"):
+		return ""
+	}
+
+	base := filepath.Base(lower)
+	if strings.Contains(lower, "/bin/") || strings.Contains(lower, "/tools/") || strings.Contains(lower, "/libexec/") {
+		return filepath.Clean(value)
+	}
+
+	for _, marker := range []string{"gcc", "g++", "clang", "rust", "python", "perl", "xtensa", "launcher", "exec"} {
+		if strings.Contains(base, marker) {
+			return filepath.Clean(value)
+		}
+	}
+
+	return ""
+}
+
+func inspectLauncherDelegateTarget(path, source string) LauncherDelegateTarget {
+	target := LauncherDelegateTarget{
+		Path:   path,
+		Source: source,
+	}
+
+	if linkInfo, err := os.Lstat(path); err == nil {
+		target.Mode = linkInfo.Mode().String()
+		target.Symlink = linkInfo.Mode()&os.ModeSymlink != 0
+		if target.Symlink {
+			if linkTarget, err := os.Readlink(path); err == nil {
+				target.SymlinkTarget = linkTarget
+			}
+		}
+	}
+
+	if info, err := os.Stat(path); err == nil {
+		target.Exists = true
+		target.Executable = info.Mode()&0o111 != 0
+		if target.Mode == "" {
+			target.Mode = info.Mode().String()
+		}
+	}
+
+	return target
+}
+
 func Format(ins Inspection) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "ACL ELF scanner\n")
@@ -254,6 +374,23 @@ func Format(ins Inspection) string {
 		fmt.Fprintln(&b, "Hardcoded absolute paths:")
 		for _, path := range ins.HardcodedAbsolutePaths {
 			fmt.Fprintf(&b, "  - %s\n", path)
+		}
+	}
+	if len(ins.LauncherDelegateTargets) > 0 {
+		fmt.Fprintln(&b, "Launcher delegate targets:")
+		for _, target := range ins.LauncherDelegateTargets {
+			fmt.Fprintf(&b, "  - %s", target.Path)
+			if target.Source != "" {
+				fmt.Fprintf(&b, " (%s)", target.Source)
+			}
+			if target.Symlink {
+				fmt.Fprintf(&b, " symlink->%s", target.SymlinkTarget)
+			}
+			fmt.Fprintf(&b, " exists=%t executable=%t", target.Exists, target.Executable)
+			if target.Mode != "" {
+				fmt.Fprintf(&b, " mode=%s", target.Mode)
+			}
+			fmt.Fprintln(&b)
 		}
 	}
 	fmt.Fprintf(&b, "Looks like glibc/Linux-targeted: %t\n", ins.LooksLikeLinuxTarget)

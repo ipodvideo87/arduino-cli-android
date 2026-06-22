@@ -47,21 +47,22 @@ type Summary struct {
 }
 
 type Entry struct {
-	Path                   string   `json:"path"`
-	RelativePath           string   `json:"relative_path"`
-	ExecutableType         string   `json:"executable_type"`
-	CompatibilityCategory  string   `json:"compatibility_category"`
-	PatchClass             string   `json:"patch_class"`
-	Architecture           string   `json:"architecture,omitempty"`
-	Interpreter            string   `json:"interpreter,omitempty"`
-	SharedLibraries        []string `json:"shared_libraries,omitempty"`
-	RPath                  string   `json:"rpath,omitempty"`
-	RunPath                string   `json:"runpath,omitempty"`
-	HardcodedAbsolutePath  []string `json:"hardcoded_absolute_paths,omitempty"`
-	LooksAndroidCompatible bool     `json:"looks_android_compatible"`
-	LooksLinuxGlibc        bool     `json:"looks_linux_glibc"`
-	RequiresRuntime        bool     `json:"requires_runtime"`
-	Notes                  []string `json:"notes,omitempty"`
+	Path                    string                           `json:"path"`
+	RelativePath            string                           `json:"relative_path"`
+	ExecutableType          string                           `json:"executable_type"`
+	CompatibilityCategory   string                           `json:"compatibility_category"`
+	PatchClass              string                           `json:"patch_class"`
+	Architecture            string                           `json:"architecture,omitempty"`
+	Interpreter             string                           `json:"interpreter,omitempty"`
+	SharedLibraries         []string                         `json:"shared_libraries,omitempty"`
+	RPath                   string                           `json:"rpath,omitempty"`
+	RunPath                 string                           `json:"runpath,omitempty"`
+	HardcodedAbsolutePath   []string                         `json:"hardcoded_absolute_paths,omitempty"`
+	LauncherDelegateTargets []aclscan.LauncherDelegateTarget `json:"launcher_delegate_targets,omitempty"`
+	LooksAndroidCompatible  bool                             `json:"looks_android_compatible"`
+	LooksLinuxGlibc         bool                             `json:"looks_linux_glibc"`
+	RequiresRuntime         bool                             `json:"requires_runtime"`
+	Notes                   []string                         `json:"notes,omitempty"`
 }
 
 type Scanner struct {
@@ -172,6 +173,7 @@ func (s *Scanner) inspectPath(root, path string, d fs.DirEntry) (Entry, bool, er
 		entry.RPath = inspection.RPath
 		entry.RunPath = inspection.RunPath
 		entry.HardcodedAbsolutePath = append([]string(nil), inspection.HardcodedAbsolutePaths...)
+		entry.LauncherDelegateTargets = append([]aclscan.LauncherDelegateTarget(nil), inspection.LauncherDelegateTargets...)
 		entry.LooksLinuxGlibc = inspection.LooksLikeLinuxTarget
 		entry.LooksAndroidCompatible = looksAndroidCompatible(inspection)
 		entry.RequiresRuntime = entry.LooksLinuxGlibc && !entry.LooksAndroidCompatible
@@ -413,6 +415,22 @@ func FormatReport(report Report) string {
 		}
 		if len(entry.HardcodedAbsolutePath) > 0 {
 			fmt.Fprintf(&b, "  hardcoded paths: %s\n", strings.Join(entry.HardcodedAbsolutePath, ", "))
+		}
+		if len(entry.LauncherDelegateTargets) > 0 {
+			fmt.Fprintf(&b, "  launcher delegates: %d\n", len(entry.LauncherDelegateTargets))
+			for _, target := range entry.LauncherDelegateTargets {
+				fmt.Fprintf(&b, "    - %s (exists=%t executable=%t", target.Path, target.Exists, target.Executable)
+				if target.Symlink {
+					fmt.Fprintf(&b, ", symlink->%s", target.SymlinkTarget)
+				}
+				if target.Source != "" {
+					fmt.Fprintf(&b, ", source=%s", target.Source)
+				}
+				if target.Mode != "" {
+					fmt.Fprintf(&b, ", mode=%s", target.Mode)
+				}
+				fmt.Fprintln(&b, ")")
+			}
 		}
 		if entry.RequiresRuntime {
 			fmt.Fprintf(&b, "  requires runtime: yes\n")

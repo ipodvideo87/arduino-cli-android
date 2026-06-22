@@ -24,3 +24,26 @@ func TestLooksLikeRustLauncherRejectsUnrelatedBinary(t *testing.T) {
 
 	require.False(t, looksLikeRustLauncher(path))
 }
+
+func TestRustLauncherDelegateTargets(t *testing.T) {
+	root := t.TempDir()
+	launcher := filepath.Join(root, "xtensa-esp32s3-elf-gcc")
+	backend := filepath.Join(root, "xtensa-esp32s3-elf-gcc.real")
+	require.NoError(t, os.WriteFile(backend, []byte("backend"), 0o755))
+	require.NoError(t, os.WriteFile(launcher, []byte("Get executable path\x00Current exe has path\x00Called tool must have pattern \"xtensa-esp*-elf-*\"\x00Dynconfig for target\x00XTENSA_GNU_CONFIG\x00execv errno\x00"), 0o644))
+
+	targets := findRustLauncherDelegateTargets(launcher)
+	require.NotEmpty(t, targets)
+
+	found := false
+	for _, target := range targets {
+		if target.Path != backend {
+			continue
+		}
+		found = true
+		require.True(t, target.Exists)
+		require.True(t, target.Executable)
+		require.NotEmpty(t, target.Source)
+	}
+	require.True(t, found, "expected a .real delegate candidate to be identified")
+}

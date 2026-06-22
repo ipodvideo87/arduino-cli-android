@@ -58,20 +58,22 @@ type RuntimeDiagnostics struct {
 }
 
 type TargetDataDiagnostics struct {
-	Machine      string `json:"machine,omitempty"`
-	IsELF        bool   `json:"is_elf"`
-	HasPTInterp  bool   `json:"has_pt_interp"`
-	LikelySource string `json:"likely_source,omitempty"`
+	Machine         string                           `json:"machine,omitempty"`
+	IsELF           bool                             `json:"is_elf"`
+	HasPTInterp     bool                             `json:"has_pt_interp"`
+	LikelySource    string                           `json:"likely_source,omitempty"`
+	DelegateTargets []aclscan.LauncherDelegateTarget `json:"delegate_targets,omitempty"`
 }
 
 type ResultDiagnostics struct {
-	Mode       string `json:"mode"`
-	Stdout     string `json:"stdout,omitempty"`
-	Stderr     string `json:"stderr,omitempty"`
-	ExitCode   *int   `json:"exit_code,omitempty"`
-	Errno      string `json:"errno,omitempty"`
-	StartError string `json:"start_error,omitempty"`
-	Started    bool   `json:"started"`
+	Mode           string `json:"mode"`
+	Stdout         string `json:"stdout,omitempty"`
+	Stderr         string `json:"stderr,omitempty"`
+	ExitCode       *int   `json:"exit_code,omitempty"`
+	Errno          string `json:"errno,omitempty"`
+	ChildExecErrno string `json:"child_exec_errno,omitempty"`
+	StartError     string `json:"start_error,omitempty"`
+	Started        bool   `json:"started"`
 }
 
 func (r DiagnosticReport) JSON() ([]byte, error) {
@@ -122,6 +124,23 @@ func FormatDiagnosticReport(r DiagnosticReport) string {
 	if len(r.Runtime.Argv) > 0 {
 		fmt.Fprintf(&b, "Argv: %s\n", strings.Join(r.Runtime.Argv, " "))
 	}
+	if len(r.TargetData.DelegateTargets) > 0 {
+		fmt.Fprintln(&b, "Delegate targets:")
+		for _, target := range r.TargetData.DelegateTargets {
+			fmt.Fprintf(&b, "  - %s", target.Path)
+			if target.Symlink {
+				fmt.Fprintf(&b, " symlink->%s", target.SymlinkTarget)
+			}
+			fmt.Fprintf(&b, " exists=%t executable=%t", target.Exists, target.Executable)
+			if target.Mode != "" {
+				fmt.Fprintf(&b, " mode=%s", target.Mode)
+			}
+			if target.Source != "" {
+				fmt.Fprintf(&b, " source=%s", target.Source)
+			}
+			fmt.Fprintln(&b)
+		}
+	}
 	fmt.Fprintf(&b, "Sanitized environment summary: %s\n", r.Environment.SanitizedSummary)
 	if len(r.Environment.Kept) > 0 {
 		fmt.Fprintln(&b, "Kept environment variables:")
@@ -153,6 +172,9 @@ func FormatDiagnosticReport(r DiagnosticReport) string {
 	}
 	if r.Result.Errno != "" {
 		fmt.Fprintf(&b, "Errno: %s\n", r.Result.Errno)
+	}
+	if r.Result.ChildExecErrno != "" {
+		fmt.Fprintf(&b, "Child exec errno: %s\n", r.Result.ChildExecErrno)
 	}
 	if r.Result.ExitCode != nil {
 		fmt.Fprintf(&b, "Exit code: %d\n", *r.Result.ExitCode)
@@ -230,19 +252,21 @@ func BuildDiagnosticReport(plan ExecutionPlan, req Request, result Result) Diagn
 			Argv:     append([]string(nil), plan.Argv...),
 		},
 		TargetData: TargetDataDiagnostics{
-			Machine:      plan.Target.Machine,
-			IsELF:        plan.Target.IsELF,
-			HasPTInterp:  strings.TrimSpace(plan.Target.Interpreter) != "",
-			LikelySource: likelyTargetSource(plan),
+			Machine:         plan.Target.Machine,
+			IsELF:           plan.Target.IsELF,
+			HasPTInterp:     strings.TrimSpace(plan.Target.Interpreter) != "",
+			LikelySource:    likelyTargetSource(plan),
+			DelegateTargets: append([]aclscan.LauncherDelegateTarget(nil), plan.Target.LauncherDelegateTargets...),
 		},
 		Result: ResultDiagnostics{
-			Mode:       plan.LaunchMode,
-			Stdout:     result.Stdout,
-			Stderr:     result.Stderr,
-			ExitCode:   exitCodePtr,
-			Errno:      result.Errno,
-			StartError: result.StartError,
-			Started:    req.Apply && result.StartError == "",
+			Mode:           plan.LaunchMode,
+			Stdout:         result.Stdout,
+			Stderr:         result.Stderr,
+			ExitCode:       exitCodePtr,
+			Errno:          result.Errno,
+			ChildExecErrno: detectChildExecErrno(result),
+			StartError:     result.StartError,
+			Started:        req.Apply && result.StartError == "",
 		},
 		Hints: buildLikelyCauseHints(plan, result, exists, execPerm, envDetection),
 	}
@@ -503,6 +527,26 @@ func buildLikelyCauseHints(plan ExecutionPlan, result Result, exists, execPerm b
 	if plan.TargetClass == TargetClassRustLauncher && result.StartError != "" {
 		hints = append(hints, "Rust launcher wrappers need direct kernel exec; inspect wrapper-specific /proc/self/exe behavior and target resolution")
 	}
+	if plan.TargetClass == TargetClassRustLauncher {
+		if childErrno := detectChildExecErrno(result); childErrno != "" {
+			hints = append(hints, "Rust launcher child exec returned "+childErrno+"; check delegate path existence, execute bits, symlink resolution, and noexec/SELinux constraints")
+		}
+		if len(plan.Target.LauncherDelegateTargets) > 0 {
+			var issues []string
+			for _, target := range plan.Target.LauncherDelegateTargets {
+				if !target.Exists {
+					issues = append(issues, target.Path+" missing")
+					continue
+				}
+				if !target.Executable {
+					issues = append(issues, target.Path+" not executable")
+				}
+			}
+			if len(issues) > 0 {
+				hints = append(hints, "Rust launcher delegate candidates: "+strings.Join(issues, "; "))
+			}
+		}
+	}
 	if plan.LaunchMode == LaunchModeExplicitLoader {
 		hints = append(hints, "explicit loader path depends on a valid runtime tree and loader-visible libraries")
 	}
@@ -516,6 +560,23 @@ func buildLikelyCauseHints(plan ExecutionPlan, result Result, exists, execPerm b
 		hints = append(hints, "nonzero exit on a direct rust-launcher run is evidence about the tool itself, not the loader path")
 	}
 	return dedupeStrings(hints)
+}
+
+func detectChildExecErrno(result Result) string {
+	combined := strings.ToLower(result.Stdout + "\n" + result.Stderr + "\n" + result.StartError)
+	switch {
+	case strings.Contains(combined, "execv errno (13)"),
+		strings.Contains(combined, "errno 13"),
+		strings.Contains(combined, "eacces"),
+		strings.Contains(combined, "permission denied"):
+		return "EACCES"
+	case strings.Contains(combined, "execv errno (2)"),
+		strings.Contains(combined, "enoent"),
+		strings.Contains(combined, "no such file"):
+		return "ENOENT"
+	default:
+		return ""
+	}
 }
 
 func dedupeStrings(in []string) []string {

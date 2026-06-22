@@ -595,6 +595,44 @@ func TestBuildDiagnosticReportIncludesStartFailureEvidence(t *testing.T) {
 	require.False(t, report.Result.Started)
 }
 
+func TestBuildDiagnosticReportIncludesRustLauncherDelegateTargetsAndEACCESHint(t *testing.T) {
+	target := mustExecutable(t)
+	hostArch := hostArchitecture(t, target)
+	report := BuildDiagnosticReport(ExecutionPlan{
+		TargetPath:  target,
+		TargetClass: TargetClassRustLauncher,
+		LaunchMode:  LaunchModeDirectExec,
+		Target: aclscan.Inspection{
+			Path:                  target,
+			IsELF:                 true,
+			Machine:               hostArch,
+			LooksLikeRustLauncher: true,
+			LooksLikeLinuxTarget:  true,
+			Interpreter:           "/lib64/ld-linux-aarch64.so.1",
+			ImportedLibraries:     []string{"libc.so.6"},
+			LauncherDelegateTargets: []aclscan.LauncherDelegateTarget{{
+				Path:       "/tmp/xtensa-esp32s3-elf-gcc.real",
+				Exists:     true,
+				Executable: false,
+				Mode:       "-rw-r--r--",
+				Source:     "basename-variant",
+			}},
+		},
+		Argv: []string{target, "--version"},
+	}, Request{TargetPath: target}, Result{
+		Stdout:     "execv errno (13)",
+		Stderr:     "Rust panic at main.rs:210 internal unreachable code",
+		StartError: "",
+	})
+
+	require.Len(t, report.TargetData.DelegateTargets, 1)
+	require.Equal(t, "/tmp/xtensa-esp32s3-elf-gcc.real", report.TargetData.DelegateTargets[0].Path)
+	require.Equal(t, "EACCES", report.Result.ChildExecErrno)
+	require.Contains(t, strings.Join(report.Hints, " "), "delegate path existence")
+	require.Contains(t, strings.Join(report.Hints, " "), "EACCES")
+	require.Contains(t, strings.Join(report.Hints, " "), "not executable")
+}
+
 func installRuntimeFixture(t *testing.T, root, runtimeID, compatibility string) (aclruntime.Runtime, string) {
 	t.Helper()
 

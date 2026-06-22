@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	aclscan "github.com/arduino/arduino-cli/internal/acl/elfscan"
 	"github.com/stretchr/testify/require"
 )
 
@@ -77,6 +78,37 @@ func TestValidateReportAcceptsRustLauncherByCategory(t *testing.T) {
 	require.True(t, validation.Summary.Passed)
 	require.Equal(t, 1, validation.Summary.ExecutableELFs)
 	require.Empty(t, validation.Findings)
+}
+
+func TestValidateReportWarnsOnRustLauncherDelegatePermissionIssue(t *testing.T) {
+	report := Report{
+		Root:    "/tmp/packages",
+		Summary: Summary{TotalEntries: 1},
+		Entries: []Entry{{
+			RelativePath:          "tools/xtensa-esp32s3-elf-gcc",
+			ExecutableType:        CategoryRustLauncher,
+			CompatibilityCategory: CategoryLinuxGlibc,
+			PatchClass:            PatchClassLoaderAndRPath,
+			Architecture:          "AArch64",
+			Interpreter:           "/lib/ld-linux-aarch64.so.1",
+			SharedLibraries:       []string{"libc.so.6"},
+			RPath:                 "$ORIGIN/../lib",
+			RequiresRuntime:       true,
+			LauncherDelegateTargets: []aclscan.LauncherDelegateTarget{{
+				Path:       "/tmp/backend",
+				Exists:     true,
+				Executable: false,
+				Mode:       "-rw-r--r--",
+				Source:     "basename-variant",
+			}},
+		}},
+	}
+
+	validation := ValidateReport(report)
+	require.True(t, validation.Summary.Passed)
+	require.Equal(t, 1, validation.Summary.Warnings)
+	require.Contains(t, strings.Join(validation.Findings[0].Messages, " "), "delegate target")
+	require.Contains(t, strings.Join(validation.Findings[0].Messages, " "), "not executable")
 }
 
 func TestValidateReportRejectsLoaderAndRPathWithoutInterpreter(t *testing.T) {

@@ -176,6 +176,9 @@ func validateLoaderAndRPath(report *ValidationReport, entry Entry) {
 	if !ok {
 		addError(report, entry, messages...)
 	}
+	if isRustLauncherEntry(entry) {
+		validateRustLauncherDelegateTargets(report, entry)
+	}
 }
 
 func validateRuntimeDependency(report *ValidationReport, entry Entry) {
@@ -235,6 +238,30 @@ func validateUnsupported(report *ValidationReport, entry Entry) {
 		return
 	}
 	report.Summary.IgnoredCount++
+}
+
+func validateRustLauncherDelegateTargets(report *ValidationReport, entry Entry) {
+	if len(entry.LauncherDelegateTargets) == 0 {
+		return
+	}
+
+	var problems []string
+	for _, target := range entry.LauncherDelegateTargets {
+		label := target.Path
+		if target.Symlink && target.SymlinkTarget != "" {
+			label = fmt.Sprintf("%s -> %s", target.Path, target.SymlinkTarget)
+		}
+		switch {
+		case !target.Exists:
+			problems = append(problems, fmt.Sprintf("%s is missing", label))
+		case !target.Executable:
+			problems = append(problems, fmt.Sprintf("%s is not executable", label))
+		}
+	}
+
+	if len(problems) > 0 {
+		addWarning(report, entry, "rust launcher delegate target permission/path issue: "+strings.Join(problems, "; "))
+	}
 }
 
 func unsupportedHostToolMessage(entry Entry) string {
@@ -378,6 +405,11 @@ func isELFEntry(entry Entry) bool {
 	default:
 		return strings.EqualFold(strings.TrimSpace(entry.CompatibilityCategory), CategoryRustLauncher)
 	}
+}
+
+func isRustLauncherEntry(entry Entry) bool {
+	return strings.EqualFold(strings.TrimSpace(entry.ExecutableType), CategoryRustLauncher) ||
+		strings.EqualFold(strings.TrimSpace(entry.CompatibilityCategory), CategoryRustLauncher)
 }
 
 func isScriptEntry(entry Entry) bool {
