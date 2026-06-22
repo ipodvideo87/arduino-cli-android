@@ -72,6 +72,12 @@ itself starts, but that is now limited to explicit-loader launches.
 This is the first execution backend, not final proof that Linux-oriented tooling works
 correctly on Android.
 
+Native diagnostics also showed that some launcher failures were not execution-planner
+bugs at all. The packaging path can still strip execute bits when it rewrites source
+assets, so ACL now preserves source file modes during runtime packaging and runtime
+installation, and validate-compat reports executable or script candidates that arrive
+without `+x`.
+
 ## Validation Guidance
 
 Android execution must be validated from a fresh Termux clone outside proot. The current

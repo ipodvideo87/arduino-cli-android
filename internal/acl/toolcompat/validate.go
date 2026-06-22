@@ -173,6 +173,10 @@ func validateLoaderAndRPath(report *ValidationReport, entry Entry) {
 		ok = false
 		messages = append(messages, "expected requires_runtime=true")
 	}
+	if !entry.HasExecutePermission {
+		ok = false
+		messages = append(messages, "expected execute bit to be preserved")
+	}
 	if !ok {
 		addError(report, entry, messages...)
 	}
@@ -217,6 +221,10 @@ func validateRuntimeDependency(report *ValidationReport, entry Entry) {
 func validateScript(report *ValidationReport, entry Entry) {
 	if !isScriptEntry(entry) {
 		addError(report, entry, "expected script entry for script-no-elf-patch classification")
+		return
+	}
+	if !entry.HasExecutePermission {
+		addError(report, entry, "expected execute bit for script entry")
 	}
 }
 

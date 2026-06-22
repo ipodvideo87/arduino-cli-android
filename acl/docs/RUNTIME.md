@@ -108,6 +108,10 @@ Repeated builds should produce the same runtime ID, manifest content, hashes, ch
 and directory layout. Any change in those results should be treated as a packaging
 change.
 
+The runtime builder and installer also preserve file mode bits now. That matters for
+launcher wrappers, scripts, and other platform-specific executables whose package
+format must keep the original `+x` state intact all the way into the installed runtime.
+
 ## Manual Package Build
 
 Use the builder CLI to create a package from source assets:
@@ -172,6 +176,10 @@ clear record of what each tool appears to need.
 package tree is internally consistent with ACL’s current patching rules. That step is a
 precondition for later execution or compilation work, because it catches mismatches
 between the scanner, runtime manager, and patching policy before any launch attempt.
+
+The validation pass now also records permission evidence from scanned files so it can
+report executables or scripts that lost their execute bit during packaging or install.
+That makes permission regressions visible before they turn into native launch failures.
 
 Validation PASS means the compatibility data currently satisfies ACL’s rules. It does
 not mean that the underlying tool actually executed on Android, and it does not prove

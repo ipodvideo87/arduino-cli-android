@@ -17,6 +17,8 @@ func TestValidateReportAcceptsLoaderAndRPathExecutable(t *testing.T) {
 			ExecutableType:        "elf",
 			CompatibilityCategory: CategoryLinuxGlibc,
 			PatchClass:            PatchClassLoaderAndRPath,
+			Mode:                  "-rwxr-xr-x",
+			HasExecutePermission:  true,
 			Architecture:          "AArch64",
 			Interpreter:           "/lib/ld-linux-aarch64.so.1",
 			SharedLibraries:       []string{"libc.so.6"},
@@ -43,6 +45,8 @@ func TestValidateReportAcceptsRustLauncherAsElf(t *testing.T) {
 			ExecutableType:        CategoryRustLauncher,
 			CompatibilityCategory: CategoryLinuxGlibc,
 			PatchClass:            PatchClassLoaderAndRPath,
+			Mode:                  "-rwxr-xr-x",
+			HasExecutePermission:  true,
 			Architecture:          "AArch64",
 			Interpreter:           "/lib/ld-linux-aarch64.so.1",
 			SharedLibraries:       []string{"libc.so.6"},
@@ -66,6 +70,8 @@ func TestValidateReportAcceptsRustLauncherByCategory(t *testing.T) {
 			ExecutableType:        "binary",
 			CompatibilityCategory: CategoryRustLauncher,
 			PatchClass:            PatchClassLoaderAndRPath,
+			Mode:                  "-rwxr-xr-x",
+			HasExecutePermission:  true,
 			Architecture:          "AArch64",
 			Interpreter:           "/lib/ld-linux-aarch64.so.1",
 			SharedLibraries:       []string{"libc.so.6"},
@@ -89,6 +95,8 @@ func TestValidateReportWarnsOnRustLauncherDelegatePermissionIssue(t *testing.T) 
 			ExecutableType:        CategoryRustLauncher,
 			CompatibilityCategory: CategoryLinuxGlibc,
 			PatchClass:            PatchClassLoaderAndRPath,
+			Mode:                  "-rwxr-xr-x",
+			HasExecutePermission:  true,
 			Architecture:          "AArch64",
 			Interpreter:           "/lib/ld-linux-aarch64.so.1",
 			SharedLibraries:       []string{"libc.so.6"},
@@ -109,6 +117,46 @@ func TestValidateReportWarnsOnRustLauncherDelegatePermissionIssue(t *testing.T) 
 	require.Equal(t, 1, validation.Summary.Warnings)
 	require.Contains(t, strings.Join(validation.Findings[0].Messages, " "), "delegate target")
 	require.Contains(t, strings.Join(validation.Findings[0].Messages, " "), "not executable")
+}
+
+func TestValidateReportRejectsMissingExecuteBitOnExecutableAndScript(t *testing.T) {
+	report := Report{
+		Root:    "/tmp/packages",
+		Summary: Summary{TotalEntries: 2},
+		Entries: []Entry{
+			{
+				RelativePath:          "tools/host-tool",
+				ExecutableType:        "elf",
+				CompatibilityCategory: CategoryLinuxGlibc,
+				PatchClass:            PatchClassLoaderAndRPath,
+				Mode:                  "-rw-r--r--",
+				HasExecutePermission:  false,
+				Architecture:          "AArch64",
+				Interpreter:           "/lib/ld-linux-aarch64.so.1",
+				SharedLibraries:       []string{"libc.so.6"},
+				RPath:                 "$ORIGIN/../lib",
+				RequiresRuntime:       true,
+			},
+			{
+				RelativePath:          "tools/tool.sh",
+				ExecutableType:        "shell-script",
+				CompatibilityCategory: CategoryScript,
+				PatchClass:            PatchClassScript,
+				Mode:                  "-rw-r--r--",
+				HasExecutePermission:  false,
+			},
+		},
+	}
+
+	validation := ValidateReport(report)
+	require.False(t, validation.Summary.Passed)
+	require.Equal(t, 2, validation.Summary.Errors)
+	joined := strings.Join([]string{
+		strings.Join(validation.Findings[0].Messages, " "),
+		strings.Join(validation.Findings[1].Messages, " "),
+	}, " ")
+	require.Contains(t, joined, "expected execute bit to be preserved")
+	require.Contains(t, joined, "expected execute bit for script entry")
 }
 
 func TestValidateReportRejectsLoaderAndRPathWithoutInterpreter(t *testing.T) {
@@ -187,6 +235,8 @@ func TestValidateReportAcceptsScriptNoELFPatch(t *testing.T) {
 			ExecutableType:        "shell-script",
 			CompatibilityCategory: CategoryScript,
 			PatchClass:            PatchClassScript,
+			Mode:                  "-rwxr-xr-x",
+			HasExecutePermission:  true,
 		}},
 	}
 

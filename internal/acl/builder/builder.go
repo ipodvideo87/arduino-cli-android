@@ -483,8 +483,12 @@ func importAsset(packageDir string, asset SourceAsset) error {
 		return err
 	}
 	defer in.Close()
+	info, err := in.Stat()
+	if err != nil {
+		return err
+	}
 
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode().Perm())
 	if err != nil {
 		return err
 	}
@@ -492,7 +496,10 @@ func importAsset(packageDir string, asset SourceAsset) error {
 		_ = out.Close()
 		return err
 	}
-	return out.Close()
+	if err := out.Close(); err != nil {
+		return err
+	}
+	return os.Chmod(dst, info.Mode())
 }
 
 func prepareEmptyDir(dir string) error {

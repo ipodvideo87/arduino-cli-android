@@ -156,6 +156,33 @@ func TestRunBuildsPackageFromFixtureAssets(t *testing.T) {
 	}
 }
 
+func TestRunBuildsPackagePreservesExecuteBits(t *testing.T) {
+	dir := t.TempDir()
+	loader := filepath.Join(dir, "loader.bin")
+	lib := filepath.Join(dir, "library.bin")
+	require.NoError(t, os.WriteFile(loader, []byte("loader fixture"), 0o755))
+	require.NoError(t, os.WriteFile(lib, []byte("library fixture"), 0o755))
+	output := filepath.Join(t.TempDir(), "package")
+	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
+	t.Setenv("SOURCE_DATE_EPOCH", "1718755200")
+
+	exitCode := run([]string{
+		"--name", "fixture",
+		"--version", "1.0.0",
+		"--arch", "aarch64",
+		"--abi", "android-aarch64",
+		"--compatibility", "experimental",
+		"--loader", loader,
+		"--lib", lib,
+		"--output", output,
+	}, stdout, stderr)
+
+	require.Equal(t, 0, exitCode)
+	require.Empty(t, stderr.String())
+	requireExecutable(t, filepath.Join(output, "loader", filepath.Base(loader)))
+	requireExecutable(t, filepath.Join(output, "lib", filepath.Base(lib)))
+}
+
 func fixtureAssets(t *testing.T) (string, string) {
 	t.Helper()
 
@@ -165,4 +192,11 @@ func fixtureAssets(t *testing.T) (string, string) {
 	require.NoError(t, os.WriteFile(loader, []byte("loader fixture"), 0o644))
 	require.NoError(t, os.WriteFile(lib, []byte("library fixture"), 0o644))
 	return loader, lib
+}
+
+func requireExecutable(t *testing.T, path string) {
+	t.Helper()
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	require.NotZero(t, info.Mode()&0o111, "expected executable bits for %s", path)
 }

@@ -614,7 +614,10 @@ func copyTree(src, dst string) error {
 
 		switch {
 		case info.IsDir():
-			return os.MkdirAll(target, info.Mode().Perm())
+			if err := os.MkdirAll(target, info.Mode().Perm()); err != nil {
+				return err
+			}
+			return os.Chmod(target, info.Mode())
 		default:
 			if !info.Mode().IsRegular() {
 				return fmt.Errorf("package entry %q is not a regular file", rel)
@@ -635,7 +638,10 @@ func copyTree(src, dst string) error {
 				out.Close()
 				return err
 			}
-			return out.Close()
+			if err := out.Close(); err != nil {
+				return err
+			}
+			return os.Chmod(target, info.Mode())
 		}
 	})
 }

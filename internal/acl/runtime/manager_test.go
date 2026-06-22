@@ -54,6 +54,8 @@ func TestRuntimeManagerInstallDiscoverValidateAndSelect(t *testing.T) {
 	installed, err := mgr.InstallFromDir(packageDir)
 	require.NoError(t, err)
 	require.Equal(t, manifest.RuntimeID, installed.ID)
+	requireExecutableMode(t, filepath.Join(installed.Path, "rootfs", "loader", "ld-linux-test.so"))
+	requireExecutableMode(t, filepath.Join(installed.Path, "rootfs", "lib", "libc.so.6"))
 
 	discovered, err := mgr.Discover()
 	require.NoError(t, err)
@@ -143,6 +145,13 @@ func fileHash(t *testing.T, path string) string {
 	sum, err := sha256Hex(path)
 	require.NoError(t, err)
 	return sum
+}
+
+func requireExecutableMode(t *testing.T, path string) {
+	t.Helper()
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	require.NotZero(t, info.Mode()&0o111, "expected executable bits for %s", path)
 }
 
 func machineNameFromELF(t *testing.T, path string) string {

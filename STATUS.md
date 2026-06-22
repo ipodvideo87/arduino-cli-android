@@ -32,6 +32,9 @@ into reusable infrastructure for Linux-based development tools on Android.
 - ACL runtime discovery now prefers `ACL_RUNTIME_ROOT`, then `HOME/.arduino-cli-android/acl-runtime`, then `PREFIX/opt/arduino-cli-android/acl-runtime`, then `./acl-runtime`.
 - ACL execution now emits structured diagnostics for dry-run and `--apply` so native Termux failures can be triaged with target, runtime, environment, and result evidence.
 - `validate-compat` now treats Rust launcher wrappers as ELF executables again.
+- ACL package building and runtime installation now preserve executable file modes instead of rewriting everything through a default `0644` create path.
+- ACL compatibility validation now reports executable and script candidates that are missing execute bits.
+- Runtime and package tests now cover executable-mode preservation through builder packaging, runtime installation, and build-runtime CLI packaging.
 - The ACL toolchain compatibility validation mode exists, is covered by unit tests, and now separates ignored resources from warnings.
 - Documentation policies are in place and kept aligned with implementation.
 
@@ -54,6 +57,7 @@ into reusable infrastructure for Linux-based development tools on Android.
   `LD_PRELOAD` or `LD_LIBRARY_PATH` state from the shell environment.
 - Successful proot execution does not prove Android-native compatibility.
 - A complete compile-and-upload loop has not yet been demonstrated.
+- The remaining native gap is broader Android compile-and-upload proof, not launcher execute-bit preservation.
 
 ## Next Engineering Milestone
 

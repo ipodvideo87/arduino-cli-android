@@ -41,6 +41,8 @@ func TestGenerateManifestAndPackageAreDeterministic(t *testing.T) {
 	verifyPackageLayout(t, out2)
 	require.NoError(t, b.Verify(out1))
 	require.NoError(t, b.Verify(out2))
+	requireExecutableFileMode(t, filepath.Join(out1, "loader", "ld-linux-test.so"))
+	requireExecutableFileMode(t, filepath.Join(out1, "lib", "libacl-test.so"))
 }
 
 func TestPackageProducesRuntimeManagerCompatibleManifest(t *testing.T) {
@@ -186,6 +188,13 @@ func copyFile(t *testing.T, src, dst string) {
 	data, err := os.ReadFile(src)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(dst, data, 0o755))
+}
+
+func requireExecutableFileMode(t *testing.T, path string) {
+	t.Helper()
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	require.NotZero(t, info.Mode()&0o111, "expected executable bits for %s", path)
 }
 
 func hostArchitecture(t *testing.T, path string) string {

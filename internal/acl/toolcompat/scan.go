@@ -52,6 +52,8 @@ type Entry struct {
 	ExecutableType          string                           `json:"executable_type"`
 	CompatibilityCategory   string                           `json:"compatibility_category"`
 	PatchClass              string                           `json:"patch_class"`
+	Mode                    string                           `json:"mode,omitempty"`
+	HasExecutePermission    bool                             `json:"has_execute_permission"`
 	Architecture            string                           `json:"architecture,omitempty"`
 	Interpreter             string                           `json:"interpreter,omitempty"`
 	SharedLibraries         []string                         `json:"shared_libraries,omitempty"`
@@ -155,6 +157,10 @@ func (s *Scanner) inspectPath(root, path string, d fs.DirEntry) (Entry, bool, er
 		Path:         path,
 		RelativePath: filepath.ToSlash(rel),
 	}
+	if modeInfo, err := effectiveModeInfo(path, info); err == nil {
+		entry.Mode = modeInfo.Mode().String()
+		entry.HasExecutePermission = modeInfo.Mode()&0o111 != 0
+	}
 
 	switch kind {
 	case "elf":
@@ -217,6 +223,13 @@ func (s *Scanner) inspectPath(root, path string, d fs.DirEntry) (Entry, bool, er
 	}
 
 	return entry, true, nil
+}
+
+func effectiveModeInfo(path string, info fs.FileInfo) (fs.FileInfo, error) {
+	if info.Mode()&os.ModeSymlink == 0 {
+		return info, nil
+	}
+	return os.Stat(path)
 }
 
 func detectCandidateType(path string, mode fs.FileMode) (string, bool, error) {
@@ -410,6 +423,10 @@ func FormatReport(report Report) string {
 		if entry.RunPath != "" {
 			fmt.Fprintf(&b, "  runpath: %s\n", entry.RunPath)
 		}
+		if entry.Mode != "" {
+			fmt.Fprintf(&b, "  mode: %s\n", entry.Mode)
+		}
+		fmt.Fprintf(&b, "  execute bit: %t\n", entry.HasExecutePermission)
 		if len(entry.SharedLibraries) > 0 {
 			fmt.Fprintf(&b, "  shared libraries: %s\n", strings.Join(entry.SharedLibraries, ", "))
 		}
