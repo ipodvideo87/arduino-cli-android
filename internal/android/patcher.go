@@ -27,19 +27,15 @@ func patchInstallTree(root string, patchPlatformTxt bool, goos string) error {
 	if goos != "android" {
 		return nil
 	}
+	if !patchPlatformTxt && isOptionalAndroidDebugToolRoot(root) {
+		return nil
+	}
 	runtimeDir, err := installRuntime(root)
 	if err != nil {
 		return err
 	}
 	if err := repairExecutableModes(root); err != nil {
 		return err
-	}
-
-	// OpenOCD is a debug/JTAG-only host tool on Android. It is intentionally
-	// left unsupported so core installation can complete without requiring a
-	// complete Android runtime closure for libusb-based debug backends.
-	if !patchPlatformTxt && isOptionalAndroidDebugToolRoot(root) {
-		return nil
 	}
 
 	if patchPlatformTxt {
@@ -60,6 +56,10 @@ func patchInstallTree(root string, patchPlatformTxt bool, goos string) error {
 }
 
 func isOptionalAndroidDebugToolRoot(root string) bool {
+	clean := filepath.ToSlash(filepath.Clean(root))
+	if strings.Contains(clean, "/openocd-esp32/") {
+		return true
+	}
 	toolDir := filepath.Base(filepath.Dir(filepath.Clean(root)))
 	return toolcompat.IsAndroidUnsupportedDebugToolPath(toolDir)
 }

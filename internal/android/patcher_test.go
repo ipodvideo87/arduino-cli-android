@@ -99,7 +99,11 @@ func TestPatchInstallTreeSkipsOpenOCDToolPackage(t *testing.T) {
 	copyFile(t, hostExe, elfPath, 0o600)
 
 	require.NoError(t, patchInstallTree(root, false, "android"))
-	requireExecutableMode(t, elfPath)
+}
+
+func TestIsOptionalAndroidDebugToolRootMatchesOpenOCDPackageLayout(t *testing.T) {
+	root := filepath.Join("/data/data/com.termux/files/home/.arduino15/packages/esp32/tools/openocd-esp32/v0.12.0-esp32-20251215")
+	require.True(t, isOptionalAndroidDebugToolRoot(root))
 }
 
 func TestEnsureRuntimeDependenciesAvailableAcceptsCompleteRuntime(t *testing.T) {
