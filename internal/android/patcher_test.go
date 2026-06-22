@@ -145,13 +145,13 @@ func TestPatchExecutableWrapsFilePathOnMalformedELF(t *testing.T) {
 }
 
 func TestPatchSpecForELFSkipsNonAArch64(t *testing.T) {
-	spec, ok := patchSpecForELFFields(elf.EM_X86_64, "EXEC", "/lib64/ld-linux-x86-64.so.2", []string{"libc.so.6"}, "/tmp/runtime")
+	spec, ok := patchSpecForELFFields("/tmp/tool", elf.EM_X86_64, "EXEC", "/lib64/ld-linux-x86-64.so.2", []string{"libc.so.6"}, "/tmp/runtime")
 	require.False(t, ok)
 	require.Equal(t, patchSpec{}, spec)
 }
 
 func TestPatchSpecForELFUsesInterpreterForExecutables(t *testing.T) {
-	spec, ok := patchSpecForELFFields(elf.EM_AARCH64, "EXEC", "/lib/ld-linux-aarch64.so.1", []string{"libc.so.6"}, "/tmp/runtime")
+	spec, ok := patchSpecForELFFields("/tmp/tool", elf.EM_AARCH64, "EXEC", "/lib/ld-linux-aarch64.so.1", []string{"libc.so.6"}, "/tmp/runtime")
 	require.True(t, ok)
 	require.True(t, spec.setInterpreter)
 	require.Equal(t, filepath.Join("/tmp/runtime", "ld-linux-aarch64.so.1"), spec.interpreter)
@@ -159,11 +159,16 @@ func TestPatchSpecForELFUsesInterpreterForExecutables(t *testing.T) {
 }
 
 func TestPatchSpecForELFSkipsInterpreterForSharedLibraries(t *testing.T) {
-	spec, ok := patchSpecForELFFields(elf.EM_AARCH64, "DYN", "", []string{"libc.so.6"}, "/tmp/runtime")
+	spec, ok := patchSpecForELFFields("/tmp/tool", elf.EM_AARCH64, "DYN", "", []string{"libc.so.6"}, "/tmp/runtime")
 	require.True(t, ok)
 	require.False(t, spec.setInterpreter)
 	require.Empty(t, spec.interpreter)
 	require.Contains(t, spec.rpath, "/tmp/runtime")
+}
+
+func TestBuildRPathAddsGCCInternalSearchPaths(t *testing.T) {
+	rpath := buildRPath("/opt/arduino-toolchain/libexec/gcc/aarch64-linux-android/12.2.0/cc1plus", "/tmp/runtime")
+	require.Equal(t, "$ORIGIN/../../../../.acl/runtime:$ORIGIN/../../../../lib:$ORIGIN/../../../../lib64:$ORIGIN/../../../../libs:$ORIGIN/..", rpath)
 }
 
 func copyFile(t *testing.T, src, dst string, mode os.FileMode) {

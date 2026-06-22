@@ -53,7 +53,7 @@ func patchExecutable(path, runtimeDir string) error {
 	}
 	defer f.Close()
 
-	spec, shouldPatch := patchSpecForELF(f, runtimeDir)
+	spec, shouldPatch := patchSpecForELF(path, f, runtimeDir)
 	if !shouldPatch {
 		return nil
 	}
@@ -98,7 +98,7 @@ func ensureRuntimeDependenciesAvailable(path, runtimeDir string, libs []string) 
 	return fmt.Errorf("runtime dependency closure incomplete for %s: missing %s in %s", path, strings.Join(missing, ", "), runtimeDir)
 }
 
-func patchSpecForELF(f *elf.File, runtimeDir string) (patchSpec, bool) {
+func patchSpecForELF(path string, f *elf.File, runtimeDir string) (patchSpec, bool) {
 	interp, err := elfInterpreter(f)
 	if err != nil {
 		interp = ""
@@ -108,10 +108,10 @@ func patchSpecForELF(f *elf.File, runtimeDir string) (patchSpec, bool) {
 		return patchSpec{}, false
 	}
 	fileType := strings.TrimPrefix(f.FileHeader.Type.String(), "ET_")
-	return patchSpecForELFFields(f.FileHeader.Machine, fileType, interp, libs, runtimeDir)
+	return patchSpecForELFFields(path, f.FileHeader.Machine, fileType, interp, libs, runtimeDir)
 }
 
-func patchSpecForELFFields(machine elf.Machine, fileType string, interp string, libs []string, runtimeDir string) (patchSpec, bool) {
+func patchSpecForELFFields(path string, machine elf.Machine, fileType string, interp string, libs []string, runtimeDir string) (patchSpec, bool) {
 	if machine != elf.EM_AARCH64 {
 		return patchSpec{}, false
 	}
@@ -128,10 +128,10 @@ func patchSpecForELFFields(machine elf.Machine, fileType string, interp string, 
 		return patchSpec{
 			setInterpreter: true,
 			interpreter:    filepath.Join(runtimeDir, "ld-linux-aarch64.so.1"),
-			rpath:          buildRPath(runtimeDir),
+			rpath:          buildRPath(path, runtimeDir),
 		}, true
 	case toolcompat.PatchClassRPathOnly:
-		return patchSpec{rpath: buildRPath(runtimeDir)}, true
+		return patchSpec{rpath: buildRPath(path, runtimeDir)}, true
 	default:
 		return patchSpec{}, false
 	}
@@ -151,15 +151,48 @@ func elfInterpreter(f *elf.File) (string, error) {
 	return "", fmt.Errorf("no PT_INTERP")
 }
 
-func buildRPath(runtimeDir string) string {
-	return strings.Join([]string{
-		runtimeDir,
-		"$ORIGIN",
-		"$ORIGIN/../lib",
-		"$ORIGIN/../lib64",
-		"$ORIGIN/../libs",
-		"$ORIGIN/..",
-	}, ":")
+func buildRPath(path, runtimeDir string) string {
+	parts := []string{runtimeDir}
+	if isGCCInternalExecutable(path) {
+		parts = []string{"$ORIGIN/../../../../.acl/runtime"}
+		parts = append(parts,
+			"$ORIGIN/../../../../lib",
+			"$ORIGIN/../../../../lib64",
+			"$ORIGIN/../../../../libs",
+			"$ORIGIN/..",
+		)
+	} else {
+		parts = append(parts,
+			"$ORIGIN",
+			"$ORIGIN/../lib",
+			"$ORIGIN/../lib64",
+			"$ORIGIN/../libs",
+			"$ORIGIN/..",
+		)
+	}
+	return strings.Join(uniquePathParts(parts), ":")
+}
+
+func isGCCInternalExecutable(path string) bool {
+	clean := filepath.ToSlash(strings.ToLower(path))
+	return strings.Contains(clean, "/libexec/gcc/")
+}
+
+func uniquePathParts(parts []string) []string {
+	seen := make(map[string]struct{}, len(parts))
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if _, ok := seen[part]; ok {
+			continue
+		}
+		seen[part] = struct{}{}
+		out = append(out, part)
+	}
+	return out
 }
 
 func patchWithPatchelf(path string, spec patchSpec) error {
