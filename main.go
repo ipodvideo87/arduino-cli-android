@@ -37,6 +37,7 @@ import (
 func main() {
 	// Disable logging until it is setup in the arduino-cli pre-run
 	logrus.SetOutput(io.Discard)
+	scrubUnsafeLoaderEnvForNativeTermux()
 
 	// Search for the configuration file in the command line arguments and in the environment
 	configFile := configuration.FindConfigFlagsInArgsOrFallbackOnEnv(os.Args)
