@@ -139,11 +139,13 @@ func TestScanCopiesRustLauncherDelegateTargets(t *testing.T) {
 			LooksLikeLinuxTarget:  true,
 			LooksLikeRustLauncher: true,
 			LauncherDelegateTargets: []aclscan.LauncherDelegateTarget{{
-				Path:       filepath.Join(root, "xtensa-esp32s3-elf-gcc.real"),
+				Path:       filepath.Join(root, "lib", "xtensa_esp32s3.so"),
 				Exists:     true,
 				Executable: true,
 				Mode:       "-rwxr-xr-x",
-				Source:     "basename-variant",
+				Source:     "chip-plugin",
+				IsELF:      true,
+				FileType:   "DYN",
 			}},
 		}, nil
 	}
@@ -152,7 +154,7 @@ func TestScanCopiesRustLauncherDelegateTargets(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, report.Entries, 1)
 	require.Len(t, report.Entries[0].LauncherDelegateTargets, 1)
-	require.Equal(t, filepath.Join(root, "xtensa-esp32s3-elf-gcc.real"), report.Entries[0].LauncherDelegateTargets[0].Path)
+	require.Equal(t, filepath.Join(root, "lib", "xtensa_esp32s3.so"), report.Entries[0].LauncherDelegateTargets[0].Path)
 }
 
 func TestScanBuildsLinuxRuntimeCandidate(t *testing.T) {

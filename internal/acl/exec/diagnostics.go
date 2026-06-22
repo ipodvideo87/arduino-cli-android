@@ -58,11 +58,12 @@ type RuntimeDiagnostics struct {
 }
 
 type TargetDataDiagnostics struct {
-	Machine         string                           `json:"machine,omitempty"`
-	IsELF           bool                             `json:"is_elf"`
-	HasPTInterp     bool                             `json:"has_pt_interp"`
-	LikelySource    string                           `json:"likely_source,omitempty"`
-	DelegateTargets []aclscan.LauncherDelegateTarget `json:"delegate_targets,omitempty"`
+	Machine                 string                           `json:"machine,omitempty"`
+	IsELF                   bool                             `json:"is_elf"`
+	HasPTInterp             bool                             `json:"has_pt_interp"`
+	LikelySource            string                           `json:"likely_source,omitempty"`
+	XtensaDynConfigEvidence bool                             `json:"xtensa_dynconfig_evidence,omitempty"`
+	DelegateTargets         []aclscan.LauncherDelegateTarget `json:"delegate_targets,omitempty"`
 }
 
 type ResultDiagnostics struct {
@@ -123,6 +124,9 @@ func FormatDiagnosticReport(r DiagnosticReport) string {
 	}
 	if len(r.Runtime.Argv) > 0 {
 		fmt.Fprintf(&b, "Argv: %s\n", strings.Join(r.Runtime.Argv, " "))
+	}
+	if r.TargetData.XtensaDynConfigEvidence {
+		fmt.Fprintln(&b, "Xtensa dynconfig evidence: yes")
 	}
 	if len(r.TargetData.DelegateTargets) > 0 {
 		fmt.Fprintln(&b, "Delegate targets:")
@@ -252,11 +256,12 @@ func BuildDiagnosticReport(plan ExecutionPlan, req Request, result Result) Diagn
 			Argv:     append([]string(nil), plan.Argv...),
 		},
 		TargetData: TargetDataDiagnostics{
-			Machine:         plan.Target.Machine,
-			IsELF:           plan.Target.IsELF,
-			HasPTInterp:     strings.TrimSpace(plan.Target.Interpreter) != "",
-			LikelySource:    likelyTargetSource(plan),
-			DelegateTargets: append([]aclscan.LauncherDelegateTarget(nil), plan.Target.LauncherDelegateTargets...),
+			Machine:                 plan.Target.Machine,
+			IsELF:                   plan.Target.IsELF,
+			HasPTInterp:             strings.TrimSpace(plan.Target.Interpreter) != "",
+			LikelySource:            likelyTargetSource(plan),
+			XtensaDynConfigEvidence: plan.Target.LooksLikeXtensaDynConfig,
+			DelegateTargets:         append([]aclscan.LauncherDelegateTarget(nil), plan.Target.LauncherDelegateTargets...),
 		},
 		Result: ResultDiagnostics{
 			Mode:           plan.LaunchMode,
@@ -531,6 +536,9 @@ func buildLikelyCauseHints(plan ExecutionPlan, result Result, exists, execPerm b
 		if childErrno := detectChildExecErrno(result); childErrno != "" {
 			hints = append(hints, "Rust launcher child exec returned "+childErrno+"; check delegate path existence, execute bits, symlink resolution, and noexec/SELinux constraints")
 		}
+		if plan.Target.LooksLikeXtensaDynConfig {
+			hints = append(hints, "launcher strings suggest an Xtensa dynconfig plugin flow (-mdynconfig= / xtensa_.so), so the .so may be a plugin/config input rather than a standalone executable")
+		}
 		if len(plan.Target.LauncherDelegateTargets) > 0 {
 			var issues []string
 			for _, target := range plan.Target.LauncherDelegateTargets {
@@ -544,6 +552,12 @@ func buildLikelyCauseHints(plan ExecutionPlan, result Result, exists, execPerm b
 			}
 			if len(issues) > 0 {
 				hints = append(hints, "Rust launcher delegate candidates: "+strings.Join(issues, "; "))
+			}
+			for _, target := range plan.Target.LauncherDelegateTargets {
+				if strings.EqualFold(strings.TrimSpace(target.FileType), "DYN") || strings.HasSuffix(strings.ToLower(strings.TrimSpace(target.Path)), ".so") {
+					hints = append(hints, "Rust launcher delegate "+target.Path+" is a shared object; Android may reject direct execv even when the x bit is set")
+					break
+				}
 			}
 		}
 	}

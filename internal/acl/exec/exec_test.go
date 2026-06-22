@@ -603,19 +603,23 @@ func TestBuildDiagnosticReportIncludesRustLauncherDelegateTargetsAndEACCESHint(t
 		TargetClass: TargetClassRustLauncher,
 		LaunchMode:  LaunchModeDirectExec,
 		Target: aclscan.Inspection{
-			Path:                  target,
-			IsELF:                 true,
-			Machine:               hostArch,
-			LooksLikeRustLauncher: true,
-			LooksLikeLinuxTarget:  true,
-			Interpreter:           "/lib64/ld-linux-aarch64.so.1",
-			ImportedLibraries:     []string{"libc.so.6"},
+			Path:                     target,
+			IsELF:                    true,
+			Machine:                  hostArch,
+			LooksLikeRustLauncher:    true,
+			LooksLikeXtensaDynConfig: true,
+			LooksLikeLinuxTarget:     true,
+			Interpreter:              "/lib64/ld-linux-aarch64.so.1",
+			ImportedLibraries:        []string{"libc.so.6"},
 			LauncherDelegateTargets: []aclscan.LauncherDelegateTarget{{
-				Path:       "/tmp/xtensa-esp32s3-elf-gcc.real",
-				Exists:     true,
-				Executable: false,
-				Mode:       "-rw-r--r--",
-				Source:     "basename-variant",
+				Path:        "/tmp/lib/xtensa_esp32s3.so",
+				Exists:      true,
+				Executable:  true,
+				Mode:        "-rwxr-xr-x",
+				Source:      "chip-plugin",
+				IsELF:       true,
+				FileType:    "DYN",
+				Interpreter: "",
 			}},
 		},
 		Argv: []string{target, "--version"},
@@ -626,11 +630,13 @@ func TestBuildDiagnosticReportIncludesRustLauncherDelegateTargetsAndEACCESHint(t
 	})
 
 	require.Len(t, report.TargetData.DelegateTargets, 1)
-	require.Equal(t, "/tmp/xtensa-esp32s3-elf-gcc.real", report.TargetData.DelegateTargets[0].Path)
+	require.Equal(t, "/tmp/lib/xtensa_esp32s3.so", report.TargetData.DelegateTargets[0].Path)
+	require.True(t, report.TargetData.XtensaDynConfigEvidence)
 	require.Equal(t, "EACCES", report.Result.ChildExecErrno)
-	require.Contains(t, strings.Join(report.Hints, " "), "delegate path existence")
+	require.Contains(t, strings.Join(report.Hints, " "), "shared object")
+	require.Contains(t, strings.Join(report.Hints, " "), "dynconfig plugin flow")
 	require.Contains(t, strings.Join(report.Hints, " "), "EACCES")
-	require.Contains(t, strings.Join(report.Hints, " "), "not executable")
+	require.NotContains(t, strings.Join(report.Hints, " "), "not executable")
 }
 
 func installRuntimeFixture(t *testing.T, root, runtimeID, compatibility string) (aclruntime.Runtime, string) {

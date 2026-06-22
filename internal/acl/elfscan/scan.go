@@ -13,36 +13,55 @@ import (
 var ErrNotELF = errors.New("not an ELF file")
 
 type Inspection struct {
-	Path                    string
-	Exists                  bool
-	IsELF                   bool
-	Class                   string
-	Machine                 string
-	FileType                string
-	SONAME                  string
-	Interpreter             string
-	RPath                   string
-	RunPath                 string
-	ImportedLibraries       []string
-	Needed                  []string
-	HardcodedAbsolutePaths  []string
-	LauncherDelegateTargets []LauncherDelegateTarget
-	LooksLikeLinuxTarget    bool
-	LooksLikeRustLauncher   bool
-	HasProgramInterpreter   bool
+	Path                     string
+	Exists                   bool
+	IsELF                    bool
+	Class                    string
+	Machine                  string
+	FileType                 string
+	SONAME                   string
+	Interpreter              string
+	RPath                    string
+	RunPath                  string
+	ImportedLibraries        []string
+	Needed                   []string
+	HardcodedAbsolutePaths   []string
+	LauncherDelegateTargets  []LauncherDelegateTarget
+	LooksLikeLinuxTarget     bool
+	LooksLikeRustLauncher    bool
+	LooksLikeXtensaDynConfig bool
+	HasProgramInterpreter    bool
 }
 
 type LauncherDelegateTarget struct {
-	Path          string `json:"path"`
-	Exists        bool   `json:"exists"`
-	Executable    bool   `json:"executable"`
-	Mode          string `json:"mode,omitempty"`
-	Symlink       bool   `json:"symlink"`
-	SymlinkTarget string `json:"symlink_target,omitempty"`
-	Source        string `json:"source,omitempty"`
+	Path                   string   `json:"path"`
+	Exists                 bool     `json:"exists"`
+	Executable             bool     `json:"executable"`
+	Mode                   string   `json:"mode,omitempty"`
+	Symlink                bool     `json:"symlink"`
+	SymlinkTarget          string   `json:"symlink_target,omitempty"`
+	Source                 string   `json:"source,omitempty"`
+	InspectionError        string   `json:"inspection_error,omitempty"`
+	IsELF                  bool     `json:"is_elf"`
+	Class                  string   `json:"class,omitempty"`
+	Machine                string   `json:"machine,omitempty"`
+	FileType               string   `json:"file_type,omitempty"`
+	Interpreter            string   `json:"interpreter,omitempty"`
+	RPath                  string   `json:"rpath,omitempty"`
+	RunPath                string   `json:"runpath,omitempty"`
+	ImportedLibraries      []string `json:"imported_libraries,omitempty"`
+	Needed                 []string `json:"needed,omitempty"`
+	HardcodedAbsolutePaths []string `json:"hardcoded_absolute_paths,omitempty"`
+	LooksLikeLinuxTarget   bool     `json:"looks_like_linux_target"`
+	LooksLikeRustLauncher  bool     `json:"looks_like_rust_launcher"`
+	HasProgramInterpreter  bool     `json:"has_program_interpreter"`
 }
 
 func Inspect(path string) (Inspection, error) {
+	return inspect(path, true)
+}
+
+func inspect(path string, detectDelegates bool) (Inspection, error) {
 	result := Inspection{Path: path}
 
 	info, err := os.Stat(path)
@@ -76,7 +95,8 @@ func Inspect(path string) (Inspection, error) {
 	result.HardcodedAbsolutePaths = findInterestingAbsoluteStrings(path)
 	result.LooksLikeLinuxTarget = looksLikeLinuxTarget(result.SONAME, result.Interpreter, result.ImportedLibraries)
 	result.LooksLikeRustLauncher = looksLikeRustLauncher(path)
-	if result.LooksLikeRustLauncher {
+	result.LooksLikeXtensaDynConfig = looksLikeXtensaDynConfig(path)
+	if detectDelegates && result.LooksLikeRustLauncher {
 		result.LauncherDelegateTargets = findRustLauncherDelegateTargets(path)
 	}
 
@@ -235,6 +255,31 @@ func looksLikeRustLauncher(path string) bool {
 	return foundPattern && foundDynconfig && foundExecPath
 }
 
+func looksLikeXtensaDynConfig(path string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+
+	var foundDynConfig bool
+	var foundPluginHint bool
+	for _, s := range extractStrings(data) {
+		lower := strings.ToLower(s)
+		switch {
+		case strings.Contains(s, "XTENSA_GNU_CONFIG"):
+			foundDynConfig = true
+		case strings.Contains(lower, "-mdynconfig="):
+			foundDynConfig = true
+		case strings.Contains(lower, "dynconfig for target"):
+			foundDynConfig = true
+		case strings.Contains(lower, "xtensa_.so"):
+			foundPluginHint = true
+		}
+	}
+
+	return foundDynConfig && foundPluginHint
+}
+
 func findRustLauncherDelegateTargets(path string) []LauncherDelegateTarget {
 	seen := map[string]struct{}{}
 	var targets []LauncherDelegateTarget
@@ -270,10 +315,8 @@ func findRustLauncherDelegateTargets(path string) []LauncherDelegateTarget {
 		}
 	}
 
-	base := filepath.Base(path)
-	dir := filepath.Dir(path)
-	for _, suffix := range []string{".real", ".backend", ".bin", "-real", "-backend"} {
-		addCandidate(filepath.Join(dir, base+suffix), "basename-variant")
+	for _, candidate := range rustLauncherDelegateCandidates(path) {
+		addCandidate(candidate, "chip-plugin")
 	}
 
 	return targets
@@ -287,9 +330,7 @@ func normalizeLauncherDelegateCandidate(value string) string {
 
 	lower := strings.ToLower(value)
 	switch {
-	case strings.HasSuffix(lower, ".so"),
-		strings.HasSuffix(lower, ".so.1"),
-		strings.HasSuffix(lower, ".a"),
+	case strings.HasSuffix(lower, ".a"),
 		strings.HasSuffix(lower, ".h"),
 		strings.HasSuffix(lower, ".md"),
 		strings.HasSuffix(lower, ".txt"),
@@ -311,6 +352,38 @@ func normalizeLauncherDelegateCandidate(value string) string {
 	}
 
 	return ""
+}
+
+func rustLauncherDelegateCandidates(path string) []string {
+	base := strings.ToLower(filepath.Base(path))
+	chips := rustLauncherChipCandidates(base)
+	if len(chips) == 0 {
+		return nil
+	}
+
+	packageRoot := filepath.Clean(filepath.Join(filepath.Dir(path), ".."))
+	libDir := filepath.Join(packageRoot, "lib")
+	candidates := make([]string, 0, len(chips))
+	for _, chip := range chips {
+		candidates = append(candidates, filepath.Join(libDir, "xtensa_"+chip+".so"))
+	}
+	return candidates
+}
+
+func rustLauncherChipCandidates(base string) []string {
+	base = strings.ToLower(base)
+	switch {
+	case strings.Contains(base, "esp32s3"):
+		return []string{"esp32s3", "esp32"}
+	case strings.Contains(base, "esp32s2"):
+		return []string{"esp32s2", "esp32"}
+	case strings.Contains(base, "esp32"):
+		return []string{"esp32"}
+	case strings.Contains(base, "esp8266"), strings.Contains(base, "lx106"):
+		return []string{"esp8266"}
+	default:
+		return nil
+	}
 }
 
 func inspectLauncherDelegateTarget(path, source string) LauncherDelegateTarget {
@@ -336,6 +409,25 @@ func inspectLauncherDelegateTarget(path, source string) LauncherDelegateTarget {
 			target.Mode = info.Mode().String()
 		}
 	}
+
+	inspection, err := inspect(path, false)
+	if err != nil {
+		target.InspectionError = err.Error()
+		return target
+	}
+	target.IsELF = inspection.IsELF
+	target.Class = inspection.Class
+	target.Machine = inspection.Machine
+	target.FileType = inspection.FileType
+	target.Interpreter = inspection.Interpreter
+	target.RPath = inspection.RPath
+	target.RunPath = inspection.RunPath
+	target.ImportedLibraries = append([]string(nil), inspection.ImportedLibraries...)
+	target.Needed = append([]string(nil), inspection.Needed...)
+	target.HardcodedAbsolutePaths = append([]string(nil), inspection.HardcodedAbsolutePaths...)
+	target.LooksLikeLinuxTarget = inspection.LooksLikeLinuxTarget
+	target.LooksLikeRustLauncher = inspection.LooksLikeRustLauncher
+	target.HasProgramInterpreter = inspection.HasProgramInterpreter
 
 	return target
 }
@@ -389,6 +481,23 @@ func Format(ins Inspection) string {
 			fmt.Fprintf(&b, " exists=%t executable=%t", target.Exists, target.Executable)
 			if target.Mode != "" {
 				fmt.Fprintf(&b, " mode=%s", target.Mode)
+			}
+			if target.InspectionError != "" {
+				fmt.Fprintf(&b, " inspect_error=%s", target.InspectionError)
+			} else {
+				fmt.Fprintf(&b, " elf=%t class=%s machine=%s type=%s", target.IsELF, target.Class, target.Machine, target.FileType)
+				if target.Interpreter != "" {
+					fmt.Fprintf(&b, " interp=%s", target.Interpreter)
+				}
+				if target.RPath != "" {
+					fmt.Fprintf(&b, " rpath=%s", target.RPath)
+				}
+				if target.RunPath != "" {
+					fmt.Fprintf(&b, " runpath=%s", target.RunPath)
+				}
+				if len(target.Needed) > 0 {
+					fmt.Fprintf(&b, " needed=%s", strings.Join(target.Needed, ","))
+				}
 			}
 			fmt.Fprintln(&b)
 		}
