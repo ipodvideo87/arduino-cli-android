@@ -89,6 +89,19 @@ func TestPatchInstallTreeSkipsEmptyFiles(t *testing.T) {
 	require.NoError(t, patchInstallTree(root, false, "android"))
 }
 
+func TestPatchInstallTreeSkipsOpenOCDToolPackage(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "tools", "openocd-esp32", "v0.12.0-esp32-20251215")
+	hostExe, err := os.Executable()
+	require.NoError(t, err)
+
+	elfPath := filepath.Join(root, "bin", "openocd")
+	require.NoError(t, os.MkdirAll(filepath.Dir(elfPath), 0o755))
+	copyFile(t, hostExe, elfPath, 0o600)
+
+	require.NoError(t, patchInstallTree(root, false, "android"))
+	requireExecutableMode(t, elfPath)
+}
+
 func TestEnsureRuntimeDependenciesAvailableAcceptsCompleteRuntime(t *testing.T) {
 	runtimeDir := t.TempDir()
 	for _, name := range []string{"libc.so.6", "libdl.so.2", "libm.so.6"} {

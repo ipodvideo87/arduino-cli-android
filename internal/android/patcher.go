@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/arduino/arduino-cli/internal/acl/toolcompat"
 )
 
 // PatchPlatformForAndroid patches an installed platform tree using the ACL
@@ -33,6 +35,13 @@ func patchInstallTree(root string, patchPlatformTxt bool, goos string) error {
 		return err
 	}
 
+	// OpenOCD is a debug/JTAG-only host tool on Android. It is intentionally
+	// left unsupported so core installation can complete without requiring a
+	// complete Android runtime closure for libusb-based debug backends.
+	if !patchPlatformTxt && isOptionalAndroidDebugToolRoot(root) {
+		return nil
+	}
+
 	if patchPlatformTxt {
 		if err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -48,6 +57,11 @@ func patchInstallTree(root string, patchPlatformTxt bool, goos string) error {
 	}
 
 	return patchELFs(root, runtimeDir)
+}
+
+func isOptionalAndroidDebugToolRoot(root string) bool {
+	toolDir := filepath.Base(filepath.Dir(filepath.Clean(root)))
+	return toolcompat.IsAndroidUnsupportedDebugToolPath(toolDir)
 }
 
 // patchPlatform modifies platform.txt for Android compatibility.

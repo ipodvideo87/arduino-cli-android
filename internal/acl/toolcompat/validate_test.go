@@ -331,6 +331,26 @@ func TestValidateReportWarnsOnUnsupportedHostExecutable(t *testing.T) {
 	require.Contains(t, strings.Join(validation.Findings[0].Messages, " "), "unsupported on Android")
 }
 
+func TestValidateReportWarnsOnOpenOCDHostExecutable(t *testing.T) {
+	report := Report{
+		Root:    "/tmp/packages",
+		Summary: Summary{TotalEntries: 1},
+		Entries: []Entry{{
+			RelativePath:          "esp32/tools/openocd-esp32/v0.12.0-esp32-20251215/bin/openocd",
+			ExecutableType:        "elf",
+			CompatibilityCategory: CategoryUnsupported,
+			PatchClass:            PatchClassUnsupported,
+			Architecture:          "AArch64",
+		}},
+	}
+
+	validation := ValidateReport(report)
+	require.True(t, validation.Summary.Passed)
+	require.Equal(t, 1, validation.Summary.Warnings)
+	require.Contains(t, strings.Join(validation.Findings[0].Messages, " "), "OpenOCD")
+	require.Contains(t, strings.Join(validation.Findings[0].Messages, " "), "unsupported on Android")
+}
+
 func TestValidateReportWarnsOnWindowsExecutable(t *testing.T) {
 	report := Report{
 		Root:    "/tmp/packages",
