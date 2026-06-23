@@ -56,6 +56,8 @@ Use it to capture confirmed behavior, evidence, and open questions before making
   - Evidence: `internal/android/patcher.go` special-cases `isGCCInternalExecutable(path)` and adds `$.acl/runtime` plus sibling library search paths.
 - Tool patching is applied after installation, not during extraction.
   - Evidence: `internal/arduino/cores/packagemanager/install_uninstall.go` calls `android.PatchToolForAndroid(...)` after `toolResource.Install(...)`.
+- Builtin tools installed under `packages/builtin/tools/...` now also pass through the Android patcher after install.
+  - Evidence: `commands/instances.go` now calls the same Android patch step after builtin tool installation.
 - `patchelf --set-interpreter` is the operation that rewrites large GCC internal executables into a split-load layout with an extra low-address `LOAD` and a relocated `DYNAMIC` segment; `--set-rpath` alone preserves the original program-header shape.
   - Evidence: local comparison of upstream `cc1plus` from `xtensa-esp-elf-14.2.0_20260121-aarch64-linux-gnu.tar.gz` against copies patched with `patchelf 0.18.0`.
   - Original `cc1plus`: 10 program headers, `PT_INTERP=/lib/ld-linux-aarch64.so.1`, `DYNAMIC` at `0x1fe19f8`.
@@ -64,6 +66,8 @@ Use it to capture confirmed behavior, evidence, and open questions before making
 - GCC internal executables under `libexec/gcc/` are now launched through a shell wrapper that preserves the original binary in `.acl/original/` and invokes the bundled loader with `--library-path`; they are no longer rewritten in place with `patchelf --set-interpreter`.
   - Evidence: repository implementation in `internal/android/elf_plan.go` and regression tests in `internal/android/patcher_test.go`.
   - This is the current generic launch strategy for GCC internal executables on Android.
+- The GCC wrapper scrubs `LD_PRELOAD`, `LD_LIBRARY_PATH`, `LD_AUDIT`, Termux loader variables, and `QEMU_` / `PROOT_` state before invoking the bundled glibc loader.
+  - Evidence: repository implementation in `internal/android/elf_plan.go` and regression tests in `internal/android/patcher_test.go`.
 
 ## 6. Dynamic Loader Behavior
 
@@ -87,6 +91,8 @@ Use it to capture confirmed behavior, evidence, and open questions before making
     runtime-closure package hint for missing glibc libraries.
 - `cc1plus` currently has only `libdl.so.2`, `libm.so.6`, and `libc.so.6` in `DT_NEEDED`, so additional runtime files should not be added unless proven by metadata or loader traces.
   - Evidence: `readelf -d` on the patched `cc1plus`.
+- A present ELF executable can still fail with `fork/exec ...: no such file or directory` on native Android when its PT_INTERP points at an unavailable loader path.
+  - Evidence: native builtin `ctags` failure before patching, where `file` and `readelf` showed an AArch64 ELF with `PT_INTERP /lib/ld-linux-aarch64.so.1`.
 
 ## 8. GCC / Binutils Internal Executables
 
@@ -121,14 +127,10 @@ Use it to capture confirmed behavior, evidence, and open questions before making
 
 ## 11. Known Open Issues
 
-- `cc1plus` segfaults immediately after `execve` during ESP32-S3 Blink compilation on native Termux.
-  - Evidence: native `strace` and the current validation blocker reported by the device.
-- It is not yet proven whether `cc1plus` requires additional runtime files beyond the current glibc set.
-  - Evidence: current `DT_NEEDED` only names `libdl.so.2`, `libm.so.6`, and `libc.so.6`.
-- The exact failure layer for `cc1plus` is still under investigation: loader, relocation, TLS, `mprotect`, or another glibc/Android interaction.
-  - Evidence: crash timing and `SEGV_ACCERR`.
-- The direct `cc1plus` crash is now narrowed to the interpreter-rewrite path rather than missing libraries or compiler arguments.
-  - Evidence: the crash persists for direct `cc1plus --help`, and the rewritten binary's fault address lands inside the relocated `.dynamic` area produced by `patchelf --set-interpreter`.
+- `cc1plus` now uses the wrapper strategy instead of `patchelf --set-interpreter`; the previous immediate startup segfault is no longer the current blocker.
+  - Evidence: native Termux validation progressed past the earlier `cc1plus` crash once the wrapper strategy was enabled.
+- The current open Android blocker is builtin `ctags` being invoked before Android patching.
+  - Evidence: native Termux compile failure showing `fork/exec .../builtin/tools/ctags/5.8-arduino11/ctags: no such file or directory` with a present ELF and `PT_INTERP /lib/ld-linux-aarch64.so.1`.
 
 ## 12. Native Termux Validation Commands
 

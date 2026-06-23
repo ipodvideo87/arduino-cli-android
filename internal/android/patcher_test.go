@@ -199,6 +199,19 @@ func TestPlanPatchForELFUsesDifferentStrategyForGCCInternalBinaries(t *testing.T
 	require.Contains(t, internalPlan.Reason, "patchelf --set-interpreter")
 }
 
+func TestPlanPatchForBuiltinCtagsUsesLoaderAndRPath(t *testing.T) {
+	runtimeDir := "/tmp/runtime"
+	analysis := sampleAArch64ELFAnalysis("/data/data/com.termux/files/home/.arduino15/packages/builtin/tools/ctags/5.8-arduino11/ctags", "other")
+
+	plan := planPatchForELF(analysis, runtimeDir)
+
+	require.Equal(t, patchActionLoaderAndPath, plan.Action)
+	require.True(t, plan.Spec.setInterpreter)
+	require.Equal(t, filepath.Join(runtimeDir, "ld-linux-aarch64.so.1"), plan.Spec.interpreter)
+	require.Contains(t, plan.Spec.rpath, runtimeDir)
+	require.NotEqual(t, patchActionWrapperLaunch, plan.Action)
+}
+
 func TestPlanPatchForELFIsDeterministic(t *testing.T) {
 	runtimeDir := "/tmp/runtime"
 	analysis := sampleAArch64ELFAnalysis("/opt/arduino-toolchain/libexec/gcc/xtensa-esp-elf/14.2.0/cc1plus", "gcc-libexec")
@@ -250,6 +263,8 @@ func TestApplyWrapperLaunchCreatesLoaderWrapper(t *testing.T) {
 	require.Contains(t, string(wrapper), "ld-linux-aarch64.so.1")
 	require.Contains(t, string(wrapper), ".acl/original/cc1plus")
 	require.Contains(t, string(wrapper), "--library-path")
+	require.Contains(t, string(wrapper), "unset LD_PRELOAD")
+	require.Contains(t, string(wrapper), "TERMUX_PREFIX")
 }
 
 func sampleAArch64ELFAnalysis(path string, pathClass string) elfAnalysis {

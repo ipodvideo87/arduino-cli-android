@@ -35,6 +35,7 @@ does not replace native Android validation.
 - ACL execution now sanitizes the launch environment to remove LD, QEMU, and PROOT leakage while preserving normal Termux and Android variables.
 - ACL runtime discovery now prefers `ACL_RUNTIME_ROOT`, then `HOME/.arduino-cli-android/acl-runtime`, then `PREFIX/opt/arduino-cli-android/acl-runtime`, then `./acl-runtime`.
 - ACL execution now emits structured diagnostics for dry-run and `--apply` so native Termux failures can be triaged with target, runtime, environment, and result evidence.
+- Builtin tools installed from `packages/builtin/tools/...` now pass through the Android patcher, so builtin `ctags` follows the same loader and RPATH handling as other tools.
 - `validate-compat` now treats Rust launcher wrappers as ELF executables again.
 - ACL package building and runtime installation now preserve executable file modes instead of rewriting everything through a default `0644` create path.
 - ACL compatibility validation now reports executable and script candidates that are missing execute bits.
@@ -68,6 +69,7 @@ does not replace native Android validation.
   repo.
 - GCC internal executables under `libexec/gcc/` now use wrapper launch instead of
   in-place interpreter rewriting; native Termux validation for that path is still pending.
+- Native Termux validation of the builtin `ctags` Android patching path is still pending.
 - Successful proot execution does not prove Android-native compatibility.
 - A complete compile-and-upload loop has not yet been demonstrated.
 - The remaining native gap is broader Android compile-and-upload proof, not launcher execute-bit preservation.

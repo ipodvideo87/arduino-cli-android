@@ -252,5 +252,6 @@ script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 runtime_dir="$script_dir/../../../../.acl/runtime"
 loader="$runtime_dir/ld-linux-aarch64.so.1"
 target="$script_dir/.acl/original/%s"
+unset LD_PRELOAD LD_LIBRARY_PATH LD_AUDIT TERMUX_VERSION TERMUX_PREFIX TERMUX__PREFIX TERMUX_HOME TERMUX__HOME TERMUX__ROOTFS_DIR TERMUX_MAIN_PACKAGE_FORMAT QEMU_LD_PREFIX QEMU_CPU PROOT_NO_SECCOMP PROOT_TMPDIR PROOT_DONT_PROOT PROOT_VERBOSE
 exec "$loader" --library-path "$runtime_dir" "$target" "$@"`, binaryName)) + "\n"
 }

@@ -28,6 +28,7 @@ import (
 
 	"github.com/arduino/arduino-cli/commands/cmderrors"
 	"github.com/arduino/arduino-cli/commands/internal/instances"
+	"github.com/arduino/arduino-cli/internal/android"
 	"github.com/arduino/arduino-cli/internal/arduino/cores"
 	"github.com/arduino/arduino-cli/internal/arduino/cores/packageindex"
 	"github.com/arduino/arduino-cli/internal/arduino/cores/packagemanager"
@@ -49,6 +50,17 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+var patchAndroidInstalledTool = func(root string) error {
+	return android.PatchToolForAndroid(root)
+}
+
+func patchBuiltinToolsForAndroid(root *paths.Path) error {
+	if root == nil || !root.IsDir() {
+		return nil
+	}
+	return patchAndroidInstalledTool(root.String())
+}
+
 func installTool(ctx context.Context, pm *packagemanager.PackageManager, tool *cores.ToolRelease, downloadCB rpc.DownloadProgressCB, taskCB rpc.TaskProgressCB, checks resources.IntegrityCheckMode) error {
 	pme, release := pm.NewExplorer()
 	defer release()
@@ -60,6 +72,11 @@ func installTool(ctx context.Context, pm *packagemanager.PackageManager, tool *c
 	taskCB(&rpc.TaskProgress{Completed: true})
 	if err := pme.InstallTool(tool, taskCB, true, checks); err != nil {
 		return errors.New(i18n.Tr("installing %[1]s tool: %[2]s", tool, err))
+	}
+	if tool.InstallDir != nil {
+		if err := patchAndroidInstalledTool(tool.InstallDir.String()); err != nil {
+			return errors.New(i18n.Tr("patching %[1]s tool for Android: %[2]s", tool, err))
+		}
 	}
 	return nil
 }
@@ -269,6 +286,15 @@ func (s *arduinoCoreServerImpl) Init(req *rpc.InitRequest, stream rpc.ArduinoCor
 			_ = loadBuiltinTools()
 		}
 
+		if err := patchBuiltinToolsForAndroid(pmb.PackagesDir.Join("builtin", "tools")); err != nil {
+			e := &cmderrors.InitFailedError{
+				Code:   codes.Internal,
+				Cause:  err,
+				Reason: rpc.FailedInstanceInitReason_FAILED_INSTANCE_INIT_REASON_TOOL_LOAD_ERROR,
+			}
+			responseError(e.GRPCStatus())
+		}
+
 		// We load hardware before verifying builtin tools are installed
 		// otherwise we wouldn't find them and reinstall them each time
 		// and they would never get reloaded.
@@ -306,6 +332,14 @@ func (s *arduinoCoreServerImpl) Init(req *rpc.InitRequest, stream rpc.ArduinoCor
 			for _, err := range loadBuiltinTools() {
 				s := &cmderrors.PlatformLoadingError{Cause: err}
 				responseError(s.GRPCStatus())
+			}
+			if err := patchBuiltinToolsForAndroid(pmb.PackagesDir.Join("builtin", "tools")); err != nil {
+				e := &cmderrors.InitFailedError{
+					Code:   codes.Internal,
+					Cause:  err,
+					Reason: rpc.FailedInstanceInitReason_FAILED_INSTANCE_INIT_REASON_TOOL_LOAD_ERROR,
+				}
+				responseError(e.GRPCStatus())
 			}
 		}
 

@@ -19,11 +19,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"debug/elf"
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/arduino/arduino-cli/internal/arduino/builder/cpp"
 	"github.com/arduino/arduino-cli/internal/arduino/builder/internal/preprocessor/internal/ctags"
@@ -211,9 +214,45 @@ func RunCTags(ctx context.Context, sourceFile *paths.Path, buildProperties *prop
 		return nil, nil, "", err
 	}
 	stdout, stderr, err := proc.RunAndCaptureOutput(ctx)
+	if err != nil {
+		err = annotateCTagsExecutionError(parts[0], err)
+	}
 
 	args := fmt.Sprintln(strings.Join(parts, " "))
 	return stdout, stderr, args, err
+}
+
+func annotateCTagsExecutionError(ctagsPath string, err error) error {
+	if err == nil || !errors.Is(err, syscall.ENOENT) {
+		return err
+	}
+	info, statErr := os.Stat(ctagsPath)
+	if statErr != nil || info.IsDir() {
+		return err
+	}
+
+	f, openErr := elf.Open(ctagsPath)
+	if openErr != nil {
+		return err
+	}
+	defer f.Close()
+
+	for _, prog := range f.Progs {
+		if prog.Type != elf.PT_INTERP {
+			continue
+		}
+		data := make([]byte, prog.Filesz)
+		if _, readErr := prog.ReadAt(data, 0); readErr != nil {
+			return err
+		}
+		interp := strings.TrimRight(string(data), "\x00")
+		if interp == "" {
+			return err
+		}
+		return fmt.Errorf("%w: %s exists but its PT_INTERP %q could not be satisfied; on Android/Termux this usually means the ELF was not Android-patched", err, ctagsPath, interp)
+	}
+
+	return err
 }
 
 func filterSketchSource(sketch *sketch.Sketch, source io.Reader, removeLineMarkers bool, stderr *bytes.Buffer) string {

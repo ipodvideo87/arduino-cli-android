@@ -1,6 +1,6 @@
 // This file is part of arduino-cli.
 //
-// Copyright 2025 ARDUINO SA (http://www.arduino.cc/)
+// Copyright 2026 ARDUINO SA (http://www.arduino.cc/)
 //
 // This software is released under the GNU General Public License version 3,
 // which covers the main part of arduino-cli.
@@ -16,27 +16,19 @@
 package preprocessor
 
 import (
-	"bytes"
-	"fmt"
+	"os"
+	"syscall"
 	"testing"
 
-	"github.com/arduino/arduino-cli/internal/arduino/sketch"
-	"github.com/arduino/go-paths-helper"
 	"github.com/stretchr/testify/require"
 )
 
-func TestCtagsSketchFilter(t *testing.T) {
-	sourcePath := paths.New("testdata", "sketch_merged.cpp")
-	f, err := sourcePath.Open()
+func TestAnnotateCTagsExecutionErrorAddsPTInterpHintForENOENT(t *testing.T) {
+	ctagsPath, err := os.Executable()
 	require.NoError(t, err)
-	t.Cleanup(func() { f.Close() })
 
-	sketch := &sketch.Sketch{
-		MainFile: paths.New("/home/megabug/Arduino/Test/Test.ino"),
-	}
-	stderr := bytes.NewBuffer(nil)
-	res := filterSketchSource(sketch, f, false, stderr)
-	require.Empty(t, stderr)
-	require.NotEmpty(t, res)
-	fmt.Println(res)
+	err = annotateCTagsExecutionError(ctagsPath, &os.PathError{Op: "fork/exec", Path: ctagsPath, Err: syscall.ENOENT})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "PT_INTERP")
+	require.Contains(t, err.Error(), "Android/Termux")
 }

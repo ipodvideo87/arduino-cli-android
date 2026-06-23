@@ -20,6 +20,9 @@ Native Termux validation always takes priority over container or desktop validat
 - Record the source of each finding with device evidence, command output, file metadata, or a linked upstream reference.
 - Distinguish confirmed device evidence from inference or assumption.
 - Do not stack speculative patches for Android issues. Prefer one root-cause fix that matches native Termux behavior.
+- For Android-specific failures, identify the exact failing layer before changing code: archive extraction, filesystem syscall, ELF patching, dynamic loader, runtime library closure, environment propagation, compiler runtime, or Arduino CLI logic.
+- Collect evidence before changing code: exact command, stderr, `strace` excerpt, ELF metadata, file modes, runtime paths, and environment differences between native Termux and Ubuntu/proot.
+- Do not assume an existing ELF error means the file is missing; on Android/Termux, `ENOENT` for a present executable often means the PT_INTERP path is wrong or unpatched.
 - Ubuntu/proot validation is useful, but native Termux remains the final authority.
 
 ## Core Principles
