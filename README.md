@@ -33,6 +33,9 @@ These claims are validated in the native Android/Termux target unless noted othe
 ## Current Broken or Experimental Features
 
 - The ACL runtime is still experimental and carries Termux-origin assumptions.
+- The Android runtime bundle currently vendors the Termux glibc runtime set in
+  `internal/android/runtime`; any future runtime library that is not bundled
+  there must come from native Termux `gcc-libs-glibc` / `glibc-repo`.
 - ELF patching is mostly a plan-first workflow; the actual rewrite path is not finished.
 - Runtime verification is conservative and may fail until the runtime tree is fully populated.
 - ACL should not be treated as production-ready or complete.

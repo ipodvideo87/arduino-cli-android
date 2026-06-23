@@ -165,4 +165,34 @@ func TestCompleteRuntimeClosureReportsMissingDependency(t *testing.T) {
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "libMissing.so")
+	require.NotContains(t, err.Error(), "gcc-libs-glibc")
+}
+
+func TestCompleteRuntimeClosureReportsMissingTermuxGlibcRuntimePackage(t *testing.T) {
+	root := t.TempDir()
+	runtimeDir := filepath.Join(root, ".acl", "runtime")
+	require.NoError(t, os.MkdirAll(runtimeDir, 0o755))
+
+	target := filepath.Join(root, "bin", "tool")
+	require.NoError(t, os.MkdirAll(filepath.Dir(target), 0o755))
+	require.NoError(t, os.WriteFile(target, []byte("target"), 0o755))
+
+	err := completeRuntimeClosureWithHooks(root, runtimeDir, nil, runtimeClosureHooks{
+		listPatchTargets: func(root, runtimeDir string) ([]string, error) {
+			return []string{target}, nil
+		},
+		neededLibraries: func(path string) ([]string, error) {
+			return []string{"libstdc++.so.6"}, nil
+		},
+		findSource: func(name string, sourceRoots []string) (string, error) {
+			return "", os.ErrNotExist
+		},
+		copyFile: func(src, dst string) error {
+			return nil
+		},
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "gcc-libs-glibc")
+	require.Contains(t, err.Error(), "glibc-repo")
+	require.Contains(t, err.Error(), "libstdc++.so.6")
 }

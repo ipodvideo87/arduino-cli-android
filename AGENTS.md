@@ -13,6 +13,15 @@ There are intentionally two Linux environments in this project:
 
 Native Termux validation always takes priority over container or desktop validation.
 
+## Android Research Policy
+- Before making Android-specific changes, read [docs/android/ANDROID_COMPATIBILITY_RESEARCH.md](docs/android/ANDROID_COMPATIBILITY_RESEARCH.md).
+- If the behavior is not already documented there, research it before guessing.
+- Add new confirmed Android/Termux findings to that file as part of the same work.
+- Record the source of each finding with device evidence, command output, file metadata, or a linked upstream reference.
+- Distinguish confirmed device evidence from inference or assumption.
+- Do not stack speculative patches for Android issues. Prefer one root-cause fix that matches native Termux behavior.
+- Ubuntu/proot validation is useful, but native Termux remains the final authority.
+
 ## Core Principles
 - Android-first engineering.
 - Automation over manual configuration.
@@ -47,6 +56,11 @@ Do not claim a milestone is complete until it has been verified through real-wor
 - A successful Ubuntu/proot run is useful evidence, but it does not prove Android compatibility.
 - When debugging filesystem, dynamic linking, executable patching, process execution, or archive extraction, always distinguish Android/Bionic behavior from Ubuntu/glibc behavior.
 - Prefer generic fixes that apply across toolchains and archive formats instead of tool-specific workarounds.
+- For Android-specific failures, collect evidence first: exact command, stderr, `strace` excerpt, ELF metadata, file modes, runtime paths, and environment differences between native Termux and Ubuntu/proot.
+- Identify the failing layer explicitly before changing code: archive extraction, filesystem syscall, ELF patching, dynamic loader, runtime library closure, environment propagation, compiler runtime, or Arduino CLI logic.
+- Preserve normal Linux behavior unless Android requires a scoped fallback.
+- Add regression tests for the exact incompatibility you fix.
+- Document newly discovered Android-vs-Linux differences in the project docs.
 
 ## Engineering Expectations
 - Understand the existing architecture before changing it.

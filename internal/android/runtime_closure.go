@@ -10,6 +10,16 @@ import (
 	"strings"
 )
 
+var termuxGlibcRuntimeLibraries = map[string]struct{}{
+	"libc.so.6":       {},
+	"libdl.so.2":      {},
+	"libgcc_s.so.1":   {},
+	"libm.so.6":       {},
+	"libpthread.so.0": {},
+	"libstdc++.so.6":  {},
+	"libz.so.1":       {},
+}
+
 type runtimeClosureHooks struct {
 	listPatchTargets func(root, runtimeDir string) ([]string, error)
 	neededLibraries  func(path string) ([]string, error)
@@ -107,10 +117,29 @@ func completeRuntimeClosureWithHooks(root, runtimeDir string, sourceRoots []stri
 			libraries = append(libraries, lib)
 		}
 		sort.Strings(libraries)
+		// Surface a package-level Termux hint when the closure is blocked on
+		// known glibc runtime libraries instead of leaving callers with a raw
+		// missing-file error.
+		if hasTermuxGlibcRuntimeLibrary(libraries) {
+			return fmt.Errorf(
+				"Android runtime dependency closure needs Termux glibc runtime libraries; enable glibc-repo and install gcc-libs-glibc unless these libraries are vendored in the repo; runtime source lookup for %s is missing %s",
+				root,
+				strings.Join(libraries, ", "),
+			)
+		}
 		return fmt.Errorf("runtime dependency closure incomplete for %s: missing %s", root, strings.Join(libraries, ", "))
 	}
 
 	return nil
+}
+
+func hasTermuxGlibcRuntimeLibrary(libraries []string) bool {
+	for _, lib := range libraries {
+		if _, ok := termuxGlibcRuntimeLibraries[lib]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func listRuntimePatchTargets(root, runtimeDir string) ([]string, error) {

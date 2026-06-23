@@ -62,6 +62,10 @@ does not replace native Android validation.
   executables, but that path still needs native proof.
 - The copied glibc loader still has to resolve its libraries without leaking Termux
   `LD_PRELOAD` or `LD_LIBRARY_PATH` state from the shell environment.
+- The current Android runtime bundle vendors the Termux glibc runtime set in
+  `internal/android/runtime`; any future non-vendored runtime library still needs a
+  native Termux source, but the currently required set is already shipped with the
+  repo.
 - Successful proot execution does not prove Android-native compatibility.
 - A complete compile-and-upload loop has not yet been demonstrated.
 - The remaining native gap is broader Android compile-and-upload proof, not launcher execute-bit preservation.
