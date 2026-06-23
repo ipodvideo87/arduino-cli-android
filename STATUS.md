@@ -47,10 +47,6 @@ does not replace native Android validation.
 
 ## Work In Progress
 
-- Validate the installed toolchain against real Arduino packages before the first
-  controlled compilation attempt. The Termux ESP32 scan has already been used to tune the
-  compatibility validation policy, but Arduino sketch compilation is still unproven.
-- Prove a complete ESP32 toolchain compile end to end.
 - Validate firmware upload on real hardware.
 - Verify the full Arduino CLI workflow on native Android.
 - Keep the development workflow aligned with the two-environment model: native Termux as
@@ -72,8 +68,7 @@ does not replace native Android validation.
   in-place interpreter rewriting; native Termux validation has advanced past the prior
   `cc1plus` startup crash.
 - Successful proot execution does not prove Android-native compatibility.
-- A complete compile-and-upload loop has not yet been demonstrated.
-- The remaining native gap is firmware upload and broader Android compile-and-upload proof.
+- Firmware upload on real hardware has not yet been demonstrated.
 
 ## Next Engineering Milestone
 
