@@ -5,6 +5,15 @@ An experimental fork of Arduino CLI with Android and Termux compatibility work.
 For the long-term project mission and intended end state, see [MISSION.md](MISSION.md).
 For the current progress snapshot, see [STATUS.md](STATUS.md).
 
+## Development Environments
+
+This repository is developed against two intentionally different Linux environments:
+
+1. Native Termux on Android. This is the production target and the final authority for behavior. It uses Android userspace, Bionic, the Android kernel, Android filesystem rules, SELinux, and the Android app sandbox.
+2. Ubuntu inside `proot-distro`. This is a development-only environment for tooling, GitHub work, and other tasks that are easier to run under Ubuntu/glibc. It is useful, but it does not prove Android compatibility.
+
+When the two environments disagree, native Termux wins.
+
 ## Project Goal
 
 Run Arduino CLI and its toolchain-dependent helpers directly on Android devices while keeping
@@ -19,12 +28,25 @@ the workflow understandable, testable, and as upstream-friendly as possible.
 - ACL can inventory installed Arduino package executables and produce structured compatibility reports.
 - ACL can validate scanned tool compatibility data before compile or execution work begins.
 
+These claims are validated in the native Android/Termux target unless noted otherwise.
+
 ## Current Broken or Experimental Features
 
 - The ACL runtime is still experimental and carries Termux-origin assumptions.
 - ELF patching is mostly a plan-first workflow; the actual rewrite path is not finished.
 - Runtime verification is conservative and may fail until the runtime tree is fully populated.
 - ACL should not be treated as production-ready or complete.
+
+## Validation Workflow
+
+Use this order when judging a meaningful change:
+
+1. Unit tests.
+2. Integration tests.
+3. Build verification.
+4. Native Termux validation on Android.
+
+Passing under Ubuntu/proot is useful development evidence, but it is not the final success criterion for Android-specific behavior.
 
 ## ACL Architecture
 

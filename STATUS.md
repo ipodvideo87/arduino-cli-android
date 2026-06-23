@@ -8,6 +8,10 @@ see [MISSION.md](MISSION.md).
 Make Arduino CLI feel native on Android and turn the Android Compatibility Layer (ACL)
 into reusable infrastructure for Linux-based development tools on Android.
 
+Native Termux on Android is the production target and final validation environment.
+Ubuntu inside `proot-distro` is used for development tooling and repository work, but it
+does not replace native Android validation.
+
 ## Completed Milestones
 
 - The repository has been freshly cloned and rebuilt from GitHub.
@@ -47,6 +51,8 @@ into reusable infrastructure for Linux-based development tools on Android.
 - Prove a complete ESP32 toolchain compile end to end.
 - Validate firmware upload on real hardware.
 - Verify the full Arduino CLI workflow on native Android.
+- Keep the development workflow aligned with the two-environment model: native Termux as
+  the source of truth, Ubuntu/proot as a tooling environment.
 
 ## Known Blockers
 

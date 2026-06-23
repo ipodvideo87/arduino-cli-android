@@ -5,6 +5,14 @@ This repository aims to become a production-quality Arduino CLI that runs native
 
 `MISSION.md` is the high-level mission document. Use it to distinguish long-term direction from current implementation status.
 
+## Development Architecture
+There are intentionally two Linux environments in this project:
+
+1. Native Termux on Android is the production target. It runs under the Android application sandbox, Android kernel, Bionic, SELinux, and Android filesystem and permission rules. Any shipped binary must work here. When native Termux and another environment disagree, native Termux is the source of truth.
+2. Ubuntu inside `proot-distro` is a development environment only. It is useful for Codex, GitHub tooling, and other utilities that are easier to run under Ubuntu/glibc, but it is not the deployment target and passing tests there is not sufficient.
+
+Native Termux validation always takes priority over container or desktop validation.
+
 ## Core Principles
 - Android-first engineering.
 - Automation over manual configuration.
@@ -32,6 +40,13 @@ Work in this order unless a higher-priority issue is clearly required:
 7. Upload firmware to a physical ESP32-S3.
 
 Do not claim a milestone is complete until it has been verified through real-world testing.
+
+## Validation Policy
+- Unit tests come first, then integration tests, then build verification.
+- Native Termux validation is the final authority for Android behavior.
+- A successful Ubuntu/proot run is useful evidence, but it does not prove Android compatibility.
+- When debugging filesystem, dynamic linking, executable patching, process execution, or archive extraction, always distinguish Android/Bionic behavior from Ubuntu/glibc behavior.
+- Prefer generic fixes that apply across toolchains and archive formats instead of tool-specific workarounds.
 
 ## Engineering Expectations
 - Understand the existing architecture before changing it.
