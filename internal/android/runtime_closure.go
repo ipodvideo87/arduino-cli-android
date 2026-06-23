@@ -226,31 +226,41 @@ func copyRuntimeFile(src, dst string) error {
 }
 
 func runtimeSourceRoots() []string {
-	candidates := []string{
-		"/data/data/com.termux/files/usr/glibc/lib",
-	}
+	bases := []string{"/data/data/com.termux/files/usr"}
 	for _, envKey := range []string{"TERMUX_PREFIX", "TERMUX__PREFIX", "PREFIX"} {
 		if base := strings.TrimSpace(os.Getenv(envKey)); base != "" {
-			candidates = append(candidates, filepath.Join(base, "glibc", "lib"))
+			bases = append(bases, base)
 		}
 	}
+	return termuxRuntimeSourceRoots(bases)
+}
 
+func termuxRuntimeSourceRoots(bases []string) []string {
 	seen := map[string]struct{}{}
-	roots := make([]string, 0, len(candidates))
-	for _, candidate := range candidates {
-		candidate = filepath.Clean(candidate)
-		if candidate == "." || candidate == string(filepath.Separator) {
+	roots := make([]string, 0, len(bases)*2)
+	for _, base := range bases {
+		base = strings.TrimSpace(base)
+		if base == "" {
 			continue
 		}
-		if _, ok := seen[candidate]; ok {
-			continue
+		for _, candidate := range []string{
+			filepath.Join(base, "lib"),
+			filepath.Join(base, "glibc", "lib"),
+		} {
+			candidate = filepath.Clean(candidate)
+			if candidate == "." || candidate == string(filepath.Separator) {
+				continue
+			}
+			if _, ok := seen[candidate]; ok {
+				continue
+			}
+			seen[candidate] = struct{}{}
+			info, err := os.Stat(candidate)
+			if err != nil || !info.IsDir() {
+				continue
+			}
+			roots = append(roots, candidate)
 		}
-		seen[candidate] = struct{}{}
-		info, err := os.Stat(candidate)
-		if err != nil || !info.IsDir() {
-			continue
-		}
-		roots = append(roots, candidate)
 	}
 	return roots
 }

@@ -101,6 +101,19 @@ func TestPatchInstallTreeSkipsOpenOCDToolPackage(t *testing.T) {
 	require.NoError(t, patchInstallTree(root, false, "android"))
 }
 
+func TestPatchInstallTreeSkipsESP32GDBToolPackage(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "tools", "riscv32-esp-elf-gdb", "16.3_20250913")
+	hostExe, err := os.Executable()
+	require.NoError(t, err)
+
+	elfPath := filepath.Join(root, "bin", "riscv32-esp-elf-gdb")
+	require.NoError(t, os.MkdirAll(filepath.Dir(elfPath), 0o755))
+	copyFile(t, hostExe, elfPath, 0o600)
+
+	require.NoError(t, patchInstallTree(root, false, "android"))
+	require.NoDirExists(t, filepath.Join(root, aclDirName))
+}
+
 func TestIsOptionalAndroidDebugToolRootMatchesOpenOCDPackageLayout(t *testing.T) {
 	root := filepath.Join("/data/data/com.termux/files/home/.arduino15/packages/esp32/tools/openocd-esp32/v0.12.0-esp32-20251215")
 	require.True(t, isOptionalAndroidDebugToolRoot(root))

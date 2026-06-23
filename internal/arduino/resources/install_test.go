@@ -16,9 +16,12 @@
 package resources
 
 import (
+	"context"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
+	"syscall"
 	"testing"
 
 	"github.com/arduino/go-paths-helper"
@@ -87,4 +90,38 @@ func TestInstallPlatform(t *testing.T) {
 			require.Contains(t, err.Error(), test.error)
 		})
 	}
+}
+
+func TestInstallUsesSharedArchiveExtractorForHardLinks(t *testing.T) {
+	downloadDir, tempPath, destDir := paths.New(t.TempDir()), paths.New(t.TempDir()), paths.New(t.TempDir())
+	testFileName := "tool-with-hard-link.tar"
+	testFilePath := filepath.Join(downloadDir.String(), testFileName)
+
+	archive := createTarArchiveWithHardLink(t)
+	require.NoError(t, os.WriteFile(testFilePath, archive, 0o644))
+
+	r := &DownloadResource{
+		ArchiveFileName: testFileName,
+	}
+
+	originalExtractor := extractArchive
+	t.Cleanup(func() {
+		extractArchive = originalExtractor
+	})
+
+	called := false
+	extractArchive = func(ctx context.Context, body io.Reader, location string) error {
+		called = true
+		return extractArchiveWithFS(ctx, body, location, archiveFS{
+			link: func(oldname, newname string) error {
+				return &os.LinkError{Op: "link", Old: oldname, New: newname, Err: syscall.EPERM}
+			},
+		})
+	}
+
+	require.NoError(t, r.Install(downloadDir, tempPath, destDir, IntegrityCheckNone))
+	require.True(t, called, "tool install should use the shared archive extractor")
+	data, err := os.ReadFile(filepath.Join(destDir.String(), "avr", "bin", "avr-gcc"))
+	require.NoError(t, err)
+	require.Equal(t, "tool-binary", string(data))
 }

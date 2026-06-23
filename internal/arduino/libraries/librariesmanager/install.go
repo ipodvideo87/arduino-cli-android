@@ -25,10 +25,10 @@ import (
 	"github.com/arduino/arduino-cli/commands/cmderrors"
 	"github.com/arduino/arduino-cli/internal/arduino/globals"
 	"github.com/arduino/arduino-cli/internal/arduino/libraries"
+	"github.com/arduino/arduino-cli/internal/arduino/resources"
 	"github.com/arduino/arduino-cli/internal/arduino/utils"
 	"github.com/arduino/arduino-cli/internal/i18n"
 	paths "github.com/arduino/go-paths-helper"
-	"github.com/codeclysm/extract/v4"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	semver "go.bug.st/relaxed-semver"
@@ -174,7 +174,7 @@ func (lmi *Installer) InstallZipLib(ctx context.Context, archivePath *paths.Path
 
 	// Extract to a temporary directory so we can check if the zip is structured correctly.
 	// We also use the top level folder from the archive to infer the library name.
-	if err := extract.Archive(ctx, file, tmpDir.String(), nil); err != nil {
+	if err := resources.ExtractArchive(ctx, file, tmpDir.String()); err != nil {
 		return fmt.Errorf("%s: %w", i18n.Tr("extracting archive"), err)
 	}
 

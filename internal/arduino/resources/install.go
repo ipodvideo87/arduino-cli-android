@@ -22,7 +22,6 @@ import (
 
 	"github.com/arduino/arduino-cli/internal/i18n"
 	paths "github.com/arduino/go-paths-helper"
-	"github.com/codeclysm/extract/v4"
 	"go.bug.st/cleanup"
 )
 
@@ -73,7 +72,7 @@ func (release *DownloadResource) Install(downloadDir, tempPath, destDir *paths.P
 	// Extract into temp directory
 	ctx, cancel := cleanup.InterruptableContext(context.Background())
 	defer cancel()
-	if err := extract.Archive(ctx, file, tempDir.String(), nil); err != nil {
+	if err := extractArchive(ctx, file, tempDir.String()); err != nil {
 		return errors.New(i18n.Tr("extracting archive: %s", err))
 	}
 
