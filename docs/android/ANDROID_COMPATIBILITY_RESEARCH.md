@@ -56,6 +56,11 @@ Use it to capture confirmed behavior, evidence, and open questions before making
   - Evidence: `internal/android/patcher.go` special-cases `isGCCInternalExecutable(path)` and adds `$.acl/runtime` plus sibling library search paths.
 - Tool patching is applied after installation, not during extraction.
   - Evidence: `internal/arduino/cores/packagemanager/install_uninstall.go` calls `android.PatchToolForAndroid(...)` after `toolResource.Install(...)`.
+- `patchelf --set-interpreter` is the operation that rewrites large GCC internal executables into a split-load layout with an extra low-address `LOAD` and a relocated `DYNAMIC` segment; `--set-rpath` alone preserves the original program-header shape.
+  - Evidence: local comparison of upstream `cc1plus` from `xtensa-esp-elf-14.2.0_20260121-aarch64-linux-gnu.tar.gz` against copies patched with `patchelf 0.18.0`.
+  - Original `cc1plus`: 10 program headers, `PT_INTERP=/lib/ld-linux-aarch64.so.1`, `DYNAMIC` at `0x1fe19f8`.
+  - Patched with `--set-interpreter` only: 11 program headers, new low-address `LOAD` at `0x3e0000`, `DYNAMIC` moved to `0x66db88`.
+  - Patched with `--set-rpath` only: still 10 program headers, original load layout retained.
 
 ## 6. Dynamic Loader Behavior
 
@@ -117,6 +122,8 @@ Use it to capture confirmed behavior, evidence, and open questions before making
   - Evidence: current `DT_NEEDED` only names `libdl.so.2`, `libm.so.6`, and `libc.so.6`.
 - The exact failure layer for `cc1plus` is still under investigation: loader, relocation, TLS, `mprotect`, or another glibc/Android interaction.
   - Evidence: crash timing and `SEGV_ACCERR`.
+- The direct `cc1plus` crash is now narrowed to the interpreter-rewrite path rather than missing libraries or compiler arguments.
+  - Evidence: the crash persists for direct `cc1plus --help`, and the rewritten binary's fault address lands inside the relocated `.dynamic` area produced by `patchelf --set-interpreter`.
 
 ## 12. Native Termux Validation Commands
 
