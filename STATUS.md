@@ -37,6 +37,7 @@ does not replace native Android validation.
 - ACL execution now emits structured diagnostics for dry-run and `--apply` so native Termux failures can be triaged with target, runtime, environment, and result evidence.
 - Builtin tools installed from `packages/builtin/tools/...` now pass through the Android patcher, so builtin `ctags` follows the same loader and RPATH handling as other tools.
 - ESP32-S3 Blink compilation now succeeds on native Termux.
+- Native ESP32-S3 compile is validated on-device.
 - `validate-compat` now treats Rust launcher wrappers as ELF executables again.
 - ACL package building and runtime installation now preserve executable file modes instead of rewriting everything through a default `0644` create path.
 - ACL compatibility validation now reports executable and script candidates that are missing execute bits.

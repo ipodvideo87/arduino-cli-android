@@ -126,6 +126,8 @@ Use it to capture confirmed behavior, evidence, and open questions before making
   - Evidence: `main.go` and Android execution tests.
 - Builtin `ctags` now executes under the Android patcher on native Termux, clearing the previous `fork/exec ... no such file or directory` failure.
   - Evidence: native Termux ESP32-S3 Blink compilation now completes successfully after the builtin patch pass.
+- Native ESP32-S3 Blink compilation is now validated on-device.
+  - Evidence: native Termux command `./arduino-cli compile -v --fqbn esp32:esp32:esp32s3 ~/Development/Sketches/Blink` completed successfully with the reported program storage and dynamic memory usage.
 
 ## 11. Known Open Issues
 

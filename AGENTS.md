@@ -24,6 +24,7 @@ Native Termux validation always takes priority over container or desktop validat
 - Collect evidence before changing code: exact command, stderr, `strace` excerpt, ELF metadata, file modes, runtime paths, and environment differences between native Termux and Ubuntu/proot.
 - Do not assume an existing ELF error means the file is missing; on Android/Termux, `ENOENT` for a present executable often means the PT_INTERP path is wrong or unpatched.
 - Ubuntu/proot validation is useful, but native Termux remains the final authority.
+- For milestone-level Android work, add a dedicated milestone document under `docs/android/` and keep the validation evidence, root cause, and remaining work there.
 
 ## Core Principles
 - Android-first engineering.
@@ -32,6 +33,9 @@ Native Termux validation always takes priority over container or desktop validat
 - Preserve upstream compatibility whenever practical.
 - Keep Android-specific code isolated when possible.
 - Prefer deterministic, reproducible behavior.
+- Favor ELF-analysis-driven patch plans over blind Android fixes.
+- Use wrapper launch for GCC libexec binaries when `patchelf --set-interpreter` is unsafe.
+- Ensure builtin tools are included in the Android patching flow when they are installed under `packages/builtin/tools/...`.
 
 ## Project Goals
 - Run Arduino CLI natively on Android.
