@@ -61,6 +61,9 @@ Use it to capture confirmed behavior, evidence, and open questions before making
   - Original `cc1plus`: 10 program headers, `PT_INTERP=/lib/ld-linux-aarch64.so.1`, `DYNAMIC` at `0x1fe19f8`.
   - Patched with `--set-interpreter` only: 11 program headers, new low-address `LOAD` at `0x3e0000`, `DYNAMIC` moved to `0x66db88`.
   - Patched with `--set-rpath` only: still 10 program headers, original load layout retained.
+- GCC internal executables under `libexec/gcc/` are now launched through a shell wrapper that preserves the original binary in `.acl/original/` and invokes the bundled loader with `--library-path`; they are no longer rewritten in place with `patchelf --set-interpreter`.
+  - Evidence: repository implementation in `internal/android/elf_plan.go` and regression tests in `internal/android/patcher_test.go`.
+  - This is the current generic launch strategy for GCC internal executables on Android.
 
 ## 6. Dynamic Loader Behavior
 
@@ -109,6 +112,8 @@ Use it to capture confirmed behavior, evidence, and open questions before making
   - Evidence: native AVR and ESP32 core installs now succeed after the shared extractor fix.
 - Runtime closure now copies required glibc runtime libraries into `.acl/runtime`.
   - Evidence: native validation and the runtime closure implementation.
+- GCC internal executable patching now uses wrapper launch instead of interpreter rewrite.
+  - Evidence: repository implementation and unit tests.
 - Debug-only tools such as OpenOCD and GDB remain skipped for Android patching.
   - Evidence: `internal/android/patcher.go` and tests.
 - Termux environment scrubbing is preserved.

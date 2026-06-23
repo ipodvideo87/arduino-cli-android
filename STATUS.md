@@ -66,6 +66,8 @@ does not replace native Android validation.
   `internal/android/runtime`; any future non-vendored runtime library still needs a
   native Termux source, but the currently required set is already shipped with the
   repo.
+- GCC internal executables under `libexec/gcc/` now use wrapper launch instead of
+  in-place interpreter rewriting; native Termux validation for that path is still pending.
 - Successful proot execution does not prove Android-native compatibility.
 - A complete compile-and-upload loop has not yet been demonstrated.
 - The remaining native gap is broader Android compile-and-upload proof, not launcher execute-bit preservation.

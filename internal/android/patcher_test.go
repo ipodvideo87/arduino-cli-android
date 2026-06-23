@@ -184,6 +184,97 @@ func TestBuildRPathAddsGCCInternalSearchPaths(t *testing.T) {
 	require.Equal(t, "$ORIGIN/../../../../.acl/runtime:$ORIGIN/../../../../lib:$ORIGIN/../../../../lib64:$ORIGIN/../../../../libs:$ORIGIN/..", rpath)
 }
 
+func TestPlanPatchForELFUsesDifferentStrategyForGCCInternalBinaries(t *testing.T) {
+	runtimeDir := "/tmp/runtime"
+	driver := sampleAArch64ELFAnalysis("/opt/arduino-toolchain/bin/xtensa-esp-elf-g++", "bin")
+	internal := sampleAArch64ELFAnalysis("/opt/arduino-toolchain/libexec/gcc/xtensa-esp-elf/14.2.0/cc1plus", "gcc-libexec")
+
+	driverPlan := planPatchForELF(driver, runtimeDir)
+	internalPlan := planPatchForELF(internal, runtimeDir)
+
+	require.Equal(t, patchActionLoaderAndPath, driverPlan.Action)
+	require.True(t, driverPlan.Spec.setInterpreter)
+	require.Equal(t, patchActionWrapperLaunch, internalPlan.Action)
+	require.False(t, internalPlan.Spec.setInterpreter)
+	require.Contains(t, internalPlan.Reason, "patchelf --set-interpreter")
+}
+
+func TestPlanPatchForELFIsDeterministic(t *testing.T) {
+	runtimeDir := "/tmp/runtime"
+	analysis := sampleAArch64ELFAnalysis("/opt/arduino-toolchain/libexec/gcc/xtensa-esp-elf/14.2.0/cc1plus", "gcc-libexec")
+
+	first := planPatchForELF(analysis, runtimeDir)
+	second := planPatchForELF(analysis, runtimeDir)
+
+	require.Equal(t, first, second)
+}
+
+func TestApplyPatchelfPlanRejectsInterpreterRewriteForGCCInternalBinaries(t *testing.T) {
+	path := "/opt/arduino-toolchain/libexec/gcc/xtensa-esp-elf/14.2.0/cc1plus"
+	err := applyPatchelfPlan(path, patchSpec{
+		setInterpreter: true,
+		interpreter:    "/tmp/runtime/ld-linux-aarch64.so.1",
+		rpath:          "/tmp/runtime",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "refusing to apply --set-interpreter")
+	require.Contains(t, err.Error(), path)
+}
+
+func TestApplyWrapperLaunchCreatesLoaderWrapper(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "libexec", "gcc", "xtensa-esp-elf", "14.2.0", "cc1plus")
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte("original"), 0o755))
+
+	plan := patchPlan{
+		Action: patchActionWrapperLaunch,
+		Analysis: elfAnalysis{
+			Path:      path,
+			PathClass: "gcc-libexec",
+		},
+		WrapperBackup:  filepath.Join(root, "libexec", "gcc", "xtensa-esp-elf", "14.2.0", ".acl", "original", "cc1plus"),
+		WrapperTarget:  path,
+		WrapperRuntime: filepath.Join(root, ".acl", "runtime"),
+	}
+
+	require.NoError(t, os.MkdirAll(plan.WrapperRuntime, 0o755))
+	require.NoError(t, applyWrapperLaunch(plan))
+
+	backup, err := os.ReadFile(plan.WrapperBackup)
+	require.NoError(t, err)
+	require.Equal(t, "original", string(backup))
+
+	wrapper, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Contains(t, string(wrapper), "ld-linux-aarch64.so.1")
+	require.Contains(t, string(wrapper), ".acl/original/cc1plus")
+	require.Contains(t, string(wrapper), "--library-path")
+}
+
+func sampleAArch64ELFAnalysis(path string, pathClass string) elfAnalysis {
+	return elfAnalysis{
+		Path:              path,
+		PathClass:         pathClass,
+		Machine:           elf.EM_AARCH64,
+		FileType:          "EXEC",
+		Interpreter:       "/lib/ld-linux-aarch64.so.1",
+		ImportedLibraries: []string{"libdl.so.2", "libm.so.6", "libc.so.6"},
+		RunPath:           "$ORIGIN/../lib",
+		RPath:             "",
+		ProgramHeaders: []elfProgramHeader{
+			{Type: "PT_LOAD", Offset: 0x0, VAddr: 0x400000, FileSize: 0x1000, MemSize: 0x1000, Flags: "R E", Align: 0x10000},
+			{Type: "PT_INTERP", Offset: 0x270, VAddr: 0x400270, FileSize: 0x1b, MemSize: 0x1b, Flags: "R", Align: 0x1},
+			{Type: "PT_GNU_RELRO", Offset: 0x2000, VAddr: 0x420000, FileSize: 0x100, MemSize: 0x100, Flags: "R", Align: 0x1},
+			{Type: "PT_TLS", Offset: 0x3000, VAddr: 0x430000, FileSize: 0x10, MemSize: 0x10, Flags: "R", Align: 0x8},
+		},
+		HasTLS:           true,
+		HasGNURelro:      true,
+		PageAligned:      true,
+		LoadSegmentCount: 1,
+	}
+}
+
 func copyFile(t *testing.T, src, dst string, mode os.FileMode) {
 	t.Helper()
 	data, err := os.ReadFile(src)

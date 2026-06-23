@@ -25,6 +25,9 @@ func patchELFs(root, runtimeDir string) error {
 			return fmt.Errorf("walk %s: %w", path, err)
 		}
 		if info.IsDir() {
+			if filepath.Base(path) == ".acl" {
+				return filepath.SkipDir
+			}
 			if path == runtimeDir {
 				return filepath.SkipDir
 			}
@@ -47,22 +50,15 @@ func patchExecutable(path, runtimeDir string) error {
 		return nil
 	}
 
-	f, err := elf.Open(path)
+	analysis, err := analyzeELFForPatch(path)
 	if err != nil {
-		return fmt.Errorf("open ELF %s: %w", path, err)
+		return err
 	}
-	defer f.Close()
-
-	spec, shouldPatch := patchSpecForELF(path, f, runtimeDir)
-	if !shouldPatch {
+	plan := planPatchForELF(analysis, runtimeDir)
+	if plan.Action == patchActionNoChange || plan.Action == patchActionUnsupported {
 		return nil
 	}
-
-	libs, err := f.ImportedLibraries()
-	if err != nil {
-		return fmt.Errorf("read imports %s: %w", path, err)
-	}
-	if err := ensureRuntimeDependenciesAvailable(path, runtimeDir, libs); err != nil {
+	if err := ensureRuntimeDependenciesAvailable(path, runtimeDir, analysis.ImportedLibraries); err != nil {
 		return err
 	}
 
@@ -72,8 +68,11 @@ func patchExecutable(path, runtimeDir string) error {
 	}
 	originalMode := info.Mode()
 
-	if err := patchWithPatchelf(path, spec); err != nil {
+	if err := applyPatchPlan(plan); err != nil {
 		return err
+	}
+	if plan.Action == patchActionWrapperLaunch {
+		return os.Chmod(path, 0o755)
 	}
 	return os.Chmod(path, originalMode)
 }

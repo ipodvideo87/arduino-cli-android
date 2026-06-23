@@ -85,7 +85,13 @@ func repairExecutableModes(root string) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		if info.IsDir() {
+			if filepath.Base(path) == ".acl" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
 			return nil
 		}
 
