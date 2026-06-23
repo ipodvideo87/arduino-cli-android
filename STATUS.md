@@ -36,6 +36,7 @@ does not replace native Android validation.
 - ACL runtime discovery now prefers `ACL_RUNTIME_ROOT`, then `HOME/.arduino-cli-android/acl-runtime`, then `PREFIX/opt/arduino-cli-android/acl-runtime`, then `./acl-runtime`.
 - ACL execution now emits structured diagnostics for dry-run and `--apply` so native Termux failures can be triaged with target, runtime, environment, and result evidence.
 - Builtin tools installed from `packages/builtin/tools/...` now pass through the Android patcher, so builtin `ctags` follows the same loader and RPATH handling as other tools.
+- ESP32-S3 Blink compilation now succeeds on native Termux.
 - `validate-compat` now treats Rust launcher wrappers as ELF executables again.
 - ACL package building and runtime installation now preserve executable file modes instead of rewriting everything through a default `0644` create path.
 - ACL compatibility validation now reports executable and script candidates that are missing execute bits.
@@ -68,13 +69,13 @@ does not replace native Android validation.
   native Termux source, but the currently required set is already shipped with the
   repo.
 - GCC internal executables under `libexec/gcc/` now use wrapper launch instead of
-  in-place interpreter rewriting; native Termux validation for that path is still pending.
-- Native Termux validation of the builtin `ctags` Android patching path is still pending.
+  in-place interpreter rewriting; native Termux validation has advanced past the prior
+  `cc1plus` startup crash.
 - Successful proot execution does not prove Android-native compatibility.
 - A complete compile-and-upload loop has not yet been demonstrated.
-- The remaining native gap is broader Android compile-and-upload proof, not launcher execute-bit preservation.
+- The remaining native gap is firmware upload and broader Android compile-and-upload proof.
 
 ## Next Engineering Milestone
 
-Use `acl-scan validate-compat` on a fresh installed package tree, then use the validated
-compatibility data to gate the first narrow Arduino compilation attempt.
+Validate firmware upload on real hardware, then continue tightening ACL compatibility
+gating around the now-working native ESP32-S3 compile path.

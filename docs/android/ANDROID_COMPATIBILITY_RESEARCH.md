@@ -119,18 +119,18 @@ Use it to capture confirmed behavior, evidence, and open questions before making
 - Runtime closure now copies required glibc runtime libraries into `.acl/runtime`.
   - Evidence: native validation and the runtime closure implementation.
 - GCC internal executable patching now uses wrapper launch instead of interpreter rewrite.
-  - Evidence: repository implementation and unit tests.
+  - Evidence: repository implementation, unit tests, and native Termux validation that now gets past the earlier `cc1plus` startup crash.
 - Debug-only tools such as OpenOCD and GDB remain skipped for Android patching.
   - Evidence: `internal/android/patcher.go` and tests.
 - Termux environment scrubbing is preserved.
   - Evidence: `main.go` and Android execution tests.
+- Builtin `ctags` now executes under the Android patcher on native Termux, clearing the previous `fork/exec ... no such file or directory` failure.
+  - Evidence: native Termux ESP32-S3 Blink compilation now completes successfully after the builtin patch pass.
 
 ## 11. Known Open Issues
 
-- `cc1plus` now uses the wrapper strategy instead of `patchelf --set-interpreter`; the previous immediate startup segfault is no longer the current blocker.
-  - Evidence: native Termux validation progressed past the earlier `cc1plus` crash once the wrapper strategy was enabled.
-- The current open Android blocker is builtin `ctags` being invoked before Android patching.
-  - Evidence: native Termux compile failure showing `fork/exec .../builtin/tools/ctags/5.8-arduino11/ctags: no such file or directory` with a present ELF and `PT_INTERP /lib/ld-linux-aarch64.so.1`.
+- Native Termux firmware upload and broader compile-and-upload proof are still pending.
+  - Evidence: validation has reached a successful ESP32-S3 compile, but firmware upload has not yet been proven on-device.
 
 ## 12. Native Termux Validation Commands
 
