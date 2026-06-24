@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-06-19T00:00:00Z",
+  "binaries": [
+    {
+      "path": "/data/data/com.termux/files/usr/bin/avrdude",
+      "compat_category": "native Android compatible",
+      "elf": {
+        "class": "ELF64",
+        "machine": "EM_AARCH64",
+        "interpreter": "/system/bin/linker64",
+        "needed": [
+          "libusb-1.0.so",
+          "libhidapi.so",
+          "libc.so"
+        ],
+        "is_static": false
+      },
+      "recommendation": {
+        "action": "no-action",
+        "rationale": "Binary already targets Android/Bionic; no patching required."
+      }
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "native_android": 1,
+    "linux_glibc": 0,
+    "static": 0,
+    "script": 0,
+    "unknown": 0,
+    "unsupported": 0,
+    "errors": 0,
+    "needs_patch": 0
+  }
+}

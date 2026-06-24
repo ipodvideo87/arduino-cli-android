@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "binaries": [
+    {
+      "path": "__FIXTURE_PATH__",
+      "compat_category": "unsupported",
+      "recommendation": {
+        "action": "unsupported",
+        "rationale": "Binary format not supported on Android (e.g. Windows PE); cannot patch."
+      }
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "native_android": 0,
+    "linux_glibc": 0,
+    "static": 0,
+    "script": 0,
+    "unknown": 0,
+    "unsupported": 1,
+    "errors": 0,
+    "needs_patch": 0
+  }
+}
