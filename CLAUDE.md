@@ -73,8 +73,9 @@ The ACL is designed as a staged pipeline:
          ▼
     ┌─────────┐
     │ Patcher │  → Plan or apply ELF edits (interpreter, RPATH)
-    └─────────┘  → Requires `patchelf` to be available
-         │
+    └─────────┘  → Dry-run mode: emit unified diff-style patch plan (no writes)
+         │         → Apply mode: invoke patchelf to rewrite ELF fields
+         │         → Requires `patchelf` to be available for apply mode
          ▼
     ┌──────────┐
     │ Launcher │  → Bootstrap runtime environment
@@ -167,6 +168,7 @@ The JSON report emitted by `acl-scan compat-json` follows a versioned schema:
 | `acl/cmd/acl-runtime/main.go` | Runtime manager CLI entry point |
 | `acl/cmd/acl-build-runtime/main.go` | Runtime package builder CLI entry point |
 | `acl/scanner/` | ELF scanner implementation (classification, JSON report, patch recommendations) |
+| `acl/patcher/` | ELF patcher implementation (dry-run plan + apply mode) |
 | `acl/database/android.json` | Android compatibility metadata |
 | `acl/database/bionic.json` | Bionic ABI metadata |
 | `acl/database/glibc.json` | glibc compatibility metadata |
@@ -245,7 +247,7 @@ The JSON report emitted by `acl-scan compat-json` follows a versioned schema:
 - **Docker** — Debian packaging
 
 ### External Android Tools
-- **patchelf** — Required for ELF patching operations
+- **patchelf** — Required for ELF patching operations (apply mode only; dry-run requires no external tools)
 - **Termux** — Android terminal environment (production target)
 - **proot-distro** — Ubuntu development environment (dev only)
 
@@ -280,6 +282,30 @@ Each scanner JSON entry may contain structured `patch_actions`. Known action typ
 | `none` | — | No ELF edit required for this entry |
 
 Consumers of the JSON report (patcher, launcher, CI scripts) must iterate `patch_actions` rather than parse free-text `recommendation` strings.
+
+### ELF Patcher: Dry-Run and Apply Modes
+
+The patcher operates in two explicit modes:
+
+| Mode | Behavior | External Tools Required |
+|---|---|---|
+| **Dry-run** (default) | Emits a unified diff-style patch plan showing what would change; no files written | None |
+| **Apply** | Invokes `patchelf` to rewrite PT_INTERP and/or RPATH/RUNPATH fields in-place | `patchelf` must be on PATH |
+
+**Dry-run output conventions:**
+- Output resembles a unified diff: each file that would be patched is shown with `---` (current value) and `+++` (proposed value) lines for each ELF field to be changed
+- Files requiring no changes are summarized but not shown in diff output
+- Exit code 0 even when patches are planned (dry-run never fails due to planned changes)
+- Suitable for piping into review workflows or CI gate checks
+
+**Apply mode conventions:**
+- Requires explicit opt-in flag (e.g., `--apply`) — dry-run is the safe default
+- Operates on scanner JSON report (`patch_actions`) as its authoritative input, not free-text recommendations
+- Each `patch_action` entry is executed in order: `set-interpreter` before `set-rpath`
+- Failures on individual files are reported but do not abort the full batch (continue-on-error within a run)
+- Apply mode should be run only after verifier confirms the runtime is present and valid
+
+**Design principle:** The patcher is a consumer of scanner JSON output — it reads `patch_actions` arrays and does not re-classify ELF files itself.
 
 ### ACL Runtime Package Format
 ```
@@ -316,23 +342,4 @@ Consumers of the JSON report (patcher, launcher, CI scripts) must iterate `patch
 - gRPC/protobuf for the RPC layer between CLI client and daemon
 
 ### ACL-Specific Conventions
-- **Android-specific code is isolated** — keep Android compatibility concerns separate from upstream Arduino CLI logic
-- **Conservative heuristics** — scanner and verifier err on the side of caution; report unknown rather than guess
-- **Staged pipeline** — each ACL stage (scan → verify → patch → launch) has explicit boundaries and does not assume the next stage is safe
-- **Dry-run first** — planning and dry-run modes are the default; actual binary rewrites are explicit
-- **Reproducible builds** — builder must produce identical output for identical inputs (same runtime ID, manifest, hashes, directory structure)
-- **Strict validation** — manifest fields must use supported architecture, ABI, and compatibility values; no empty paths, duplicate libraries, or symlink escapes
-- **Dual output convention** — scanner subcommands always come in pairs: a human-readable variant and a `-json` machine-readable variant (e.g., `compat` / `compat-json`, `validate-compat` / `validate-compat-json`)
-- **Versioned JSON schemas** — all machine-readable JSON outputs include a `schema_version` field; consumers must check this before processing
-- **Structured patch actions over free text** — `patch_actions` arrays in JSON output are the authoritative source for what patching is needed; `recommendation` strings are supplementary human-readable summaries only
-
-### Research-Before-Change Policy
-Before writing any Android-specific code:
-1. Read `docs/android/ANDROID_COMPATIBILITY_RESEARCH.md`
-2. If behavior is undocumented, research it before guessing
-3. Add confirmed findings (with device evidence) to that file
-4. Collect: exact command, stderr, `strace` excerpt, ELF metadata, file modes, runtime paths, environment differences
-
-### Error Handling on Android
-- `ENOENT` for a present executable on Android/Termux often means the `PT_INTERP` path is wrong or unpatched — do NOT assume the file is missing
-- Identify the exact failing layer before changing code: archive extraction → filesystem syscall → ELF patching → dynamic loader → runtime library closure → environment
+- **Android-specific code is isolated** — keep Android compatibility concerns separate from upstream Arduino
