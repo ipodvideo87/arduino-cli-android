@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "binaries": [
+    {
+      "path": "__FIXTURE_PATH__",
+      "compat_category": "script",
+      "recommendation": {
+        "action": "script-no-elf-patch",
+        "rationale": "Script file; ELF patching is not applicable."
+      }
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "native_android": 0,
+    "linux_glibc": 0,
+    "static": 0,
+    "script": 1,
+    "unknown": 0,
+    "unsupported": 0,
+    "errors": 0,
+    "needs_patch": 0
+  }
+}

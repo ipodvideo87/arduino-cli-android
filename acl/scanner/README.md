@@ -1,90 +1,158 @@
 # ACL Scanner
 
-The scanner module now has two related responsibilities:
+The scanner module inspects ELF binaries and produces structured compatibility
+reports for the Android Compatibility Layer (ACL) pipeline.
 
-- inspect individual ELF binaries and extract runtime metadata ACL needs
-- scan Arduino package installations and produce structured tool compatibility reports
-- validate the scanned compatibility data against ACL’s current patching rules
+## Pipeline
 
-For ELF inspection, the scanner extracts:
+```
+InspectFile → ClassifyFile → FindMissingSymbols → Recommend → ScanPaths
+```
 
-- ELF class
-- machine type
-- SONAME
-- program interpreter
-- RPATH/RUNPATH
-- imported libraries
-- suspicious absolute paths embedded in the file
+| Stage | Function | Output |
+|---|---|---|
+| Inspect | `InspectFile(path)` | `*ELFInfo` (class, machine, PT_INTERP, RPATH/RUNPATH, DT_NEEDED) |
+| Classify | `ClassifyFile(path)` | `CompatCategory` + `*ELFInfo` |
+| Symbols | `FindMissingSymbols(info)` | `[]MissingSymbol` (glibc-only DT_NEEDED entries) |
+| Recommend | `Recommend(cat, info)` | `PatchRecommendation` (concrete patch action + suggested values) |
+| Scan | `ScanPaths(paths)` | `ScanReport` (full JSON document) |
 
-For tool compatibility reporting, `acl-scan compat` and `acl-scan compat-json` walk an
-installed Arduino packages tree, classify executable candidates, and report:
+## Compatibility Categories
 
-- executable type such as ELF, shell script, Python, or Java archive
-- some ESP32 toolchain wrappers are Rust launchers; they are still ELF host tools, but
-  they are called out separately because explicit loader invocation can break their
-  executable identity and they must still be treated as ELF executables during
-  validation
-- architecture
-- interpreter
-- shared library dependencies
-- RPATH/RUNPATH
-- hardcoded absolute paths
-- compatibility category such as native Android compatible, Linux/glibc executable, static ELF, script, unknown, or unsupported
-- foreign Windows executables such as `.exe` files are classified separately and treated as unsupported host tooling
+| Category | Meaning |
+|---|---|
+| `native Android compatible` | Runs as-is; Bionic/Termux linker detected |
+| `Linux/glibc executable` | Needs patching; glibc `ld-linux` detected |
+| `static ELF` | No dynamic linking; no patching required |
+| `script` | Shebang detected; ELF patching not applicable |
+| `unknown` | Could not classify |
+| `unsupported` | Windows PE or other non-Android-patchable format |
 
-Compatibility is currently determined by a conservative set of rules:
+## Patch Actions
 
-- ELF magic, PT_INTERP, imported libraries, RPATH/RUNPATH, and embedded absolute paths
-- shebang detection for shell, Python, and similar scripts
-- archive detection for Java `.jar` tools
-- executable-bit and file-shape checks to avoid treating ordinary data files as tools
+| Action | When applied |
+|---|---|
+| `no-action` | Binary is already Android-compatible |
+| `rewrite-interpreter` | PT_INTERP is a glibc linker; RPATH already OK |
+| `inject-rpath` | Interpreter OK; RPATH missing ACL runtime path |
+| `rewrite-interpreter-and-rpath` | Both PT_INTERP and RPATH need updating |
+| `script-no-elf-patch` | Script; ELF patching not applicable |
+| `unsupported` | Cannot be patched for Android use |
 
-The scanner also assigns a patch class so later stages know what kind of ELF handling is
-appropriate:
+## JSON Report Schema (v1.0)
 
-- `none`
-- `loader-and-rpath`
-- `rpath-only`
-- `runtime-dependency-only`
-- `script-no-elf-patch`
-- `unsupported`
+```json
+{
+  "schema_version": "1.0",
+  "generated_at": "<RFC3339>",
+  "binaries": [
+    {
+      "path": "/path/to/binary",
+      "compat_category": "Linux/glibc executable",
+      "elf": {
+        "class": "ELF64",
+        "machine": "EM_AARCH64",
+        "interpreter": "/lib/ld-linux-aarch64.so.1",
+        "rpath": "",
+        "runpath": "",
+        "needed": ["libc.so.6", "libpthread.so.0"],
+        "is_static": false
+      },
+      "missing_symbols": [
+        {
+          "name": "libc.so.6",
+          "library": "libc.so.6",
+          "reason": "glibc libc — Bionic provides libc.so, not libc.so.6"
+        }
+      ],
+      "recommendation": {
+        "action": "rewrite-interpreter-and-rpath",
+        "suggested_interpreter": "/data/data/com.termux/files/usr/lib/acl-runtime/loader/ld-linux-aarch64.so.1",
+        "suggested_rpath": "/data/data/com.termux/files/usr/lib/acl-runtime/lib",
+        "rationale": "..."
+      },
+      "error": ""
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "native_android": 0,
+    "linux_glibc": 1,
+    "static": 0,
+    "script": 0,
+    "unknown": 0,
+    "unsupported": 0,
+    "errors": 0,
+    "needs_patch": 1
+  }
+}
+```
 
-This keeps ACL from applying executable-only rewrites, such as interpreter patching, to
-shared libraries that should only be treated as runtime dependencies or RPATH targets.
+## Usage via acl-scan
 
-Compatibility classification is currently heuristic and intentionally conservative. It
-is meant to show what Arduino CLI has installed and which tools are likely runtime
-candidates, not to prove that execution is already safe.
+```bash
+# Human-readable text report (default)
+acl-scan compat /path/to/binary [...]
 
-Machine-readable output is emitted by `acl-scan compat-json`. Human-readable output is
-emitted by `acl-scan compat`.
+# Machine-readable JSON report
+acl-scan --output json compat /path/to/binary [...]
+acl-scan compat-json /path/to/binary [...]          # always JSON
 
-For validation, `acl-scan validate-compat` and `acl-scan validate-compat-json` run the
-same scan and then check the resulting classifications against the current ACL
-consistency rules. Validation is intentionally stricter than scanning: it looks for
-internal agreement between executable type, patch class, architecture, interpreter
-presence, and runtime dependencies before ACL tries to compile or execute anything.
-It ignores obvious docs, resources, and firmware artifacts, warns on real host tools
-that still need future compatibility work, ignores ACL-owned `.acl/runtime` files, and
-fails only when ACL finds a broken or inconsistent installed tool state.
+# Validate (exit 1 if any binary needs patching or is unknown)
+acl-scan validate-compat /path/to/binary [...]
+acl-scan validate-compat-json /path/to/binary [...]  # always JSON
 
-`PASS` means the scanned package tree matched the current validation rules. It does not
-mean that every tool can execute on Android, and it does not prove that compilation,
-flashing, or end-to-end Arduino CLI workflows already work.
+# The --output flag may appear before or after the sub-command name:
+acl-scan --output json compat /path/to/binary
+acl-scan compat --output json /path/to/binary
+acl-scan --output=json compat /path/to/binary
+```
 
-`WARN` means the scan found a foreign or unsupported tool, such as a Windows `.exe`
-binary, a Rust launcher wrapper that still needs wrapper-safe direct execution, or a
-Linux host tool that still needs future compatibility work.
+## Exit Codes
 
-`FAIL` means ACL found broken patching, inconsistent runtime metadata, or other state
-that ACL is responsible for fixing.
+| Code | Meaning |
+|---|---|
+| 0 | All binaries are Android-compatible (no patching needed) |
+| 1 | One or more binaries need patching, are unknown, or had errors |
+| 2 | Usage / argument error |
+| 3 | Internal error (I/O, JSON marshal failure) |
 
-Compatibility heuristics currently live in `internal/acl/toolcompat`. Future
-compatibility rules should be added there in a structured way first, and then promoted
-into versioned ACL metadata under `acl/database/` as the rule set stabilizes.
+## Using the Go Package
 
-Validation rules should also live in `internal/acl/toolcompat` so the scan and
-validation layers stay aligned.
+```go
+import "github.com/arduino/arduino-cli/acl/scanner"
 
-The shell wrappers in this directory call the Go scanner in `cmd/acl-scan` so the same
-logic is shared by all higher-level checks.
+// Inspect a single file.
+info, err := scanner.InspectFile("/usr/bin/avr-gcc")
+
+// Classify a single file.
+cat, info, err := scanner.ClassifyFile("/usr/bin/avr-gcc")
+
+// Find glibc-only DT_NEEDED entries that Bionic cannot satisfy.
+missing := scanner.FindMissingSymbols(info)
+
+// Get a concrete patch recommendation.
+rec := scanner.Recommend(cat, info)
+
+// Full pipeline over a list of files.
+report := scanner.ScanPaths([]string{"/usr/bin/avr-gcc", "/usr/bin/esptool.py"})
+
+// Serialize to indented JSON.
+data, err := scanner.MarshalReport(report)
+```
+
+## Testing
+
+```bash
+# Go unit and integration tests
+go test ./acl/scanner/...
+
+# Regenerate golden files
+UPDATE_GOLDEN=1 go test ./acl/scanner/...
+
+# Shell integration tests (requires acl-scan binary and jq)
+bash acl/tests/test-scanner-json.sh
+
+# Regenerate shell golden files
+bash acl/tests/test-scanner-json.sh --update-golden
+```
