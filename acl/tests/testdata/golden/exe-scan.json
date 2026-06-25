@@ -1,24 +1,32 @@
 {
   "schema_version": "1.0",
-  "binaries": [
+  "entries": [
     {
       "path": "__FIXTURE_PATH__",
-      "compat_category": "unsupported",
-      "recommendation": {
-        "action": "unsupported",
-        "rationale": "Binary format not supported on Android (e.g. Windows PE); cannot patch."
-      }
+      "category": "Linux/glibc executable",
+      "patch_class": "loader-and-rpath",
+      "interpreter": "/lib/ld-linux-aarch64.so.1",
+      "recommendation": "Replace PT_INTERP with Termux glibc loader and update RPATH to ACL runtime path.",
+      "patch_actions": [
+        {
+          "action": "set-interpreter",
+          "field": "interpreter",
+          "current_value": "/lib/ld-linux-aarch64.so.1",
+          "recommended_value": "__TERMUX_LOADER__",
+          "reason": "Android does not provide /lib/ld-linux-aarch64.so.1; Termux glibc loader must be used."
+        }
+      ]
     }
   ],
   "summary": {
     "total": 1,
     "native_android": 0,
-    "linux_glibc": 0,
+    "linux_glibc": 1,
     "static": 0,
     "script": 0,
     "unknown": 0,
-    "unsupported": 1,
+    "unsupported": 0,
     "errors": 0,
-    "needs_patch": 0
+    "needs_patch": 1
   }
 }

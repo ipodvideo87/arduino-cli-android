@@ -1,556 +1,398 @@
-// Package scanner provides ELF inspection, compatibility classification,
-// and machine-readable report generation for the Android Compatibility Layer.
-//
-// The report pipeline is:
-//
-//	Inspect → Classify → Recommend → Marshal
-//
-// Each stage is independent and testable in isolation.
+// Package scanner provides ELF and script compatibility scanning for the
+// Android Compatibility Layer (ACL).
 package scanner
 
 import (
-	"debug/elf"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
 
-// ─── Schema version ──────────────────────────────────────────────────────────
+// ─── Compatibility categories ────────────────────────────────────────────────
 
-// ReportSchemaVersion is the version of the JSON report schema produced by
-// this package.  Consumers MUST reject reports whose schema_version they do
-// not understand.
-const ReportSchemaVersion = "1.0"
-
-// ─── Enumerations ────────────────────────────────────────────────────────────
-
-// CompatCategory mirrors the ACL compatibility classification system described
-// in the project context document.
+// CompatCategory classifies a binary or script by its Android compatibility.
 type CompatCategory string
 
 const (
-	CompatNativeAndroid CompatCategory = "native Android compatible"
-	CompatLinuxGlibc    CompatCategory = "Linux/glibc executable"
-	CompatStatic        CompatCategory = "static ELF"
-	CompatScript        CompatCategory = "script"
-	CompatUnknown       CompatCategory = "unknown"
-	CompatUnsupported   CompatCategory = "unsupported"
+	CategoryNativeAndroid CompatCategory = "native Android compatible"
+	CategoryLinuxGlibc    CompatCategory = "Linux/glibc executable"
+	CategoryStatic        CompatCategory = "static ELF"
+	CategoryScript        CompatCategory = "script"
+	CategoryUnknown       CompatCategory = "unknown"
+	CategoryUnsupported   CompatCategory = "unsupported"
 )
 
-// PatchAction is the concrete action the Patcher stage should apply.
-type PatchAction string
+// PatchClass describes what kind of ELF patching (if any) is required.
+type PatchClass string
 
 const (
-	// PatchNoAction — binary is already Android-compatible.
-	PatchNoAction PatchAction = "no-action"
-	// PatchRewriteInterpreter — PT_INTERP must be updated to the ACL loader path.
-	PatchRewriteInterpreter PatchAction = "rewrite-interpreter"
-	// PatchInjectRpath — RPATH/RUNPATH must be added or replaced.
-	PatchInjectRpath PatchAction = "inject-rpath"
-	// PatchRewriteInterpreterAndRpath — both interpreter and RPATH need updating.
-	PatchRewriteInterpreterAndRpath PatchAction = "rewrite-interpreter-and-rpath"
-	// PatchScriptNoop — script; ELF patching does not apply.
-	PatchScriptNoop PatchAction = "script-no-elf-patch"
-	// PatchUnsupported — binary cannot be patched for Android use.
-	PatchUnsupported PatchAction = "unsupported"
+	PatchClassNone                 PatchClass = "none"
+	PatchClassLoaderAndRpath       PatchClass = "loader-and-rpath"
+	PatchClassRpathOnly            PatchClass = "rpath-only"
+	PatchClassRuntimeDependency    PatchClass = "runtime-dependency-only"
+	PatchClassScriptNoELFPatch     PatchClass = "script-no-elf-patch"
+	PatchClassUnsupported          PatchClass = "unsupported"
 )
 
-// ─── Core report types ───────────────────────────────────────────────────────
+// ─── JSON report schema ───────────────────────────────────────────────────────
 
-// ELFInfo captures raw ELF metadata extracted from a binary.
-// Fields are empty/nil when not present in the binary.
-type ELFInfo struct {
-	// Class is the ELF class: "ELF32", "ELF64", or "unknown".
-	Class string `json:"class"`
-	// Machine is the target ISA, e.g. "EM_AARCH64", "EM_386", "EM_X86_64".
-	Machine string `json:"machine"`
-	// Interpreter is the PT_INTERP value, i.e. the dynamic linker path embedded
-	// in the binary.  Empty for static binaries and non-ELF files.
-	Interpreter string `json:"interpreter,omitempty"`
-	// Rpath is the DT_RPATH value (deprecated but still seen in older toolchains).
-	Rpath string `json:"rpath,omitempty"`
-	// Runpath is the DT_RUNPATH value.
-	Runpath string `json:"runpath,omitempty"`
-	// Needed is the list of DT_NEEDED shared-library names.
-	Needed []string `json:"needed,omitempty"`
-	// IsStatic is true when the binary has no PT_INTERP and no DT_NEEDED entries.
-	IsStatic bool `json:"is_static"`
+// PatchAction is a single structured ELF-edit instruction.
+type PatchAction struct {
+	Action           string `json:"action"`
+	Field            string `json:"field,omitempty"`
+	CurrentValue     string `json:"current_value,omitempty"`
+	RecommendedValue string `json:"recommended_value,omitempty"`
+	Reason           string `json:"reason,omitempty"`
 }
 
-// MissingSymbol records a glibc symbol that is imported by the binary but is
-// absent from Android's Bionic libc.
-type MissingSymbol struct {
-	// Name is the unmangled symbol name, e.g. "__cxa_thread_atexit_impl".
-	Name string `json:"name"`
-	// Library is the DT_NEEDED entry that is expected to provide the symbol.
-	// Empty when the source library is unknown.
-	Library string `json:"library,omitempty"`
-	// Reason is a human-readable explanation, e.g. "glibc-only extension".
-	Reason string `json:"reason,omitempty"`
+// ScriptInterpreterInfo holds the shebang validation result for a script entry.
+type ScriptInterpreterInfo struct {
+	// DeclaredPath is the interpreter path as written in the shebang line.
+	DeclaredPath string `json:"declared_path"`
+
+	// Args are any arguments following the interpreter path on the shebang line.
+	Args []string `json:"args,omitempty"`
+
+	// Status is one of "found", "missing", or "remapped".
+	Status InterpreterStatus `json:"status"`
+
+	// ResolvedPath is the effective interpreter path after resolution.
+	// Empty when Status == "missing".
+	ResolvedPath string `json:"resolved_path,omitempty"`
+
+	// Recommendation is a human-readable description of what to do.
+	Recommendation string `json:"recommendation"`
 }
 
-// PatchRecommendation is the output of the Recommend stage: a single,
-// concrete action for the Patcher to execute, together with the values it
-// needs.
-type PatchRecommendation struct {
-	// Action is the patch action the Patcher should apply.
-	Action PatchAction `json:"action"`
-	// SuggestedInterpreter is the ACL runtime loader path that should replace
-	// the current PT_INTERP value.  Set when Action contains interpreter rewrite.
-	SuggestedInterpreter string `json:"suggested_interpreter,omitempty"`
-	// SuggestedRpath is the colon-separated RPATH/RUNPATH that should be
-	// injected.  Set when Action contains rpath injection.
-	SuggestedRpath string `json:"suggested_rpath,omitempty"`
-	// Rationale explains why this action was chosen.
-	Rationale string `json:"rationale"`
-}
-
-// BinaryReport is the full compatibility report for a single file.
-type BinaryReport struct {
-	// Path is the absolute or relative path of the inspected file.
+// ReportEntry is one item in the scan report (one binary or script).
+type ReportEntry struct {
+	// Path is the scanned file path.
 	Path string `json:"path"`
-	// CompatCategory is the high-level classification.
-	CompatCategory CompatCategory `json:"compat_category"`
-	// ELF contains the raw ELF metadata (nil for scripts and unknowns).
-	ELF *ELFInfo `json:"elf,omitempty"`
-	// MissingSymbols lists glibc symbols that Bionic cannot satisfy.
-	MissingSymbols []MissingSymbol `json:"missing_symbols,omitempty"`
-	// Recommendation is the concrete patch action for this binary.
-	Recommendation PatchRecommendation `json:"recommendation"`
-	// Error holds an inspection error message when classification failed.
-	Error string `json:"error,omitempty"`
+
+	// Category is the compatibility classification.
+	Category CompatCategory `json:"category"`
+
+	// PatchClass is the patching classification (empty for scripts/unknown).
+	PatchClass PatchClass `json:"patch_class,omitempty"`
+
+	// Interpreter is the PT_INTERP value for ELF binaries (empty for scripts).
+	Interpreter string `json:"interpreter,omitempty"`
+
+	// Rpath is the RPATH/RUNPATH value for ELF binaries.
+	Rpath string `json:"rpath,omitempty"`
+
+	// Recommendation is the human-readable patch recommendation.
+	Recommendation string `json:"recommendation"`
+
+	// PatchActions is the structured list of ELF edits to apply.
+	// Nil/empty for entries that need no patching.
+	PatchActions []PatchAction `json:"patch_actions,omitempty"`
+
+	// InterpreterStatus holds the shebang validation result for script entries.
+	// Nil for non-script entries.
+	InterpreterStatus *ScriptInterpreterInfo `json:"interpreter_status,omitempty"`
 }
 
-// ScanReport is the top-level JSON document emitted by acl-scan.
-type ScanReport struct {
-	// SchemaVersion identifies the report schema.  Always ReportSchemaVersion.
-	SchemaVersion string `json:"schema_version"`
-	// GeneratedAt is the RFC 3339 timestamp when the report was produced.
-	GeneratedAt string `json:"generated_at"`
-	// Binaries contains one BinaryReport per inspected path.
-	Binaries []BinaryReport `json:"binaries"`
-	// Summary aggregates counts across all inspected binaries.
-	Summary ScanSummary `json:"summary"`
+// ReportSummary holds pre-computed aggregate counters.
+type ReportSummary struct {
+	Total            int `json:"total"`
+	NativeAndroid    int `json:"native_android"`
+	LinuxGlibc       int `json:"linux_glibc"`
+	Static           int `json:"static"`
+	Script           int `json:"script"`
+	Unknown          int `json:"unknown"`
+	Unsupported      int `json:"unsupported"`
+	Errors           int `json:"errors"`
+	NeedsPatch       int `json:"needs_patch"`
+	// Script-specific counters.
+	ScriptFound      int `json:"script_interpreter_found,omitempty"`
+	ScriptMissing    int `json:"script_interpreter_missing,omitempty"`
+	ScriptRemapped   int `json:"script_interpreter_remapped,omitempty"`
 }
 
-// ScanSummary provides aggregate statistics over the full scan.
-type ScanSummary struct {
-	Total         int `json:"total"`
-	NativeAndroid int `json:"native_android"`
-	LinuxGlibc    int `json:"linux_glibc"`
-	Static        int `json:"static"`
-	Script        int `json:"script"`
-	Unknown       int `json:"unknown"`
-	Unsupported   int `json:"unsupported"`
-	Errors        int `json:"errors"`
-	// NeedsPatch is the count of binaries that require any ELF modification.
-	NeedsPatch int `json:"needs_patch"`
+// Report is the top-level JSON document emitted by the scanner.
+type Report struct {
+	SchemaVersion string        `json:"schema_version"`
+	GeneratedAt   string        `json:"generated_at"`
+	Target        string        `json:"target"`
+	Summary       ReportSummary `json:"summary"`
+	Entries       []ReportEntry `json:"entries"`
 }
 
-// ─── Well-known path constants ───────────────────────────────────────────────
+// ─── Builder ──────────────────────────────────────────────────────────────────
 
-const (
-	// termuxPrefix is the Termux installation prefix.  Paths that start with
-	// this prefix indicate a Termux-origin binary that already targets Android.
-	termuxPrefix = "/data/data/com.termux/files/usr"
-
-	// androidLinkerAarch64 is the Bionic dynamic linker path on aarch64 devices.
-	androidLinkerAarch64 = "/system/bin/linker64"
-	// androidLinkerArm is the Bionic dynamic linker path on 32-bit ARM devices.
-	androidLinkerArm = "/system/bin/linker"
-	// androidLinkerX86_64 is the Bionic dynamic linker on x86_64 Android.
-	androidLinkerX86_64 = "/system/bin/linker64"
-
-	// aclDefaultRpath is the RPATH the ACL patcher injects when the binary
-	// needs glibc-style libraries from the ACL runtime store.
-	aclDefaultRpath = "/data/data/com.termux/files/usr/lib/acl-runtime/lib"
-
-	// aclDefaultLoader is the loader the ACL patcher injects when a
-	// Linux/glibc binary needs a compatible PT_INTERP.
-	aclDefaultLoader = "/data/data/com.termux/files/usr/lib/acl-runtime/loader/ld-linux-aarch64.so.1"
-)
-
-// glibcOnlyLibraries is the set of DT_NEEDED library names that are specific
-// to glibc and have no equivalent in Bionic.  A binary that imports one of
-// these will require runtime wrapping or patching.
-var glibcOnlyLibraries = map[string]string{
-	"libpthread.so.0": "POSIX threads — folded into libc.so on Bionic/Android ≥ 5.0",
-	"librt.so.1":      "POSIX realtime extensions — folded into libc.so on Bionic",
-	"libdl.so.2":      "glibc dynamic linker interface — Bionic exposes equivalent via libc.so",
-	"libresolv.so.2":  "GNU resolver — not present in Bionic; use getaddrinfo(3) instead",
-	"libnsl.so.1":     "NIS/NIS+ — absent from Android; avoid or stub",
-	"libm.so.6":       "glibc math — present in Bionic but as libm.so, not libm.so.6",
-	"libc.so.6":       "glibc libc — Bionic provides libc.so, not libc.so.6",
-	"libgcc_s.so.1":   "GCC runtime — not provided by Android NDK default paths",
+// ReportBuilder accumulates scan results and produces a Report.
+type ReportBuilder struct {
+	target     string
+	prefixDir  string
+	runtimeDir string
+	entries    []ReportEntry
 }
 
-// glibcInterpreterPrefixes are path prefixes that indicate a Linux/glibc
-// dynamic linker embedded as PT_INTERP.
-var glibcInterpreterPrefixes = []string{
-	"/lib/ld-linux",
-	"/lib64/ld-linux",
-	"/lib/ld-musl",
-	"/usr/lib/ld-linux",
+// NewReportBuilder creates a builder for a scan of target (file or directory).
+// prefixDir is the Termux $PREFIX (may be empty to skip shebang resolution).
+// runtimeDir is an optional ACL runtime directory.
+func NewReportBuilder(target, prefixDir, runtimeDir string) *ReportBuilder {
+	return &ReportBuilder{
+		target:     target,
+		prefixDir:  prefixDir,
+		runtimeDir: runtimeDir,
+	}
 }
 
-// androidInterpreterPrefixes are path prefixes that identify Android/Bionic
-// dynamic linkers.
-var androidInterpreterPrefixes = []string{
-	"/system/bin/linker",
-	"/system/bin/linker64",
+// AddELFEntry records a scanned ELF binary.
+func (b *ReportBuilder) AddELFEntry(
+	path string,
+	category CompatCategory,
+	patchClass PatchClass,
+	interpreter, rpath string,
+	recommendation string,
+	actions []PatchAction,
+) {
+	b.entries = append(b.entries, ReportEntry{
+		Path:           path,
+		Category:       category,
+		PatchClass:     patchClass,
+		Interpreter:    interpreter,
+		Rpath:          rpath,
+		Recommendation: recommendation,
+		PatchActions:   actions,
+	})
 }
 
-// ─── Inspector ───────────────────────────────────────────────────────────────
+// AddScriptEntry records a scanned script file.  It calls ScanShebang
+// automatically to populate the InterpreterStatus field.
+func (b *ReportBuilder) AddScriptEntry(path string) error {
+	entry := ReportEntry{
+		Path:           path,
+		Category:       CategoryScript,
+		PatchClass:     PatchClassScriptNoELFPatch,
+		Recommendation: "Script file; ELF patching is not applicable.",
+	}
 
-// InspectFile reads the ELF metadata from path.  For non-ELF files it returns
-// nil, nil (the caller should classify by other means).  For genuine ELF
-// parsing errors it returns nil, err.
-func InspectFile(path string) (*ELFInfo, error) {
-	f, err := elf.Open(path)
+	shebangResult, err := ScanShebang(path, b.prefixDir, b.runtimeDir)
 	if err != nil {
-		// Not an ELF file — let the caller decide what to do.
-		return nil, nil //nolint:nilerr // intentional: not-ELF is handled upstream
-	}
-	defer f.Close()
-
-	info := &ELFInfo{}
-
-	switch f.Class {
-	case elf.ELFCLASS32:
-		info.Class = "ELF32"
-	case elf.ELFCLASS64:
-		info.Class = "ELF64"
-	default:
-		info.Class = "unknown"
-	}
-
-	info.Machine = f.Machine.String()
-
-	// PT_INTERP — the path to the dynamic linker.
-	for _, prog := range f.Progs {
-		if prog.Type == elf.PT_INTERP {
-			buf := make([]byte, prog.Filesz)
-			if _, rerr := prog.ReadAt(buf, 0); rerr == nil {
-				// Strip the NUL terminator.
-				info.Interpreter = strings.TrimRight(string(buf), "\x00")
-			}
-			break
+		// Non-fatal: record the error in the recommendation but keep going.
+		entry.Recommendation = fmt.Sprintf(
+			"Script file; ELF patching is not applicable. "+
+				"Shebang read error: %v", err)
+	} else if shebangResult != nil {
+		entry.InterpreterStatus = &ScriptInterpreterInfo{
+			DeclaredPath:   shebangResult.InterpreterPath,
+			Args:           shebangResult.InterpreterArgs,
+			Status:         shebangResult.Status,
+			ResolvedPath:   shebangResult.ResolvedPath,
+			Recommendation: shebangResult.Recommendation,
 		}
 	}
 
-	// Dynamic section entries: DT_NEEDED, DT_RPATH, DT_RUNPATH.
-	libs, _ := f.ImportedLibraries()
-	info.Needed = libs
-
-	if dynStrings, derr := f.DynString(elf.DT_RPATH); derr == nil && len(dynStrings) > 0 {
-		info.Rpath = dynStrings[0]
-	}
-	if dynStrings, derr := f.DynString(elf.DT_RUNPATH); derr == nil && len(dynStrings) > 0 {
-		info.Runpath = dynStrings[0]
-	}
-
-	// A binary is considered static when it has no PT_INTERP and no DT_NEEDED.
-	info.IsStatic = info.Interpreter == "" && len(info.Needed) == 0
-
-	return info, nil
+	b.entries = append(b.entries, entry)
+	return nil
 }
 
-// ─── Classifier ──────────────────────────────────────────────────────────────
-
-// ClassifyFile determines the CompatCategory for the file at path.
-// It also returns any ELFInfo collected during inspection.
-func ClassifyFile(path string) (CompatCategory, *ELFInfo, error) {
-	// Check for Windows PE / other foreign formats first.
-	if isWindowsBinary(path) {
-		return CompatUnsupported, nil, nil
-	}
-
-	// Check for scripts (shebang).
-	if isScript(path) {
-		return CompatScript, nil, nil
-	}
-
-	info, err := InspectFile(path)
-	if err != nil {
-		return CompatUnknown, nil, fmt.Errorf("ELF parse error for %s: %w", path, err)
-	}
-	if info == nil {
-		// Not an ELF and not a script — unknown.
-		return CompatUnknown, nil, nil
-	}
-
-	if info.IsStatic {
-		return CompatStatic, info, nil
-	}
-
-	// Termux-origin binaries target Android directly.
-	if strings.HasPrefix(info.Interpreter, termuxPrefix) {
-		return CompatNativeAndroid, info, nil
-	}
-
-	// Bionic dynamic linker — native Android binary.
-	for _, pfx := range androidInterpreterPrefixes {
-		if strings.HasPrefix(info.Interpreter, pfx) {
-			return CompatNativeAndroid, info, nil
-		}
-	}
-
-	// glibc dynamic linker — needs patching.
-	for _, pfx := range glibcInterpreterPrefixes {
-		if strings.HasPrefix(info.Interpreter, pfx) {
-			return CompatLinuxGlibc, info, nil
-		}
-	}
-
-	// No interpreter but has DT_NEEDED — treat as a shared library that is a
-	// runtime dependency rather than a standalone executable.
-	if info.Interpreter == "" && len(info.Needed) > 0 {
-		return CompatLinuxGlibc, info, nil
-	}
-
-	return CompatUnknown, info, nil
+// AddRawEntry records an entry with full control over all fields (used by
+// the text-format scanner and legacy callers).
+func (b *ReportBuilder) AddRawEntry(entry ReportEntry) {
+	b.entries = append(b.entries, entry)
 }
 
-// ─── Symbol inspector ────────────────────────────────────────────────────────
-
-// FindMissingSymbols returns the glibc-only DT_NEEDED entries that Bionic
-// cannot satisfy.  It does not perform deep symbol-level inspection (that
-// requires a live linker); instead it uses the curated glibcOnlyLibraries map
-// as a conservative first pass.
-func FindMissingSymbols(info *ELFInfo) []MissingSymbol {
-	if info == nil {
-		return nil
-	}
-	var missing []MissingSymbol
-	for _, lib := range info.Needed {
-		if reason, ok := glibcOnlyLibraries[lib]; ok {
-			missing = append(missing, MissingSymbol{
-				Name:    lib,
-				Library: lib,
-				Reason:  reason,
-			})
-		}
-	}
-	return missing
-}
-
-// ─── Recommender ─────────────────────────────────────────────────────────────
-
-// Recommend produces a concrete PatchRecommendation for the given binary.
-func Recommend(cat CompatCategory, info *ELFInfo) PatchRecommendation {
-	switch cat {
-	case CompatNativeAndroid:
-		return PatchRecommendation{
-			Action:    PatchNoAction,
-			Rationale: "Binary already targets Android/Bionic; no patching required.",
-		}
-
-	case CompatStatic:
-		return PatchRecommendation{
-			Action:    PatchNoAction,
-			Rationale: "Statically linked binary; no dynamic linker or RPATH to patch.",
-		}
-
-	case CompatScript:
-		return PatchRecommendation{
-			Action:    PatchScriptNoop,
-			Rationale: "Script file; ELF patching is not applicable.",
-		}
-
-	case CompatUnsupported:
-		return PatchRecommendation{
-			Action:    PatchUnsupported,
-			Rationale: "Binary format not supported on Android (e.g. Windows PE); cannot patch.",
-		}
-
-	case CompatLinuxGlibc:
-		if info == nil {
-			return PatchRecommendation{
-				Action:    PatchUnsupported,
-				Rationale: "Linux/glibc classification but no ELF info available; cannot determine patch strategy.",
-			}
-		}
-		needsInterp := isGlibcInterpreter(info.Interpreter)
-		needsRpath := !hasAclRpath(info)
-
-		switch {
-		case needsInterp && needsRpath:
-			return PatchRecommendation{
-				Action:               PatchRewriteInterpreterAndRpath,
-				SuggestedInterpreter: aclDefaultLoader,
-				SuggestedRpath:       aclDefaultRpath,
-				Rationale: fmt.Sprintf(
-					"PT_INTERP %q is a glibc dynamic linker; must be replaced with ACL loader. "+
-						"No ACL RPATH present; must inject %q so the ACL runtime libraries are found.",
-					info.Interpreter, aclDefaultRpath,
-				),
-			}
-		case needsInterp && !needsRpath:
-			return PatchRecommendation{
-				Action:               PatchRewriteInterpreter,
-				SuggestedInterpreter: aclDefaultLoader,
-				Rationale: fmt.Sprintf(
-					"PT_INTERP %q is a glibc dynamic linker; must be replaced with ACL loader. "+
-						"RPATH/RUNPATH already includes an ACL path.",
-					info.Interpreter,
-				),
-			}
-		case !needsInterp && needsRpath:
-			return PatchRecommendation{
-				Action:         PatchInjectRpath,
-				SuggestedRpath: aclDefaultRpath,
-				Rationale: fmt.Sprintf(
-					"Interpreter is already Android-compatible but no ACL RPATH present; "+
-						"must inject %q so the ACL runtime libraries are found.",
-					aclDefaultRpath,
-				),
-			}
-		default:
-			// Classified as Linux/glibc but interpreter and rpath look OK —
-			// conservative: still flag as no-action but explain.
-			return PatchRecommendation{
-				Action: PatchNoAction,
-				Rationale: "Classified Linux/glibc but interpreter and RPATH already appear compatible; " +
-					"manual verification recommended before marking as safe.",
-			}
-		}
-
-	default: // CompatUnknown
-		return PatchRecommendation{
-			Action:    PatchUnsupported,
-			Rationale: "Classification is unknown; manual inspection required before patching.",
-		}
+// Build finalises and returns the Report.
+func (b *ReportBuilder) Build() Report {
+	summary := computeSummary(b.entries)
+	return Report{
+		SchemaVersion: "1.0",
+		GeneratedAt:   time.Now().UTC().Format(time.RFC3339),
+		Target:        b.target,
+		Summary:       summary,
+		Entries:       b.entries,
 	}
 }
 
-// ─── Summary builder ─────────────────────────────────────────────────────────
-
-// BuildSummary computes a ScanSummary from a slice of BinaryReports.
-func BuildSummary(reports []BinaryReport) ScanSummary {
-	s := ScanSummary{Total: len(reports)}
-	for _, r := range reports {
-		if r.Error != "" {
-			s.Errors++
-		}
-		switch r.CompatCategory {
-		case CompatNativeAndroid:
+// computeSummary tallies all entries into a ReportSummary.
+func computeSummary(entries []ReportEntry) ReportSummary {
+	var s ReportSummary
+	s.Total = len(entries)
+	for _, e := range entries {
+		switch e.Category {
+		case CategoryNativeAndroid:
 			s.NativeAndroid++
-		case CompatLinuxGlibc:
+		case CategoryLinuxGlibc:
 			s.LinuxGlibc++
-		case CompatStatic:
-			s.Static++
-		case CompatScript:
-			s.Script++
-		case CompatUnsupported:
-			s.Unsupported++
-		default:
-			s.Unknown++
-		}
-		switch r.Recommendation.Action {
-		case PatchRewriteInterpreter,
-			PatchInjectRpath,
-			PatchRewriteInterpreterAndRpath:
 			s.NeedsPatch++
+		case CategoryStatic:
+			s.Static++
+		case CategoryScript:
+			s.Script++
+			if e.InterpreterStatus != nil {
+				switch e.InterpreterStatus.Status {
+				case InterpreterFound:
+					s.ScriptFound++
+				case InterpreterMissing:
+					s.ScriptMissing++
+				case InterpreterRemapped:
+					s.ScriptRemapped++
+				}
+			}
+		case CategoryUnknown:
+			s.Unknown++
+		case CategoryUnsupported:
+			s.Unsupported++
+		}
+		if e.PatchClass != "" &&
+			e.PatchClass != PatchClassNone &&
+			e.PatchClass != PatchClassScriptNoELFPatch &&
+			e.Category == CategoryLinuxGlibc {
+			// NeedsPatch already counted above for glibc; skip double-count.
 		}
 	}
 	return s
 }
 
-// ─── High-level entry point ──────────────────────────────────────────────────
+// ─── Output helpers ───────────────────────────────────────────────────────────
 
-// ScanPaths inspects each path and returns a populated ScanReport.
-// Errors during individual file inspection are captured in BinaryReport.Error
-// and do not abort the scan.
-func ScanPaths(paths []string) ScanReport {
-	reports := make([]BinaryReport, 0, len(paths))
-
-	for _, p := range paths {
-		br := scanOne(p)
-		reports = append(reports, br)
-	}
-
-	return ScanReport{
-		SchemaVersion: ReportSchemaVersion,
-		GeneratedAt:   time.Now().UTC().Format(time.RFC3339),
-		Binaries:      reports,
-		Summary:       BuildSummary(reports),
-	}
+// WriteJSON serialises the report to w as indented JSON.
+func WriteJSON(w io.Writer, r Report) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(r)
 }
 
-func scanOne(path string) BinaryReport {
-	cat, info, err := ClassifyFile(path)
-	br := BinaryReport{
+// WriteText writes a human-readable text representation of the report to w.
+func WriteText(w io.Writer, r Report) error {
+	fmt.Fprintf(w, "ACL Compatibility Scan\n")
+	fmt.Fprintf(w, "======================\n")
+	fmt.Fprintf(w, "Target      : %s\n", r.Target)
+	fmt.Fprintf(w, "Generated   : %s\n", r.GeneratedAt)
+	fmt.Fprintf(w, "Schema      : %s\n\n", r.SchemaVersion)
+
+	for _, e := range r.Entries {
+		fmt.Fprintf(w, "  [%s] %s\n", e.Category, e.Path)
+		if e.PatchClass != "" {
+			fmt.Fprintf(w, "      patch_class : %s\n", e.PatchClass)
+		}
+		if e.Interpreter != "" {
+			fmt.Fprintf(w, "      interpreter : %s\n", e.Interpreter)
+		}
+		if e.Rpath != "" {
+			fmt.Fprintf(w, "      rpath       : %s\n", e.Rpath)
+		}
+		if e.Recommendation != "" {
+			fmt.Fprintf(w, "      note        : %s\n", e.Recommendation)
+		}
+		if e.InterpreterStatus != nil {
+			is := e.InterpreterStatus
+			fmt.Fprintf(w, "      shebang     : %s\n", is.DeclaredPath)
+			if len(is.Args) > 0 {
+				fmt.Fprintf(w, "      shebang args: %s\n", strings.Join(is.Args, " "))
+			}
+			fmt.Fprintf(w, "      interp_status: %s\n", is.Status)
+			if is.ResolvedPath != "" {
+				fmt.Fprintf(w, "      resolved    : %s\n", is.ResolvedPath)
+			}
+			fmt.Fprintf(w, "      interp_note : %s\n", is.Recommendation)
+		}
+		for _, a := range e.PatchActions {
+			fmt.Fprintf(w, "      action      : %s field=%s current=%q recommended=%q\n",
+				a.Action, a.Field, a.CurrentValue, a.RecommendedValue)
+			if a.Reason != "" {
+				fmt.Fprintf(w, "                    reason: %s\n", a.Reason)
+			}
+		}
+		fmt.Fprintln(w)
+	}
+
+	s := r.Summary
+	fmt.Fprintf(w, "Summary\n")
+	fmt.Fprintf(w, "-------\n")
+	fmt.Fprintf(w, "  Total              : %d\n", s.Total)
+	fmt.Fprintf(w, "  Native Android     : %d\n", s.NativeAndroid)
+	fmt.Fprintf(w, "  Linux/glibc        : %d\n", s.LinuxGlibc)
+	fmt.Fprintf(w, "  Static ELF         : %d\n", s.Static)
+	fmt.Fprintf(w, "  Scripts            : %d\n", s.Script)
+	if s.Script > 0 {
+		fmt.Fprintf(w, "    interp found     : %d\n", s.ScriptFound)
+		fmt.Fprintf(w, "    interp remapped  : %d\n", s.ScriptRemapped)
+		fmt.Fprintf(w, "    interp missing   : %d\n", s.ScriptMissing)
+	}
+	fmt.Fprintf(w, "  Unknown            : %d\n", s.Unknown)
+	fmt.Fprintf(w, "  Unsupported        : %d\n", s.Unsupported)
+	fmt.Fprintf(w, "  Needs patch        : %d\n", s.NeedsPatch)
+	return nil
+}
+
+// ─── File-based helpers ───────────────────────────────────────────────────────
+
+// ScanFile inspects a single file and appends an entry to the builder.
+// It uses heuristics: shebang → script; ELF magic → ELF; otherwise unknown.
+// For richer ELF classification callers should use the ELF-specific paths
+// and call AddELFEntry directly.
+func (b *ReportBuilder) ScanFile(path string) error {
+	// Read first bytes to detect file type.
+	magic, err := readMagic(path, 4)
+	if err != nil {
+		b.entries = append(b.entries, ReportEntry{
+			Path:           path,
+			Category:       CategoryUnknown,
+			Recommendation: fmt.Sprintf("Cannot read file: %v", err),
+		})
+		return nil
+	}
+
+	// Script: starts with "#!"
+	if len(magic) >= 2 && magic[0] == '#' && magic[1] == '!' {
+		return b.AddScriptEntry(path)
+	}
+
+	// ELF: starts with 0x7f 'E' 'L' 'F'
+	if len(magic) == 4 && magic[0] == 0x7f && magic[1] == 'E' && magic[2] == 'L' && magic[3] == 'F' {
+		// Minimal classification — callers that have full ELF metadata
+		// should use AddELFEntry directly.
+		b.entries = append(b.entries, ReportEntry{
+			Path:           path,
+			Category:       CategoryUnknown,
+			PatchClass:     PatchClassNone,
+			Recommendation: "ELF binary detected; full classification requires ELF inspection.",
+		})
+		return nil
+	}
+
+	// Unknown / data file.
+	b.entries = append(b.entries, ReportEntry{
 		Path:           path,
-		CompatCategory: cat,
-		ELF:            info,
-	}
-	if err != nil {
-		br.Error = err.Error()
-		br.Recommendation = PatchRecommendation{
-			Action:    PatchUnsupported,
-			Rationale: "Inspection failed; see error field.",
+		Category:       CategoryUnknown,
+		Recommendation: "File type not recognised; not an ELF binary or script.",
+	})
+	return nil
+}
+
+// ScanDirectory walks dir, calling ScanFile for each regular file.
+func (b *ReportBuilder) ScanDirectory(dir string) error {
+	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
 		}
-		return br
-	}
-
-	br.MissingSymbols = FindMissingSymbols(info)
-	br.Recommendation = Recommend(cat, info)
-	return br
+		if info.IsDir() {
+			return nil
+		}
+		return b.ScanFile(path)
+	})
 }
 
-// ─── Marshalling helpers ──────────────────────────────────────────────────────
-
-// MarshalReport serialises report to indented JSON.
-func MarshalReport(report ScanReport) ([]byte, error) {
-	return json.MarshalIndent(report, "", "  ")
-}
-
-// ─── Internal helpers ─────────────────────────────────────────────────────────
-
-func isWindowsBinary(path string) bool {
-	ext := strings.ToLower(filepath.Ext(path))
-	if ext == ".exe" || ext == ".dll" || ext == ".sys" {
-		return true
-	}
+// readMagic reads up to n bytes from the start of path.
+func readMagic(path string, n int) ([]byte, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return false
+		return nil, err
 	}
 	defer f.Close()
-	// Read the DOS MZ magic bytes.
-	hdr := make([]byte, 2)
-	if n, err := f.Read(hdr); n == 2 && err == nil {
-		return hdr[0] == 0x4D && hdr[1] == 0x5A // "MZ"
+	buf := make([]byte, n)
+	got, err := f.Read(buf)
+	if err != nil && got == 0 {
+		return nil, err
 	}
-	return false
-}
-
-func isScript(path string) bool {
-	f, err := os.Open(path)
-	if err != nil {
-		return false
-	}
-	defer f.Close()
-	hdr := make([]byte, 2)
-	if n, err := f.Read(hdr); n == 2 && err == nil {
-		return hdr[0] == '#' && hdr[1] == '!'
-	}
-	return false
-}
-
-func isGlibcInterpreter(interp string) bool {
-	for _, pfx := range glibcInterpreterPrefixes {
-		if strings.HasPrefix(interp, pfx) {
-			return true
-		}
-	}
-	return false
-}
-
-func hasAclRpath(info *ELFInfo) bool {
-	combined := info.Rpath + ":" + info.Runpath
-	return strings.Contains(combined, "acl-runtime")
+	return buf[:got], nil
 }
