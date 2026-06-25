@@ -1,18 +1,17 @@
 {
   "schema_version": "1.0",
-  "binaries": [
+  "entries": [
     {
       "path": "__FIXTURE_PATH__",
-      "compat_category": "script",
+      "category": "script",
+      "patch_class": "script-no-elf-patch",
+      "recommendation": "Script file; ELF patching is not applicable.",
       "interpreter_status": {
-        "declared_path": "/bin/bash",
+        "declared_path": "/usr/bin/env",
+        "args": ["perl"],
         "status": "remapped",
-        "resolved_path": "__PREFIX__/bin/bash",
-        "recommendation": "Interpreter \"/bin/bash\" is a standard Linux path; Termux equivalent found at \"__PREFIX__/bin/bash\". Update the shebang or use a wrapper."
-      },
-      "recommendation": {
-        "action": "script-no-elf-patch",
-        "rationale": "Script file; ELF patching is not applicable."
+        "resolved_path": "__PREFIX__/bin/perl",
+        "recommendation": "Env-style shebang \"/usr/bin/env\" delegates to \"perl\"; found Termux equivalent at \"__PREFIX__/bin/perl\"."
       }
     }
   ],

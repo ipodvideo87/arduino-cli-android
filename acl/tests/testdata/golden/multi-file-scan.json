@@ -1,32 +1,38 @@
 {
   "schema_version": "1.0",
-  "binaries": [
-    {
-      "path": "__FIXTURE_SCRIPT_PATH__",
-      "compat_category": "script",
-      "recommendation": {
-        "action": "script-no-elf-patch",
-        "rationale": "Script file; ELF patching is not applicable."
-      }
-    },
+  "entries": [
     {
       "path": "__FIXTURE_EXE_PATH__",
-      "compat_category": "unsupported",
-      "recommendation": {
-        "action": "unsupported",
-        "rationale": "Binary format not supported on Android (e.g. Windows PE); cannot patch."
+      "category": "Linux/glibc executable",
+      "patch_class": "loader-and-rpath",
+      "interpreter": "/lib/ld-linux-aarch64.so.1",
+      "recommendation": "Replace PT_INTERP with Termux glibc loader and update RPATH to ACL runtime path."
+    },
+    {
+      "path": "__FIXTURE_SCRIPT_PATH__",
+      "category": "script",
+      "patch_class": "script-no-elf-patch",
+      "recommendation": "Script file; ELF patching is not applicable.",
+      "interpreter_status": {
+        "declared_path": "/bin/bash",
+        "status": "remapped",
+        "resolved_path": "__PREFIX__/bin/bash",
+        "recommendation": "Interpreter \"/bin/bash\" is a standard Linux path; Termux equivalent found at \"__PREFIX__/bin/bash\". Update the shebang or use a wrapper."
       }
     }
   ],
   "summary": {
     "total": 2,
     "native_android": 0,
-    "linux_glibc": 0,
+    "linux_glibc": 1,
     "static": 0,
     "script": 1,
     "unknown": 0,
-    "unsupported": 1,
+    "unsupported": 0,
     "errors": 0,
-    "needs_patch": 0
+    "needs_patch": 1,
+    "script_interpreter_found": 0,
+    "script_interpreter_missing": 0,
+    "script_interpreter_remapped": 1
   }
 }

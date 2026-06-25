@@ -1,59 +1,68 @@
 {
   "schema_version": "1.0",
   "generated_at": "2026-06-19T00:00:00Z",
-  "binaries": [
-    {
-      "path": "/tools/esptool.py",
-      "compat_category": "script",
-      "recommendation": {
-        "action": "script-no-elf-patch",
-        "rationale": "Script file; ELF patching is not applicable."
-      }
-    },
-    {
-      "path": "/tools/xtensa-esp32-elf-gcc",
-      "compat_category": "Linux/glibc executable",
-      "elf": {
-        "class": "ELF64",
-        "machine": "EM_X86_64",
-        "interpreter": "/lib64/ld-linux-x86-64.so.2",
-        "needed": [
-          "libc.so.6"
-        ],
-        "is_static": false
-      },
-      "missing_symbols": [
-        {
-          "name": "libc.so.6",
-          "library": "libc.so.6",
-          "reason": "glibc libc — Bionic provides libc.so, not libc.so.6"
-        }
-      ],
-      "recommendation": {
-        "action": "rewrite-interpreter-and-rpath",
-        "suggested_interpreter": "/data/data/com.termux/files/usr/lib/acl-runtime/loader/ld-linux-aarch64.so.1",
-        "suggested_rpath": "/data/data/com.termux/files/usr/lib/acl-runtime/lib",
-        "rationale": "PT_INTERP \"/lib64/ld-linux-x86-64.so.2\" is a glibc dynamic linker; must be replaced with ACL loader. No ACL RPATH present; must inject \"/data/data/com.termux/files/usr/lib/acl-runtime/lib\" so the ACL runtime libraries are found."
-      }
-    },
-    {
-      "path": "/tools/flash.exe",
-      "compat_category": "unsupported",
-      "recommendation": {
-        "action": "unsupported",
-        "rationale": "Binary format not supported on Android (e.g. Windows PE); cannot patch."
-      }
-    }
-  ],
+  "target": "/path/to/tools",
   "summary": {
-    "total": 3,
-    "native_android": 0,
+    "total": 4,
+    "native_android": 1,
     "linux_glibc": 1,
     "static": 0,
-    "script": 1,
+    "script": 2,
     "unknown": 0,
-    "unsupported": 1,
+    "unsupported": 0,
     "errors": 0,
-    "needs_patch": 1
-  }
+    "needs_patch": 1,
+    "script_interpreter_found": 0,
+    "script_interpreter_missing": 1,
+    "script_interpreter_remapped": 1
+  },
+  "entries": [
+    {
+      "path": "/path/to/tools/avrdude",
+      "category": "native Android compatible",
+      "patch_class": "none",
+      "interpreter": "/system/bin/linker64",
+      "recommendation": "Binary already targets Android/Bionic; no patching required."
+    },
+    {
+      "path": "/path/to/tools/cc1plus",
+      "category": "Linux/glibc executable",
+      "patch_class": "loader-and-rpath",
+      "interpreter": "/lib/ld-linux-aarch64.so.1",
+      "rpath": "/usr/lib/aarch64-linux-gnu",
+      "recommendation": "Replace PT_INTERP with Termux glibc loader and update RPATH to ACL runtime path.",
+      "patch_actions": [
+        {
+          "action": "set-interpreter",
+          "field": "interpreter",
+          "current_value": "/lib/ld-linux-aarch64.so.1",
+          "recommended_value": "/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1",
+          "reason": "Android does not provide /lib/ld-linux-aarch64.so.1; Termux glibc loader must be used."
+        }
+      ]
+    },
+    {
+      "path": "/path/to/tools/install.sh",
+      "category": "script",
+      "patch_class": "script-no-elf-patch",
+      "recommendation": "Script file; ELF patching is not applicable.",
+      "interpreter_status": {
+        "declared_path": "/bin/bash",
+        "status": "remapped",
+        "resolved_path": "/data/data/com.termux/files/usr/bin/bash",
+        "recommendation": "Interpreter \"/bin/bash\" is a standard Linux path; Termux equivalent found at \"/data/data/com.termux/files/usr/bin/bash\". Update the shebang or use a wrapper."
+      }
+    },
+    {
+      "path": "/path/to/tools/configure.py",
+      "category": "script",
+      "patch_class": "script-no-elf-patch",
+      "recommendation": "Script file; ELF patching is not applicable.",
+      "interpreter_status": {
+        "declared_path": "/usr/bin/python3",
+        "status": "missing",
+        "recommendation": "Interpreter \"/usr/bin/python3\" maps to Termux path \"/data/data/com.termux/files/usr/bin/python3\" which does not exist. Install the relevant Termux package."
+      }
+    }
+  ]
 }

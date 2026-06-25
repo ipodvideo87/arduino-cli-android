@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "entries": [
+    {
+      "path": "__FIXTURE_PATH__",
+      "category": "script",
+      "patch_class": "script-no-elf-patch",
+      "recommendation": "Script file; ELF patching is not applicable.",
+      "interpreter_status": {
+        "declared_path": "/bin/bash",
+        "status": "found",
+        "resolved_path": "__BASH_PATH__",
+        "recommendation": "Interpreter \"__BASH_PATH__\" exists at its declared path; no change needed."
+      }
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "native_android": 0,
+    "linux_glibc": 0,
+    "static": 0,
+    "script": 1,
+    "unknown": 0,
+    "unsupported": 0,
+    "errors": 0,
+    "needs_patch": 0,
+    "script_interpreter_found": 1,
+    "script_interpreter_missing": 0,
+    "script_interpreter_remapped": 0
+  }
+}

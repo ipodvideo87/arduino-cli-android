@@ -1,158 +1,143 @@
 # ACL Scanner
 
-The scanner module inspects ELF binaries and produces structured compatibility
-reports for the Android Compatibility Layer (ACL) pipeline.
+The ACL Scanner inspects ELF binaries and script files for Android/Termux
+compatibility and emits structured reports consumed by the patcher, verifier,
+and launcher.
 
-## Pipeline
-
-```
-InspectFile → ClassifyFile → FindMissingSymbols → Recommend → ScanPaths
-```
-
-| Stage | Function | Output |
-|---|---|---|
-| Inspect | `InspectFile(path)` | `*ELFInfo` (class, machine, PT_INTERP, RPATH/RUNPATH, DT_NEEDED) |
-| Classify | `ClassifyFile(path)` | `CompatCategory` + `*ELFInfo` |
-| Symbols | `FindMissingSymbols(info)` | `[]MissingSymbol` (glibc-only DT_NEEDED entries) |
-| Recommend | `Recommend(cat, info)` | `PatchRecommendation` (concrete patch action + suggested values) |
-| Scan | `ScanPaths(paths)` | `ScanReport` (full JSON document) |
-
-## Compatibility Categories
+## Compatibility categories
 
 | Category | Meaning |
 |---|---|
-| `native Android compatible` | Runs as-is; Bionic/Termux linker detected |
-| `Linux/glibc executable` | Needs patching; glibc `ld-linux` detected |
-| `static ELF` | No dynamic linking; no patching required |
-| `script` | Shebang detected; ELF patching not applicable |
-| `unknown` | Could not classify |
-| `unsupported` | Windows PE or other non-Android-patchable format |
+| `native Android compatible` | Targets Android/Bionic; no patching needed |
+| `Linux/glibc executable` | Needs interpreter and/or RPATH patching |
+| `static ELF` | Statically linked; no dynamic-linker concerns |
+| `script` | Shebang-detected file (bash, python, perl, …) |
+| `unknown` | Classification failed |
+| `unsupported` | Foreign format (Windows `.exe`, etc.) |
 
-## Patch Actions
+## Script shebang validation
 
-| Action | When applied |
+When a file is classified as `script`, the scanner also validates the
+interpreter declared on the shebang line (`#!`) against:
+
+1. **Literal path** — does the path exist on the current filesystem?
+2. **ACL runtime directory** — is the interpreter's basename present under
+   `<runtimeDir>/bin/`?
+3. **`/usr/bin/env` delegation** — env-style shebangs (`#!/usr/bin/env python3`)
+   are resolved by looking up the delegate name (`python3`) in a built-in
+   Termux path table and then checking for it under `<prefixDir>/bin/`.
+4. **Well-known Termux path table** — common Linux interpreter paths (e.g.
+   `/usr/bin/python3`, `/bin/bash`) are mapped to their Termux-relative
+   equivalents under `<prefixDir>/`.
+5. **Basename fallback** — try `<prefixDir>/bin/<basename>` for any unrecognised
+   path.
+6. **Missing** — nothing found; a recommendation string explains what to install.
+
+### `interpreter_status` field
+
+Each script entry in the JSON report carries an `interpreter_status` object:
+
+```json
+{
+  "declared_path": "/usr/bin/python3",
+  "args": [],
+  "status": "remapped",
+  "resolved_path": "/data/data/com.termux/files/usr/bin/python3",
+  "recommendation": "Interpreter \"/usr/bin/python3\" is a standard Linux path; Termux equivalent found at \"...\". Update the shebang or use a wrapper."
+}
+```
+
+`status` is one of:
+
+| Value | Meaning |
 |---|---|
-| `no-action` | Binary is already Android-compatible |
-| `rewrite-interpreter` | PT_INTERP is a glibc linker; RPATH already OK |
-| `inject-rpath` | Interpreter OK; RPATH missing ACL runtime path |
-| `rewrite-interpreter-and-rpath` | Both PT_INTERP and RPATH need updating |
-| `script-no-elf-patch` | Script; ELF patching not applicable |
-| `unsupported` | Cannot be patched for Android use |
+| `found` | Interpreter exists at its declared path |
+| `remapped` | Interpreter located at a different (Termux-relative) path |
+| `missing` | Interpreter not found anywhere; action required |
 
-## JSON Report Schema (v1.0)
+### Summary counters
+
+The report summary includes per-script interpreter counters:
+
+```json
+{
+  "script_interpreter_found":    0,
+  "script_interpreter_missing":  1,
+  "script_interpreter_remapped": 3
+}
+```
+
+## JSON report schema
 
 ```json
 {
   "schema_version": "1.0",
   "generated_at": "<RFC3339>",
-  "binaries": [
+  "target": "<scanned path>",
+  "summary": { ... },
+  "entries": [
     {
-      "path": "/path/to/binary",
-      "compat_category": "Linux/glibc executable",
-      "elf": {
-        "class": "ELF64",
-        "machine": "EM_AARCH64",
-        "interpreter": "/lib/ld-linux-aarch64.so.1",
-        "rpath": "",
-        "runpath": "",
-        "needed": ["libc.so.6", "libpthread.so.0"],
-        "is_static": false
-      },
-      "missing_symbols": [
-        {
-          "name": "libc.so.6",
-          "library": "libc.so.6",
-          "reason": "glibc libc — Bionic provides libc.so, not libc.so.6"
-        }
-      ],
-      "recommendation": {
-        "action": "rewrite-interpreter-and-rpath",
-        "suggested_interpreter": "/data/data/com.termux/files/usr/lib/acl-runtime/loader/ld-linux-aarch64.so.1",
-        "suggested_rpath": "/data/data/com.termux/files/usr/lib/acl-runtime/lib",
-        "rationale": "..."
-      },
-      "error": ""
+      "path": "...",
+      "category": "script",
+      "patch_class": "script-no-elf-patch",
+      "recommendation": "Script file; ELF patching is not applicable.",
+      "interpreter_status": {
+        "declared_path": "/bin/bash",
+        "status": "remapped",
+        "resolved_path": "/data/data/com.termux/files/usr/bin/bash",
+        "recommendation": "..."
+      }
     }
-  ],
-  "summary": {
-    "total": 1,
-    "native_android": 0,
-    "linux_glibc": 1,
-    "static": 0,
-    "script": 0,
-    "unknown": 0,
-    "unsupported": 0,
-    "errors": 0,
-    "needs_patch": 1
-  }
+  ]
 }
 ```
 
-## Usage via acl-scan
-
-```bash
-# Human-readable text report (default)
-acl-scan compat /path/to/binary [...]
-
-# Machine-readable JSON report
-acl-scan --output json compat /path/to/binary [...]
-acl-scan compat-json /path/to/binary [...]          # always JSON
-
-# Validate (exit 1 if any binary needs patching or is unknown)
-acl-scan validate-compat /path/to/binary [...]
-acl-scan validate-compat-json /path/to/binary [...]  # always JSON
-
-# The --output flag may appear before or after the sub-command name:
-acl-scan --output json compat /path/to/binary
-acl-scan compat --output json /path/to/binary
-acl-scan --output=json compat /path/to/binary
-```
-
-## Exit Codes
-
-| Code | Meaning |
-|---|---|
-| 0 | All binaries are Android-compatible (no patching needed) |
-| 1 | One or more binaries need patching, are unknown, or had errors |
-| 2 | Usage / argument error |
-| 3 | Internal error (I/O, JSON marshal failure) |
-
-## Using the Go Package
+## API
 
 ```go
 import "github.com/arduino/arduino-cli/acl/scanner"
 
-// Inspect a single file.
-info, err := scanner.InspectFile("/usr/bin/avr-gcc")
+// Build a report from a directory scan.
+b := scanner.NewReportBuilder(target, prefixDir, runtimeDir)
+b.ScanDirectory("/path/to/tools")
+report := b.Build()
+scanner.WriteJSON(os.Stdout, report)
 
-// Classify a single file.
-cat, info, err := scanner.ClassifyFile("/usr/bin/avr-gcc")
-
-// Find glibc-only DT_NEEDED entries that Bionic cannot satisfy.
-missing := scanner.FindMissingSymbols(info)
-
-// Get a concrete patch recommendation.
-rec := scanner.Recommend(cat, info)
-
-// Full pipeline over a list of files.
-report := scanner.ScanPaths([]string{"/usr/bin/avr-gcc", "/usr/bin/esptool.py"})
-
-// Serialize to indented JSON.
-data, err := scanner.MarshalReport(report)
+// Low-level shebang API.
+result, err := scanner.ScanShebang("/path/to/script.py", prefixDir, "")
+// result.Status is one of InterpreterFound / InterpreterMissing / InterpreterRemapped
 ```
 
-## Testing
+## Test fixtures
+
+Script fixtures live in `../tests/testdata/scripts/`:
+
+| File | Shebang | Purpose |
+|---|---|---|
+| `bash_script.sh` | `#!/bin/bash` | Absolute bash path |
+| `usr_bin_bash_script.sh` | `#!/usr/bin/bash` | Alternative bash path |
+| `env_bash_script.sh` | `#!/usr/bin/env bash` | env-style bash |
+| `python3_script.py` | `#!/usr/bin/python3` | Absolute python3 |
+| `env_python3_script.py` | `#!/usr/bin/env python3` | env-style python3 |
+| `perl_script.pl` | `#!/usr/bin/perl` | Absolute perl |
+| `env_perl_script.pl` | `#!/usr/bin/env perl` | env-style perl |
+| `env_unknown_script.sh` | `#!/usr/bin/env notarealinterpreter` | Unknown delegate |
+| `no_shebang_script.sh` | *(none)* | No shebang line |
+
+Run the Go unit tests:
 
 ```bash
-# Go unit and integration tests
 go test ./acl/scanner/...
+```
 
-# Regenerate golden files
-UPDATE_GOLDEN=1 go test ./acl/scanner/...
+Run the fixture integration tests:
 
-# Shell integration tests (requires acl-scan binary and jq)
-bash acl/tests/test-scanner-json.sh
+```bash
+go test ./acl/tests/...
+```
 
-# Regenerate shell golden files
-bash acl/tests/test-scanner-json.sh --update-golden
+Run the shell-based smoke tests (requires `jq`):
+
+```bash
+./acl/tests/test-scanner-json.sh
 ```

@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0",
+  "entries": [
+    {
+      "path": "__FIXTURE_PATH__",
+      "category": "script",
+      "patch_class": "script-no-elf-patch",
+      "recommendation": "Script file; ELF patching is not applicable.",
+      "interpreter_status": {
+        "declared_path": "/usr/bin/python3",
+        "status": "missing",
+        "recommendation": "Interpreter \"/usr/bin/python3\" maps to Termux path \"__PREFIX__/bin/python3\" which does not exist. Install the relevant Termux package."
+      }
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "native_android": 0,
+    "linux_glibc": 0,
+    "static": 0,
+    "script": 1,
+    "unknown": 0,
+    "unsupported": 0,
+    "errors": 0,
+    "needs_patch": 0,
+    "script_interpreter_found": 0,
+    "script_interpreter_missing": 1,
+    "script_interpreter_remapped": 0
+  }
+}

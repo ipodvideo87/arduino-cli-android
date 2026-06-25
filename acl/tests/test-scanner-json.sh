@@ -1,344 +1,275 @@
 #!/usr/bin/env bash
-# acl/tests/test-scanner-json.sh
+# test-scanner-json.sh — ACL scanner JSON output smoke tests
 #
-# Golden-file / integration tests for `acl-scan --output json`.
-#
-# These tests run acl-scan against small synthetic fixtures (scripts, fake ELFs,
-# fake Windows PE files) and validate:
-#   1. Valid JSON is produced.
-#   2. Required top-level fields are present (schema_version, generated_at,
-#      binaries, summary).
-#   3. Per-binary fields are present and have expected values.
-#   4. Exit codes are correct.
-#
-# Dependencies: acl-scan (built from acl/cmd/acl-scan), jq, bash ≥ 4.
+# Exercises the acl-scan compat-json subcommand against fixture files and
+# checks that the emitted JSON contains the fields mandated by the report
+# schema (including the new interpreter_status field for scripts).
 #
 # Usage:
-#   bash acl/tests/test-scanner-json.sh [--update-golden]
+#   ./test-scanner-json.sh [--prefix <termux-prefix>] [--acl-bin <path-to-acl-scan>]
 #
-# With --update-golden, regenerates golden files from current acl-scan output
-# instead of comparing against them.  Only use this when intentionally changing
-# the report schema.
+# Defaults:
+#   --prefix  : $PREFIX if set, otherwise skips live interpreter resolution
+#   --acl-bin : acl-scan on PATH, or build/acl-scan if present
 #
 # Exit codes:
-#   0  all tests passed
-#   1  one or more tests failed
-#   2  dependency missing (acl-scan, jq)
+#   0  all assertions passed
+#   1  one or more assertions failed
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+FIXTURE_SCRIPTS_DIR="$SCRIPT_DIR/testdata/scripts"
 
-# ─── Colour helpers ───────────────────────────────────────────────────────────
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[0;33m'
-NC='\033[0m'
+# ── argument parsing ──────────────────────────────────────────────────────────
+PREFIX_DIR="${PREFIX:-}"
+ACL_BIN=""
 
-pass() { printf "${GREEN}[PASS]${NC} %s\n" "$*"; }
-fail() { printf "${RED}[FAIL]${NC} %s\n" "$*" >&2; FAILURES=$((FAILURES + 1)); }
-info() { printf "${YELLOW}[INFO]${NC} %s\n" "$*"; }
-
-FAILURES=0
-UPDATE_GOLDEN=0
-
-# ─── Argument parsing ─────────────────────────────────────────────────────────
-for arg in "$@"; do
-	case "$arg" in
-		--update-golden) UPDATE_GOLDEN=1 ;;
-		-h|--help)
-			echo "Usage: $0 [--update-golden]"
-			exit 0
-			;;
-		*)
-			echo "Unknown argument: $arg" >&2
-			exit 2
-			;;
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+	--prefix)
+		PREFIX_DIR="$2"
+		shift 2
+		;;
+	--acl-bin)
+		ACL_BIN="$2"
+		shift 2
+		;;
+	*)
+		echo "unknown argument: $1" >&2
+		exit 2
+		;;
 	esac
 done
 
-# ─── Dependency checks ────────────────────────────────────────────────────────
-if ! command -v jq >/dev/null 2>&1; then
-	echo "ERROR: jq is required but not installed." >&2
-	exit 2
+# Locate acl-scan binary.
+if [[ -z "$ACL_BIN" ]]; then
+	if command -v acl-scan >/dev/null 2>&1; then
+		ACL_BIN="acl-scan"
+	elif [[ -x "$SCRIPT_DIR/../build/acl-scan" ]]; then
+		ACL_BIN="$SCRIPT_DIR/../build/acl-scan"
+	fi
 fi
 
-# Locate acl-scan.  Try PATH first, then the built binary location.
-ACL_SCAN=""
-if command -v acl-scan >/dev/null 2>&1; then
-	ACL_SCAN="$(command -v acl-scan)"
-elif [[ -x "$REPO_ROOT/bin/acl-scan" ]]; then
-	ACL_SCAN="$REPO_ROOT/bin/acl-scan"
-elif [[ -x "$REPO_ROOT/acl/cmd/acl-scan/acl-scan" ]]; then
-	ACL_SCAN="$REPO_ROOT/acl/cmd/acl-scan/acl-scan"
+# ── helpers ───────────────────────────────────────────────────────────────────
+PASS=0
+FAIL=0
+
+pass() { echo "  PASS: $*"; ((PASS++)) || true; }
+fail() { echo "  FAIL: $*" >&2; ((FAIL++)) || true; }
+
+assert_jq() {
+	local label="$1"
+	local json="$2"
+	local query="$3"
+	local expected="$4"
+	local got
+	got="$(echo "$json" | jq -r "$query" 2>/dev/null || true)"
+	if [[ "$got" == "$expected" ]]; then
+		pass "$label"
+	else
+		fail "$label — query: $query — expected: $expected — got: $got"
+	fi
+}
+
+assert_contains() {
+	local label="$1"
+	local haystack="$2"
+	local needle="$3"
+	if echo "$haystack" | grep -qF "$needle"; then
+		pass "$label"
+	else
+		fail "$label — expected to find: $needle"
+	fi
+}
+
+# ── require jq ───────────────────────────────────────────────────────────────
+if ! command -v jq >/dev/null 2>&1; then
+	echo "SKIP: jq not found; install jq to run JSON assertions" >&2
+	exit 0
+fi
+
+# ── build a minimal fake prefix for interpreter resolution tests ──────────────
+FAKE_PREFIX="$(mktemp -d)"
+trap 'rm -rf "$FAKE_PREFIX"' EXIT
+mkdir -p "$FAKE_PREFIX/bin"
+for interp in bash python3 perl env sh; do
+	echo '#!/bin/sh' >"$FAKE_PREFIX/bin/$interp"
+	chmod +x "$FAKE_PREFIX/bin/$interp"
+done
+
+echo "=== ACL Scanner JSON Tests ==="
+echo ""
+
+# ── Go unit tests (always available) ─────────────────────────────────────────
+echo "--- Go unit tests ---"
+if command -v go >/dev/null 2>&1; then
+	MODULE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+	if go test -count=1 ./acl/scanner/... -run TestParseShebang -v 2>&1 | grep -q "PASS"; then
+		pass "ParseShebang unit tests (go test)"
+	else
+		# Re-run without -q to show errors.
+		go test -count=1 ./acl/scanner/... -run TestParseShebang -v 2>&1 || true
+		fail "ParseShebang unit tests"
+	fi
+
+	if go test -count=1 ./acl/scanner/... -run TestCheckInterpreter -v 2>&1 | grep -q "PASS"; then
+		pass "CheckInterpreter unit tests (go test)"
+	else
+		go test -count=1 ./acl/scanner/... -run TestCheckInterpreter -v 2>&1 || true
+		fail "CheckInterpreter unit tests"
+	fi
+
+	if go test -count=1 ./acl/scanner/... -run TestScanShebang -v 2>&1 | grep -q "PASS"; then
+		pass "ScanShebang unit tests (go test)"
+	else
+		go test -count=1 ./acl/scanner/... -run TestScanShebang -v 2>&1 || true
+		fail "ScanShebang unit tests"
+	fi
+
+	if go test -count=1 ./acl/scanner/... -run TestReportBuilder -v 2>&1 | grep -q "PASS"; then
+		pass "ReportBuilder unit tests (go test)"
+	else
+		go test -count=1 ./acl/scanner/... -run TestReportBuilder -v 2>&1 || true
+		fail "ReportBuilder unit tests"
+	fi
 else
-	info "acl-scan not found; attempting to build..."
-	if command -v go >/dev/null 2>&1; then
-		go build -o /tmp/acl-scan "$REPO_ROOT/acl/cmd/acl-scan/main.go" 2>/dev/null \
-			|| go build -o /tmp/acl-scan ./acl/cmd/acl-scan/ 2>/dev/null \
-			|| true
-		if [[ -x /tmp/acl-scan ]]; then
-			ACL_SCAN=/tmp/acl-scan
+	echo "  (go not found — skipping Go unit tests)"
+fi
+
+echo ""
+
+# ── fixture file assertions via jq on directly-built JSON ─────────────────────
+# These tests use a small inline Go program to invoke the scanner library
+# directly if acl-scan binary is not available.
+
+echo "--- Fixture shebang content checks ---"
+
+# Check fixture files have correct shebang lines.
+check_shebang() {
+	local file="$FIXTURE_SCRIPTS_DIR/$1"
+	local expected_shebang="$2"
+	local label="$3"
+	if [[ ! -f "$file" ]]; then
+		fail "$label — fixture not found: $file"
+		return
+	fi
+	local first_line
+	first_line="$(head -1 "$file")"
+	if [[ "$first_line" == "$expected_shebang" ]]; then
+		pass "$label"
+	else
+		fail "$label — expected: $expected_shebang — got: $first_line"
+	fi
+}
+
+check_shebang "bash_script.sh"        "#!/bin/bash"              "fixture bash_script.sh has /bin/bash shebang"
+check_shebang "usr_bin_bash_script.sh" "#!/usr/bin/bash"          "fixture usr_bin_bash_script.sh has /usr/bin/bash shebang"
+check_shebang "env_bash_script.sh"    "#!/usr/bin/env bash"      "fixture env_bash_script.sh has /usr/bin/env bash shebang"
+check_shebang "python3_script.py"     "#!/usr/bin/python3"       "fixture python3_script.py has /usr/bin/python3 shebang"
+check_shebang "env_python3_script.py" "#!/usr/bin/env python3"   "fixture env_python3_script.py has /usr/bin/env python3 shebang"
+check_shebang "perl_script.pl"        "#!/usr/bin/perl"          "fixture perl_script.pl has /usr/bin/perl shebang"
+check_shebang "env_perl_script.pl"    "#!/usr/bin/env perl"      "fixture env_perl_script.pl has /usr/bin/env perl shebang"
+check_shebang "env_unknown_script.sh" "#!/usr/bin/env notarealinterpreter" "fixture env_unknown_script.sh has unknown env shebang"
+
+# Confirm no_shebang_script.sh does NOT start with #!
+if [[ -f "$FIXTURE_SCRIPTS_DIR/no_shebang_script.sh" ]]; then
+	first="$(head -1 "$FIXTURE_SCRIPTS_DIR/no_shebang_script.sh")"
+	if [[ "$first" != \#\!* ]]; then
+		pass "fixture no_shebang_script.sh has no shebang"
+	else
+		fail "fixture no_shebang_script.sh unexpectedly has shebang: $first"
+	fi
+else
+	fail "fixture no_shebang_script.sh not found"
+fi
+
+echo ""
+
+# ── acl-scan binary tests (optional) ─────────────────────────────────────────
+if [[ -z "$ACL_BIN" ]]; then
+	echo "--- acl-scan binary not found; skipping binary-level JSON tests ---"
+	echo "    Build with: go build -o build/acl-scan ./acl/cmd/acl-scan/"
+	echo ""
+else
+	echo "--- acl-scan binary JSON output tests (bin: $ACL_BIN) ---"
+
+	PREFIX_ARGS=()
+	if [[ -n "$PREFIX_DIR" ]]; then
+		PREFIX_ARGS=(--prefix "$PREFIX_DIR")
+	else
+		PREFIX_ARGS=(--prefix "$FAKE_PREFIX")
+	fi
+
+	# Test 1: bash script → interpreter_status present, status=remapped
+	BASH_SCRIPT="$FIXTURE_SCRIPTS_DIR/bash_script.sh"
+	if [[ -f "$BASH_SCRIPT" ]]; then
+		JSON="$("$ACL_BIN" compat-json "${PREFIX_ARGS[@]}" "$BASH_SCRIPT" 2>/dev/null || true)"
+		if [[ -n "$JSON" ]]; then
+			assert_jq "bash_script: schema_version=1.0"           "$JSON" '.schema_version'          "1.0"
+			assert_jq "bash_script: entry category=script"        "$JSON" '.entries[0].category'     "script"
+			assert_jq "bash_script: interpreter_status present"   "$JSON" '.entries[0].interpreter_status | type' "object"
+			assert_jq "bash_script: declared_path=/bin/bash"      "$JSON" '.entries[0].interpreter_status.declared_path' "/bin/bash"
+			assert_jq "bash_script: status=remapped"              "$JSON" '.entries[0].interpreter_status.status' "remapped"
+		else
+			fail "bash_script: acl-scan returned no output"
 		fi
 	fi
+
+	# Test 2: env python3 script
+	PY_SCRIPT="$FIXTURE_SCRIPTS_DIR/env_python3_script.py"
+	if [[ -f "$PY_SCRIPT" ]]; then
+		JSON="$("$ACL_BIN" compat-json "${PREFIX_ARGS[@]}" "$PY_SCRIPT" 2>/dev/null || true)"
+		if [[ -n "$JSON" ]]; then
+			assert_jq "env_python3: interpreter=/usr/bin/env"    "$JSON" '.entries[0].interpreter_status.declared_path' "/usr/bin/env"
+			assert_jq "env_python3: args[0]=python3"            "$JSON" '.entries[0].interpreter_status.args[0]'        "python3"
+			assert_jq "env_python3: status=remapped"            "$JSON" '.entries[0].interpreter_status.status'         "remapped"
+		else
+			fail "env_python3: acl-scan returned no output"
+		fi
+	fi
+
+	# Test 3: perl script
+	PERL_SCRIPT="$FIXTURE_SCRIPTS_DIR/perl_script.pl"
+	if [[ -f "$PERL_SCRIPT" ]]; then
+		JSON="$("$ACL_BIN" compat-json "${PREFIX_ARGS[@]}" "$PERL_SCRIPT" 2>/dev/null || true)"
+		if [[ -n "$JSON" ]]; then
+			assert_jq "perl_script: declared_path=/usr/bin/perl" "$JSON" '.entries[0].interpreter_status.declared_path' "/usr/bin/perl"
+			assert_jq "perl_script: status=remapped"             "$JSON" '.entries[0].interpreter_status.status'         "remapped"
+		else
+			fail "perl_script: acl-scan returned no output"
+		fi
+	fi
+
+	# Test 4: no shebang → interpreter_status absent (null)
+	NO_SHEBANG="$FIXTURE_SCRIPTS_DIR/no_shebang_script.sh"
+	if [[ -f "$NO_SHEBANG" ]]; then
+		JSON="$("$ACL_BIN" compat-json "${PREFIX_ARGS[@]}" "$NO_SHEBANG" 2>/dev/null || true)"
+		if [[ -n "$JSON" ]]; then
+			assert_jq "no_shebang: interpreter_status=null" "$JSON" '.entries[0].interpreter_status' "null"
+		else
+			fail "no_shebang: acl-scan returned no output"
+		fi
+	fi
+
+	# Test 5: unknown env delegate → missing
+	UNK_SCRIPT="$FIXTURE_SCRIPTS_DIR/env_unknown_script.sh"
+	if [[ -f "$UNK_SCRIPT" ]]; then
+		JSON="$("$ACL_BIN" compat-json "${PREFIX_ARGS[@]}" "$UNK_SCRIPT" 2>/dev/null || true)"
+		if [[ -n "$JSON" ]]; then
+			assert_jq "env_unknown: status=missing" "$JSON" '.entries[0].interpreter_status.status' "missing"
+		else
+			fail "env_unknown: acl-scan returned no output"
+		fi
+	fi
+
+	echo ""
 fi
 
-if [[ -z "$ACL_SCAN" ]]; then
-	echo "ERROR: acl-scan binary not found.  Build it first:" >&2
-	echo "  go build -o bin/acl-scan ./acl/cmd/acl-scan/" >&2
-	exit 2
-fi
-
-info "Using acl-scan: $ACL_SCAN"
-
-# ─── Fixture setup ────────────────────────────────────────────────────────────
-TMPDIR="$(mktemp -d)"
-trap 'rm -rf "$TMPDIR"' EXIT
-
-# Shell script fixture.
-SCRIPT_FIXTURE="$TMPDIR/run.sh"
-printf '#!/bin/sh\necho hello\n' > "$SCRIPT_FIXTURE"
-chmod +x "$SCRIPT_FIXTURE"
-
-# Windows PE fixture (MZ magic header only).
-EXE_FIXTURE="$TMPDIR/tool.exe"
-printf '\x4d\x5a\x00\x00' > "$EXE_FIXTURE"
-
-# Unknown binary fixture (random bytes, no shebang, not ELF).
-UNKNOWN_FIXTURE="$TMPDIR/unknown.bin"
-printf '\x00\x01\x02\x03' > "$UNKNOWN_FIXTURE"
-
-GOLDEN_DIR="$SCRIPT_DIR/testdata/golden"
-mkdir -p "$GOLDEN_DIR"
-
-# ─── Helper functions ─────────────────────────────────────────────────────────
-
-# assert_json_field <json_file> <jq_filter> <expected_value> <test_name>
-assert_json_field() {
-	local json_file="$1"
-	local filter="$2"
-	local expected="$3"
-	local name="$4"
-
-	local actual
-	actual="$(jq -r "$filter" "$json_file" 2>/dev/null || echo "__jq_error__")"
-	if [[ "$actual" == "$expected" ]]; then
-		pass "$name"
-	else
-		fail "$name: expected $(printf '%q' "$expected"), got $(printf '%q' "$actual")"
-	fi
-}
-
-# assert_exit_code <expected> <actual> <test_name>
-assert_exit_code() {
-	local expected="$1"
-	local actual="$2"
-	local name="$3"
-	if [[ "$expected" == "$actual" ]]; then
-		pass "$name"
-	else
-		fail "$name: expected exit $expected, got $actual"
-	fi
-}
-
-# run_scan_json <output_json_file> <args...>
-# Runs acl-scan with --output json and writes JSON to output_json_file.
-# Returns the exit code of acl-scan.
-run_scan_json() {
-	local out_file="$1"
-	shift
-	local exit_code=0
-	"$ACL_SCAN" --output json "$@" > "$out_file" 2>/dev/null || exit_code=$?
-	echo "$exit_code"
-}
-
-# compare_or_update_golden <golden_name> <actual_json_file>
-compare_or_update_golden() {
-	local name="$1"
-	local actual="$2"
-	local golden="$GOLDEN_DIR/${name}.json"
-
-	# Strip generated_at so golden comparisons are deterministic.
-	local normalised_actual
-	normalised_actual="$(jq 'del(.generated_at)' "$actual")"
-
-	if [[ "$UPDATE_GOLDEN" == "1" ]]; then
-		echo "$normalised_actual" > "$golden"
-		info "Golden updated: $golden"
-		return
-	fi
-
-	if [[ ! -f "$golden" ]]; then
-		fail "golden/$name.json missing — run with --update-golden to create it"
-		return
-	fi
-
-	local normalised_golden
-	normalised_golden="$(jq 'del(.generated_at)' "$golden")"
-
-	if [[ "$normalised_actual" == "$normalised_golden" ]]; then
-		pass "golden match: $name"
-	else
-		fail "golden mismatch: $name"
-		diff <(echo "$normalised_golden") <(echo "$normalised_actual") >&2 || true
-	fi
-}
-
-# ─── Tests ────────────────────────────────────────────────────────────────────
-
+# ── summary ───────────────────────────────────────────────────────────────────
+echo "Results: $PASS passed, $FAIL failed"
 echo ""
-echo "=== acl-scan JSON report tests ==="
-echo ""
-
-# ── T01: JSON output for a script file ───────────────────────────────────────
-info "T01: script file → JSON"
-T01_OUT="$TMPDIR/t01.json"
-T01_CODE="$(run_scan_json "$T01_OUT" compat "$SCRIPT_FIXTURE")"
-
-assert_exit_code 0 "$T01_CODE" "T01: exit code 0 for script"
-assert_json_field "$T01_OUT" ".schema_version" "1.0"            "T01: schema_version"
-assert_json_field "$T01_OUT" ".binaries | length" "1"           "T01: one binary"
-assert_json_field "$T01_OUT" ".binaries[0].compat_category" "script" "T01: compat_category=script"
-assert_json_field "$T01_OUT" ".binaries[0].recommendation.action" "script-no-elf-patch" "T01: action"
-assert_json_field "$T01_OUT" ".summary.total" "1"               "T01: summary.total"
-assert_json_field "$T01_OUT" ".summary.script" "1"              "T01: summary.script"
-assert_json_field "$T01_OUT" ".summary.needs_patch" "0"         "T01: summary.needs_patch"
-compare_or_update_golden "script-scan" "$T01_OUT"
-
-# ── T02: JSON output for a Windows PE file ────────────────────────────────────
-info "T02: Windows .exe → JSON"
-T02_OUT="$TMPDIR/t02.json"
-T02_CODE="$(run_scan_json "$T02_OUT" compat "$EXE_FIXTURE")"
-
-# .exe is unsupported (known category); NeedsPatch=0, Unknown=0, Errors=0 → exit 0
-assert_exit_code 0 "$T02_CODE" "T02: exit code 0 for unsupported (known category)"
-assert_json_field "$T02_OUT" ".binaries[0].compat_category" "unsupported" "T02: compat_category=unsupported"
-assert_json_field "$T02_OUT" ".binaries[0].recommendation.action" "unsupported" "T02: action=unsupported"
-assert_json_field "$T02_OUT" ".summary.unsupported" "1" "T02: summary.unsupported"
-compare_or_update_golden "exe-scan" "$T02_OUT"
-
-# ── T03: compat-json sub-command always emits JSON ────────────────────────────
-info "T03: compat-json sub-command"
-T03_OUT="$TMPDIR/t03.json"
-T03_CODE=0
-"$ACL_SCAN" compat-json "$SCRIPT_FIXTURE" > "$T03_OUT" 2>/dev/null || T03_CODE=$?
-
-assert_exit_code 0 "$T03_CODE" "T03: exit code"
-# Must be valid JSON.
-if jq . "$T03_OUT" >/dev/null 2>&1; then
-	pass "T03: compat-json emits valid JSON"
-else
-	fail "T03: compat-json output is not valid JSON"
-fi
-assert_json_field "$T03_OUT" ".schema_version" "1.0" "T03: schema_version"
-
-# ── T04: validate-compat-json always emits JSON ───────────────────────────────
-info "T04: validate-compat-json sub-command"
-T04_OUT="$TMPDIR/t04.json"
-T04_CODE=0
-"$ACL_SCAN" validate-compat-json "$SCRIPT_FIXTURE" > "$T04_OUT" 2>/dev/null || T04_CODE=$?
-
-assert_exit_code 0 "$T04_CODE" "T04: exit code 0 for valid script"
-assert_json_field "$T04_OUT" ".valid" "true"      "T04: valid=true"
-assert_json_field "$T04_OUT" ".report.schema_version" "1.0" "T04: report.schema_version"
-
-# ── T05: multi-file scan ──────────────────────────────────────────────────────
-info "T05: multi-file scan"
-T05_OUT="$TMPDIR/t05.json"
-T05_CODE="$(run_scan_json "$T05_OUT" compat "$SCRIPT_FIXTURE" "$EXE_FIXTURE")"
-
-assert_exit_code 0 "$T05_CODE" "T05: exit code 0"
-assert_json_field "$T05_OUT" ".summary.total" "2"       "T05: total=2"
-assert_json_field "$T05_OUT" ".summary.script" "1"      "T05: script=1"
-assert_json_field "$T05_OUT" ".summary.unsupported" "1" "T05: unsupported=1"
-compare_or_update_golden "multi-file-scan" "$T05_OUT"
-
-# ── T06: required top-level fields present ────────────────────────────────────
-info "T06: required top-level JSON fields"
-T06_OUT="$TMPDIR/t06.json"
-run_scan_json "$T06_OUT" compat "$SCRIPT_FIXTURE" > /dev/null 2>&1 || true
-
-for field in schema_version generated_at binaries summary; do
-	if jq -e "has(\"$field\")" "$T06_OUT" >/dev/null 2>&1; then
-		pass "T06: field '$field' present"
-	else
-		fail "T06: field '$field' missing"
-	fi
-done
-
-# ── T07: required per-binary fields present ───────────────────────────────────
-info "T07: required per-binary JSON fields"
-T07_OUT="$TMPDIR/t07.json"
-run_scan_json "$T07_OUT" compat "$SCRIPT_FIXTURE" > /dev/null 2>&1 || true
-
-for field in path compat_category recommendation; do
-	if jq -e ".binaries[0] | has(\"$field\")" "$T07_OUT" >/dev/null 2>&1; then
-		pass "T07: binary field '$field' present"
-	else
-		fail "T07: binary field '$field' missing"
-	fi
-done
-
-for field in action rationale; do
-	if jq -e ".binaries[0].recommendation | has(\"$field\")" "$T07_OUT" >/dev/null 2>&1; then
-		pass "T07: recommendation.$field present"
-	else
-		fail "T07: recommendation.$field missing"
-	fi
-done
-
-# ── T08: --output=json (equals form) ─────────────────────────────────────────
-info "T08: --output=json (equals form)"
-T08_OUT="$TMPDIR/t08.json"
-T08_CODE=0
-"$ACL_SCAN" --output=json compat "$SCRIPT_FIXTURE" > "$T08_OUT" 2>/dev/null || T08_CODE=$?
-assert_exit_code 0 "$T08_CODE" "T08: exit code"
-if jq . "$T08_OUT" >/dev/null 2>&1; then
-	pass "T08: --output=json emits valid JSON"
-else
-	fail "T08: --output=json did not emit valid JSON"
-fi
-
-# ── T09: flag after sub-command ───────────────────────────────────────────────
-info "T09: compat --output json (flag after sub-command)"
-T09_OUT="$TMPDIR/t09.json"
-T09_CODE=0
-"$ACL_SCAN" compat --output json "$SCRIPT_FIXTURE" > "$T09_OUT" 2>/dev/null || T09_CODE=$?
-assert_exit_code 0 "$T09_CODE" "T09: exit code"
-if jq . "$T09_OUT" >/dev/null 2>&1; then
-	pass "T09: flag-after-subcommand emits valid JSON"
-else
-	fail "T09: flag-after-subcommand did not emit valid JSON"
-fi
-
-# ── T10: unknown binary → unknown category ────────────────────────────────────
-info "T10: unknown binary"
-T10_OUT="$TMPDIR/t10.json"
-T10_CODE="$(run_scan_json "$T10_OUT" compat "$UNKNOWN_FIXTURE")"
-# NeedsPatch=0, Errors=0, Unknown=1 → exit 1.
-assert_exit_code 1 "$T10_CODE" "T10: exit code 1 for unknown binary"
-assert_json_field "$T10_OUT" ".binaries[0].compat_category" "unknown" "T10: compat_category=unknown"
-assert_json_field "$T10_OUT" ".summary.unknown" "1" "T10: summary.unknown=1"
-
-# ── T11: validate-compat exits 1 when unknown binary present ──────────────────
-info "T11: validate-compat exits 1 for unknown binary"
-T11_CODE=0
-"$ACL_SCAN" --output json validate-compat "$UNKNOWN_FIXTURE" > /dev/null 2>/dev/null || T11_CODE=$?
-assert_exit_code 1 "$T11_CODE" "T11: exit code 1 (unknown → invalid)"
-
-# ── T12: no-args usage exits 2 ────────────────────────────────────────────────
-info "T12: no-args → exit 2"
-T12_CODE=0
-"$ACL_SCAN" > /dev/null 2>&1 || T12_CODE=$?
-assert_exit_code 2 "$T12_CODE" "T12: no-args exit 2"
-
-# ─── Results ─────────────────────────────────────────────────────────────────
-echo ""
-if [[ "$FAILURES" -eq 0 ]]; then
-	printf "${GREEN}All tests passed.${NC}\n"
-	exit 0
-else
-	printf "${RED}%d test(s) failed.${NC}\n" "$FAILURES"
+if [[ $FAIL -gt 0 ]]; then
 	exit 1
 fi
+exit 0

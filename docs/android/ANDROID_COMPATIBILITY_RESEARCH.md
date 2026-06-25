@@ -134,7 +134,27 @@ Use it to capture confirmed behavior, evidence, and open questions before making
 - Native Termux firmware upload and broader compile-and-upload proof are still pending.
   - Evidence: validation has reached a successful ESP32-S3 compile, but firmware upload has not yet been proven on-device.
 
-## 12. Native Termux Validation Commands
+## 12. Script Shebang Compatibility on Android/Termux
+
+- Termux does not provide `/bin`, `/usr/bin`, or `/usr/local/bin` at the traditional Linux filesystem paths.
+  - Evidence: Termux filesystem layout; all executables live under `$PREFIX/bin` (typically `/data/data/com.termux/files/usr/bin`).
+- A script with `#!/bin/bash` will fail on native Termux with `No such file or directory` because `/bin/bash` does not exist.
+  - Evidence: Termux filesystem layout; `/bin` is absent or a symlink that does not resolve to a real shell.
+- A script with `#!/usr/bin/env python3` will work on Termux only if `python3` is installed via `pkg install python` and resides at `$PREFIX/bin/python3`.
+  - Evidence: Termux `pkg` package layout; `env` delegates to the first match on `$PATH`, which in Termux resolves through `$PREFIX/bin`.
+- The ACL scanner now validates shebang interpreters against the Termux PREFIX and an optional ACL runtime directory.
+  - Evidence: repository implementation in `acl/scanner/shebang.go` and unit tests in `acl/scanner/shebang_test.go`.
+- The scanner emits a per-script `interpreter_status` field in the JSON report: `found`, `missing`, or `remapped`.
+  - `found` — interpreter exists at its declared path (e.g., the script already uses a Termux-native path).
+  - `remapped` — interpreter not at declared path but found at a Termux-relative equivalent.
+  - `missing` — interpreter not found anywhere; install recommendation is included.
+  - Evidence: `acl/scanner/report.go`, JSON golden files in `acl/tests/testdata/golden/`.
+- The well-known path table in `acl/scanner/shebang.go` covers common shells (bash, sh, zsh, fish, dash, ksh), Python (2, 3, 3.x versioned), Perl, Ruby, Node.js, awk/gawk, and env.
+  - Evidence: `wellKnownTermuxPaths` and `envDelegates` maps in `acl/scanner/shebang.go`.
+- The `summary` block in the JSON report now includes `script_interpreter_found`, `script_interpreter_missing`, and `script_interpreter_remapped` counters for pipeline-level decisions.
+  - Evidence: `acl/scanner/report.go` and unit tests in `acl/scanner/report_test.go`.
+
+## 13. Native Termux Validation Commands
 
 Use native Termux as the final authority. The current validation commands are:
 
