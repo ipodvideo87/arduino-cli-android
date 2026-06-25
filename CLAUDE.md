@@ -70,6 +70,9 @@ The ACL is designed as a staged pipeline:
     │ Verifier │  → Check runtime directory exists
     └──────────┘  → Verify expected glibc-style libraries present
          │         → Confirm ELF looks relocatable (not Termux-path-locked)
+         │         → Android filesystem pre-flight checks (noexec, SELinux)
+         │         → SELinux enforcement state detection
+         │         → Writable/executable path validation
          ▼
     ┌─────────┐
     │ Patcher │  → Plan or apply ELF edits (interpreter, RPATH)
@@ -169,6 +172,7 @@ The JSON report emitted by `acl-scan compat-json` follows a versioned schema:
 | `acl/cmd/acl-build-runtime/main.go` | Runtime package builder CLI entry point |
 | `acl/scanner/` | ELF scanner implementation (classification, JSON report, patch recommendations) |
 | `acl/patcher/` | ELF patcher implementation (dry-run plan + apply mode) |
+| `acl/verifier/` | Pre-launch verifier implementation (runtime checks + Android filesystem/SELinux pre-flight) |
 | `acl/database/android.json` | Android compatibility metadata |
 | `acl/database/bionic.json` | Bionic ABI metadata |
 | `acl/database/glibc.json` | glibc compatibility metadata |
@@ -307,39 +311,16 @@ The patcher operates in two explicit modes:
 
 **Design principle:** The patcher is a consumer of scanner JSON output — it reads `patch_actions` arrays and does not re-classify ELF files itself.
 
-### ACL Runtime Package Format
-```
-<package>/
-├── manifest.json      # Runtime contract (schema_version, runtime_id, arch, ABIs, loader, libraries, hashes, compatibility_level, created_at, build, extensions)
-├── metadata.json      # Builder metadata and package format version
-├── checksums.json     # File integrity map
-├── version            # Package format version marker
-├── loader/            # Dynamic linker/loader
-└── lib/               # Runtime shared libraries
-```
+### ACL Verifier: Android Filesystem and SELinux Pre-flight Check Suite
 
-### Installed Runtime Store Layout
-```
-<runtime-root>/
-├── active.json
-└── runtimes/
-    └── <runtime-id>/
-        ├── manifest.json
-        ├── loader/
-        ├── lib/
-        └── metadata/
-```
+The verifier now includes a dedicated Android pre-flight check suite that runs before any patching or execution attempt. This suite is distinct from the runtime library checks and focuses on Android/Bionic-specific environmental constraints.
 
----
+#### Pre-flight Check Categories
 
-## Coding Conventions
-
-### General Go Conventions
-- Standard Go project layout with `internal/` for private packages
-- Cobra for all CLI commands with subcommand structure
-- Viper for configuration with support for YAML, TOML, JSON, dotenv
-- Logrus for structured logging throughout
-- gRPC/protobuf for the RPC layer between CLI client and daemon
-
-### ACL-Specific Conventions
-- **Android-specific code is isolated** — keep Android compatibility concerns separate from upstream Arduino
+| Check | Purpose |
+|---|---|
+| **SELinux enforcement state** | Detect whether SELinux is enforcing, permissive, or disabled; emit appropriate warning if enforcing |
+| **Filesystem mount flags** | Detect `noexec` mounts on key paths (e.g., `/data`, home directory, runtime root) that would prevent execution |
+| **Writable path validation** | Confirm candidate installation/runtime paths are actually writable by the current process |
+| **Executable path validation** | Confirm that paths intended for executable binaries are not on `noexec`-mounted filesystems |
+| **Termux prefix detection** | Detect
