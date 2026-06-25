@@ -45,6 +45,7 @@ arduino-cli-android/
 │   ├── integrationtest/    # Integration test suite
 │   ├── locales/            # i18n data
 │   └── android/            # Android-specific runtime assets
+│       └── bootstrap/      # Relocatable data-directory bootstrap for Termux PREFIX
 ├── rpc/                    # gRPC/protobuf definitions and client examples
 ├── debian/                 # Debian packaging (Dockerfile-based)
 ├── docs/                   # Documentation, ADRs, Android research
@@ -158,6 +159,35 @@ The JSON report emitted by `acl-scan compat-json` follows a versioned schema:
     └──────────────┘  → Manage runtimes/<id>/ layout
 ```
 
+### Android Bootstrap Package (Relocatable Data-Directory)
+
+A key addition to `internal/android/bootstrap/` implements relocatable data-directory bootstrapping for Termux PREFIX environments. This addresses a fundamental Android constraint: Arduino CLI expects certain data files (board definitions, platform indexes, tool metadata) at well-known paths, but on Termux those paths must be resolved at runtime relative to `$PREFIX` (typically `/data/data/com.termux/files/usr`) rather than hardcoded to `/usr` or `/home`.
+
+#### Bootstrap Design Principles
+
+- **Relocatable-first**: All data-directory paths are derived from a single root (the Termux PREFIX or an explicitly provided override), never hardcoded to glibc/Linux defaults.
+- **Lazy initialization**: The bootstrap runs once on first launch and is a no-op on subsequent launches if the layout is already correct.
+- **Idempotent**: Re-running bootstrap on an already-bootstrapped installation must be safe and produce no duplicate entries or corrupted state.
+- **Graceful degradation**: On non-Android/non-Termux hosts (Linux dev machines, CI), the bootstrap path logic falls back to standard XDG or OS-default paths, so the same binary works everywhere.
+
+#### Bootstrap Resolution Order
+
+The data directory is resolved in this priority order:
+
+1. Explicit flag (`--data-dir` CLI flag or equivalent config key)
+2. Environment variable (`ARDUINO_DATA_DIR` or `ARDUINO_DIRECTORIES_DATA`)
+3. Termux PREFIX detection (`$PREFIX` env var, or heuristic scan of known Termux mount points)
+4. XDG / OS default (standard Arduino CLI behavior for non-Android hosts)
+
+#### Key Files
+
+| Path | Purpose |
+|---|---|
+| `internal/android/bootstrap/bootstrap.go` | Core bootstrap logic: PREFIX detection, path resolution, directory layout initialization |
+| `internal/android/bootstrap/bootstrap_test.go` | Unit tests for bootstrap path resolution and idempotency |
+| `internal/android/bootstrap/paths.go` | Path constant definitions and helper functions for Termux-relative paths |
+| `internal/android/bootstrap/detect.go` | Termux/Android environment detection heuristics |
+
 ---
 
 ## Key Files and Directories
@@ -178,6 +208,15 @@ The JSON report emitted by `acl-scan compat-json` follows a versioned schema:
 | `acl/database/glibc.json` | glibc compatibility metadata |
 | `acl/database/libraries.json` | Library compatibility index |
 | `acl/database/toolchains.json` | Toolchain metadata |
+
+### Android Bootstrap
+
+| Path | Purpose |
+|---|---|
+| `internal/android/bootstrap/bootstrap.go` | Core bootstrap: PREFIX detection, path resolution, layout init |
+| `internal/android/bootstrap/bootstrap_test.go` | Unit tests for path resolution and idempotency |
+| `internal/android/bootstrap/paths.go` | Path constants and Termux-relative path helpers |
+| `internal/android/bootstrap/detect.go` | Termux/Android environment detection heuristics |
 
 ### Documentation & Research
 
@@ -284,43 +323,3 @@ Each scanner JSON entry may contain structured `patch_actions`. Known action typ
 | `set-interpreter` | `interpreter` | Replace PT_INTERP with recommended Android/Termux loader path |
 | `set-rpath` | `rpath` | Replace RPATH/RUNPATH with recommended runtime library path |
 | `none` | — | No ELF edit required for this entry |
-
-Consumers of the JSON report (patcher, launcher, CI scripts) must iterate `patch_actions` rather than parse free-text `recommendation` strings.
-
-### ELF Patcher: Dry-Run and Apply Modes
-
-The patcher operates in two explicit modes:
-
-| Mode | Behavior | External Tools Required |
-|---|---|---|
-| **Dry-run** (default) | Emits a unified diff-style patch plan showing what would change; no files written | None |
-| **Apply** | Invokes `patchelf` to rewrite PT_INTERP and/or RPATH/RUNPATH fields in-place | `patchelf` must be on PATH |
-
-**Dry-run output conventions:**
-- Output resembles a unified diff: each file that would be patched is shown with `---` (current value) and `+++` (proposed value) lines for each ELF field to be changed
-- Files requiring no changes are summarized but not shown in diff output
-- Exit code 0 even when patches are planned (dry-run never fails due to planned changes)
-- Suitable for piping into review workflows or CI gate checks
-
-**Apply mode conventions:**
-- Requires explicit opt-in flag (e.g., `--apply`) — dry-run is the safe default
-- Operates on scanner JSON report (`patch_actions`) as its authoritative input, not free-text recommendations
-- Each `patch_action` entry is executed in order: `set-interpreter` before `set-rpath`
-- Failures on individual files are reported but do not abort the full batch (continue-on-error within a run)
-- Apply mode should be run only after verifier confirms the runtime is present and valid
-
-**Design principle:** The patcher is a consumer of scanner JSON output — it reads `patch_actions` arrays and does not re-classify ELF files itself.
-
-### ACL Verifier: Android Filesystem and SELinux Pre-flight Check Suite
-
-The verifier now includes a dedicated Android pre-flight check suite that runs before any patching or execution attempt. This suite is distinct from the runtime library checks and focuses on Android/Bionic-specific environmental constraints.
-
-#### Pre-flight Check Categories
-
-| Check | Purpose |
-|---|---|
-| **SELinux enforcement state** | Detect whether SELinux is enforcing, permissive, or disabled; emit appropriate warning if enforcing |
-| **Filesystem mount flags** | Detect `noexec` mounts on key paths (e.g., `/data`, home directory, runtime root) that would prevent execution |
-| **Writable path validation** | Confirm candidate installation/runtime paths are actually writable by the current process |
-| **Executable path validation** | Confirm that paths intended for executable binaries are not on `noexec`-mounted filesystems |
-| **Termux prefix detection** | Detect
