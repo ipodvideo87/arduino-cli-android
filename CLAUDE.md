@@ -63,6 +63,7 @@ The ACL is designed as a staged pipeline:
     ┌─────────┐
     │ Scanner │  → Inspect ELF (class, machine, SONAME, PT_INTERP,
     └─────────┘    RPATH/RUNPATH, imports, absolute paths)
+         │         → Detect shebangs and classify script interpreter compatibility
          │         → Classify compatibility category
          │         → Assign patch class
          │         → Emit human-readable OR machine-readable JSON report
@@ -85,6 +86,38 @@ The ACL is designed as a staged pipeline:
     │ Launcher │  → Bootstrap runtime environment
     └──────────┘  → Execute tools in controlled environment (experimental)
 ```
+
+### ACL Scanner — Shebang and Script Interpreter Compatibility
+
+The scanner now includes a dedicated **shebang/script interpreter compatibility check** subsystem. When a file is classified as a `script` (via shebang detection), the scanner additionally:
+
+1. **Extracts the shebang interpreter path** from the first line of the file.
+2. **Classifies the interpreter** against a known compatibility matrix:
+   - Interpreters available natively in Termux (e.g., `/usr/bin/python3`, `/bin/sh`, `/usr/bin/env`) → `compatible`
+   - Interpreters with a known Termux alternative path (e.g., `/usr/bin/python` → `/data/data/com.termux/files/usr/bin/python3`) → `remappable`
+   - Interpreters with no known Android/Termux equivalent → `unsupported`
+   - Interpreters requiring a version check or conditional availability → `conditional`
+3. **Emits structured interpreter check results** in both human-readable and JSON output modes.
+4. **Produces patch recommendations** for remappable interpreters (analogous to ELF interpreter/RPATH recommendations).
+
+#### Shebang Patch Actions
+
+Script entries in the JSON report may now include shebang-specific patch actions:
+
+| Action | Field | Meaning |
+|---|---|---|
+| `set-interpreter` | `interpreter` | Replace shebang interpreter path with Termux-compatible path |
+| `none` | — | Shebang interpreter is already compatible or no change needed |
+
+#### Script Compatibility Categories (Interpreter-Level)
+
+| Category | Meaning |
+|---|---|
+| `compatible` | Interpreter available natively in Termux at the same path |
+| `remappable` | Interpreter has a known Termux alternative; shebang rewrite recommended |
+| `unsupported` | No known Android/Termux equivalent for this interpreter |
+| `conditional` | Interpreter availability depends on installed Termux packages |
+| `unknown` | Interpreter not in the compatibility matrix; manual review needed |
 
 ### ACL Scanner Output Modes
 
@@ -119,14 +152,20 @@ The JSON report emitted by `acl-scan compat-json` follows a versioned schema:
       "path": "<relative or absolute path>",
       "category": "<compatibility category>",
       "patch_class": "<patch class>",
-      "interpreter": "<PT_INTERP value or empty>",
+      "interpreter": "<PT_INTERP value or shebang interpreter path, or empty>",
       "rpath": "<RPATH/RUNPATH value or empty>",
       "recommendation": "<human-readable patch recommendation>",
+      "interpreter_compat": {
+        "interpreter_path": "<extracted shebang interpreter path>",
+        "category": "<compatible|remappable|unsupported|conditional|unknown>",
+        "recommended_path": "<Termux-compatible interpreter path, if remappable>",
+        "reason": "<explanation>"
+      },
       "patch_actions": [
         {
           "action": "<set-interpreter|set-rpath|none>",
           "field": "<interpreter|rpath>",
-          "current_value": "<current ELF field value>",
+          "current_value": "<current ELF field or shebang value>",
           "recommended_value": "<suggested replacement value>",
           "reason": "<explanation>"
         }
@@ -140,8 +179,10 @@ The JSON report emitted by `acl-scan compat-json` follows a versioned schema:
 - `schema_version` is always present to allow consumers to detect breaking changes
 - `patch_actions` is a structured list — consumers (patcher, launcher, CI) should iterate this list rather than parse free-text recommendations
 - `recommendation` is a human-readable summary kept alongside `patch_actions` for debuggability
-- Empty/nil `patch_actions` for entries that need no patching (e.g., `patch_class: none`, `static ELF`, `script`)
+- Empty/nil `patch_actions` for entries that need no patching (e.g., `patch_class: none`, `static ELF`, `script` with compatible interpreter)
 - Summary counters (`needs_patching`, `native_compatible`, `unsupported`) are pre-computed for quick pipeline decisions
+- `interpreter_compat` is present only for `script` category entries; omitted for ELF entries
+- `interpreter_compat.recommended_path` is only populated for `remappable` category interpreters
 
 ### ACL Builder Pipeline
 
@@ -201,6 +242,9 @@ The data directory is resolved in this priority order:
 | `acl/cmd/acl-runtime/main.go` | Runtime manager CLI entry point |
 | `acl/cmd/acl-build-runtime/main.go` | Runtime package builder CLI entry point |
 | `acl/scanner/` | ELF scanner implementation (classification, JSON report, patch recommendations) |
+| `acl/scanner/shebang.go` | Shebang extraction and script interpreter compatibility classification |
+| `acl/scanner/shebang_compat.go` | Known interpreter compatibility matrix (Termux path mappings) |
+| `acl/scanner/shebang_test.go` | Unit tests for shebang detection and interpreter classification |
 | `acl/patcher/` | ELF patcher implementation (dry-run plan + apply mode) |
 | `acl/verifier/` | Pre-launch verifier implementation (runtime checks + Android filesystem/SELinux pre-flight) |
 | `acl/database/android.json` | Android compatibility metadata |
@@ -268,58 +312,4 @@ The data directory is resolved in this priority order:
 | `github.com/spf13/cobra` | CLI framework |
 | `github.com/spf13/viper` | Configuration management |
 | `google.golang.org/grpc` | gRPC server/client |
-| `google.golang.org/protobuf` | Protocol Buffers |
-| `github.com/go-git/go-git/v5` | Git operations |
-| `github.com/sirupsen/logrus` | Structured logging |
-| `github.com/leonelquinteros/gotext` | i18n/l10n |
-| `go.bug.st/relaxed-semver` | Semantic versioning |
-| `go.bug.st/downloader/v3` | File downloading |
-| `github.com/mailru/easyjson` | Fast JSON serialization |
-| `github.com/codeclysm/extract/v4` | Archive extraction |
-| `github.com/ulikunitz/xz` | XZ compression |
-| `github.com/klauspost/compress` | Additional compression (zstd) |
-| `github.com/fatih/color` | Terminal color output |
-| `dario.cat/mergo` | Struct/map merging |
-| `go.bug.st/serial` | Serial port communication |
-
-### Build & Tooling
-- **Task** (Taskfile.yml) — primary build task runner
-- **Python** (pyproject.toml) — documentation tooling (MkDocs via Poetry)
-- **Node.js** (package.json) — Prettier formatting, markdown tooling
-- **Protocol Buffers / gRPC** — RPC interface definitions
-- **Docker** — Debian packaging
-
-### External Android Tools
-- **patchelf** — Required for ELF patching operations (apply mode only; dry-run requires no external tools)
-- **Termux** — Android terminal environment (production target)
-- **proot-distro** — Ubuntu development environment (dev only)
-
----
-
-## ACL Compatibility Classification System
-
-### Compatibility Categories
-- `native Android compatible` — runs as-is on Android
-- `Linux/glibc executable` — needs patching or runtime wrapping
-- `static ELF` — no dynamic linking issues
-- `script` — shell, Python, etc. (shebang-detected)
-- `unknown` — classification failed
-- `unsupported` — Windows `.exe` or other foreign binaries
-
-### Patch Classes
-- `none` — no patching needed
-- `loader-and-rpath` — both PT_INTERP and RPATH need updating
-- `rpath-only` — only RPATH needs updating
-- `runtime-dependency-only` — treat as runtime dep, not executable
-- `script-no-elf-patch` — script, no ELF patching applicable
-- `unsupported` — cannot be patched for Android use
-
-### Patch Actions (JSON report)
-
-Each scanner JSON entry may contain structured `patch_actions`. Known action types:
-
-| Action | Field | Meaning |
-|---|---|---|
-| `set-interpreter` | `interpreter` | Replace PT_INTERP with recommended Android/Termux loader path |
-| `set-rpath` | `rpath` | Replace RPATH/RUNPATH with recommended runtime library path |
-| `none` | — | No ELF edit required for this entry |
+| `google.golang.org/protobuf` | Protocol
