@@ -15,6 +15,10 @@ Native Termux validation always takes priority over container or desktop validat
 
 ## Android Research Policy
 - Before making Android-specific changes, read [docs/android/ANDROID_COMPATIBILITY_RESEARCH.md](docs/android/ANDROID_COMPATIBILITY_RESEARCH.md).
+- Before designing Android upload or flashing behavior, also read
+  [docs/android/ANDROID_UPLOAD_ARCHITECTURE.md](docs/android/ANDROID_UPLOAD_ARCHITECTURE.md)
+  and [docs/android/ANDROID_USB_TRANSPORT_FRAMEWORK.md](docs/android/ANDROID_USB_TRANSPORT_FRAMEWORK.md)
+  and the current milestone document under `docs/android/`.
 - If the behavior is not already documented there, research it before guessing.
 - Add new confirmed Android/Termux findings to that file as part of the same work.
 - Record the source of each finding with device evidence, command output, file metadata, or a linked upstream reference.
@@ -25,6 +29,15 @@ Native Termux validation always takes priority over container or desktop validat
 - Do not assume an existing ELF error means the file is missing; on Android/Termux, `ENOENT` for a present executable often means the PT_INTERP path is wrong or unpatched.
 - Ubuntu/proot validation is useful, but native Termux remains the final authority.
 - For milestone-level Android work, add a dedicated milestone document under `docs/android/` and keep the validation evidence, root cause, and remaining work there.
+- For Android upload and flash work, do not assume desktop serial-node access. Check whether the device requires Android USB host permission and an app-mediated bridge.
+- Prefer a Termux-native or existing-Termux-tooling solution for Android USB
+  access. Do not introduce a new companion APK unless the Termux-native path is
+  proven impossible.
+- Treat Android USB work as a generic transport problem. Do not hardcode VID/PID, interface numbers, baud rates, or board-specific control sequences unless the evidence shows there is no generic path.
+- Keep Arduino CLI unaware of Android internals. ACL owns USB discovery, permission acquisition, bridge selection, diagnostics, and PTY export.
+- The Android post-install pipeline should be shared and automatic: extract, patch or repair, validate, register, and self-test. Platform and tool installers should call it; library installs should opt in only when they contain executable payloads.
+- Treat compatibility as a first-class layer. Prefer compatible library selection over source patching, record compatibility decisions in build and install reports, and surface beginner-friendly and professional detail separately.
+- Successful compiles should emit a first-class firmware package and install flows should pass through the shared Android patch pipeline, but USB flashing remains a separate milestone until proven on-device.
 
 ## Core Principles
 - Android-first engineering.
@@ -36,6 +49,8 @@ Native Termux validation always takes priority over container or desktop validat
 - Favor ELF-analysis-driven patch plans over blind Android fixes.
 - Use wrapper launch for GCC libexec binaries when `patchelf --set-interpreter` is unsafe.
 - Ensure builtin tools are included in the Android patching flow when they are installed under `packages/builtin/tools/...`.
+- Use a transport abstraction for Android upload paths instead of hardcoding `/dev/ttyUSB*` or `/dev/ttyACM*`.
+- Prefer descriptor-driven USB serial detection and PTY-based tool integration over board-specific serial assumptions.
 
 ## Project Goals
 - Run Arduino CLI natively on Android.

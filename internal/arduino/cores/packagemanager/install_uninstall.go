@@ -24,7 +24,7 @@ import (
 	"runtime"
 
 	"github.com/arduino/arduino-cli/commands/cmderrors"
-	"github.com/arduino/arduino-cli/internal/android"
+	aclinstall "github.com/arduino/arduino-cli/internal/acl/install"
 	"github.com/arduino/arduino-cli/internal/arduino/cores"
 	"github.com/arduino/arduino-cli/internal/arduino/cores/packageindex"
 	"github.com/arduino/arduino-cli/internal/arduino/resources"
@@ -173,9 +173,17 @@ func (pme *Explorer) InstallPlatformInDirectory(platformRelease *cores.PlatformR
 	} else {
 		return err
 	}
-	// Apply Android compatibility patches
-	if err := android.PatchPlatformForAndroid(destDir.String()); err != nil {
+	patchManifest := aclinstall.PatchManifest{
+		PackageName:    platformRelease.Platform.Package.Name,
+		PackageVersion: platformRelease.Version.String(),
+		Source:         "platform install",
+	}
+	patchPipeline := aclinstall.NewAndroidInstallPatchPipeline(aclinstall.NewAndroidPatchExecutor(destDir.String(), true))
+	if err := patchPipeline.Run(context.Background(), &patchManifest); err != nil {
 		return err
+	}
+	if patchManifest.Status == "" {
+		patchManifest.Status = patchManifest.FinalStatus()
 	}
 	if err := pme.cacheInstalledJSON(platformRelease); err != nil {
 		return errors.New(i18n.Tr("creating installed.json in %[1]s: %[2]s", platformRelease.InstallDir, err))
@@ -325,7 +333,13 @@ func (pme *Explorer) InstallTool(toolRelease *cores.ToolRelease, taskCB rpc.Task
 	} else {
 		return err
 	}
-	if err := android.PatchToolForAndroid(destDir.String()); err != nil {
+	patchManifest := aclinstall.PatchManifest{
+		PackageName:    toolRelease.Tool.Package.Name,
+		PackageVersion: toolRelease.Version.String(),
+		Source:         "tool install",
+	}
+	patchPipeline := aclinstall.NewAndroidInstallPatchPipeline(aclinstall.NewAndroidPatchExecutor(destDir.String(), false))
+	if err := patchPipeline.Run(context.Background(), &patchManifest); err != nil {
 		return &cmderrors.FailedInstallError{Message: i18n.Tr("Cannot patch tool %s for Android", toolRelease), Cause: err}
 	}
 	// Perform post install

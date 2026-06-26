@@ -120,7 +120,7 @@ func (s *arduinoCoreServerImpl) PlatformUpgrade(req *rpc.PlatformUpgradeRequest,
 		}
 		defer releaseLmi()
 
-		if err := s.installLibraries(ctx, li, lmi, libs, pme.DownloadDir, downloadCB, taskCB); err != nil {
+		if err := s.installLibraries(ctx, li, lmi, libs, platformRelease.Version.String(), pme.DownloadDir, downloadCB, taskCB); err != nil {
 			return nil, err
 		}
 

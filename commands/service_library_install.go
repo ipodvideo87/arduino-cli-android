@@ -22,14 +22,17 @@ import (
 
 	"github.com/arduino/arduino-cli/commands/cmderrors"
 	"github.com/arduino/arduino-cli/commands/internal/instances"
+	"github.com/arduino/arduino-cli/internal/acl/compatibility"
 	"github.com/arduino/arduino-cli/internal/arduino/libraries"
 	"github.com/arduino/arduino-cli/internal/arduino/libraries/librariesindex"
 	"github.com/arduino/arduino-cli/internal/arduino/libraries/librariesmanager"
 	"github.com/arduino/arduino-cli/internal/arduino/resources"
 	"github.com/arduino/arduino-cli/internal/i18n"
+	"github.com/arduino/arduino-cli/pkg/fqbn"
 	rpc "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/commands/v1"
 	"github.com/arduino/go-paths-helper"
 	"github.com/sirupsen/logrus"
+	semver "go.bug.st/relaxed-semver"
 )
 
 // LibraryInstallStreamResponseToCallbackFunction returns a gRPC stream to be used in LibraryInstall that sends
@@ -74,12 +77,20 @@ func (s *arduinoCoreServerImpl) LibraryInstall(req *rpc.LibraryInstallRequest, s
 	}
 	defer releaseLmi()
 
-	// Obtain the download directory
+	// Obtain the package manager explorer so we can inspect the active profile and the download directory.
 	var downloadsDir *paths.Path
+	var coreVersion string
 	if pme, releasePme, err := instances.GetPackageManagerExplorer(req.GetInstance()); err != nil {
 		return err
 	} else {
 		downloadsDir = pme.DownloadDir
+		if profile := pme.GetProfile(); profile != nil && profile.FQBN != "" {
+			if parsed, err := fqbn.Parse(profile.FQBN); err == nil {
+				if _, platformRelease, _, _, _, err := pme.ResolveFQBN(parsed); err == nil && platformRelease != nil {
+					coreVersion = platformRelease.Version.String()
+				}
+			}
+		}
 		releasePme()
 	}
 
@@ -88,6 +99,7 @@ func (s *arduinoCoreServerImpl) LibraryInstall(req *rpc.LibraryInstallRequest, s
 		req.GetName(), req.GetVersion(),
 		libraries.FromRPCLibraryInstallLocation(req.GetInstallLocation()),
 		req.GetNoDeps(), req.GetNoOverwrite(),
+		coreVersion,
 		downloadsDir,
 		taskCB, downloadCB,
 	); err != nil {
@@ -114,9 +126,11 @@ func (s *arduinoCoreServerImpl) downloadAndInstallLibrary(
 	name, version string,
 	installLocation libraries.LibraryLocation,
 	noDeps, noOverwrite bool,
+	coreVersion string,
 	downloadsDir *paths.Path,
 	taskCB rpc.TaskProgressCB, downloadCB rpc.DownloadProgressCB,
 ) error {
+	resolver := compatibility.DefaultResolver()
 	toInstall := map[string]*librariesindex.Release{}
 	if noDeps {
 		version, err := parseVersion(version)
@@ -126,6 +140,16 @@ func (s *arduinoCoreServerImpl) downloadAndInstallLibrary(
 		libRelease, err := li.FindRelease(name, version)
 		if err != nil {
 			return err
+		}
+		if coreVersion != "" {
+			if selected, ok := selectCompatibleLibraryRelease(resolver, li, coreVersion, libRelease); ok {
+				taskCB(&rpc.TaskProgress{
+					Name:      i18n.Tr("Selecting compatible version for %s", libRelease.GetName()),
+					Message:   i18n.Tr("Using %s instead of %s for compatibility", selected.Version, libRelease.Version),
+					Completed: true,
+				})
+				libRelease = selected
+			}
 		}
 		toInstall[libRelease.GetName()] = libRelease
 	} else {
@@ -148,6 +172,19 @@ func (s *arduinoCoreServerImpl) downloadAndInstallLibrary(
 				}
 			}
 			toInstall[dep.GetName()] = dep
+		}
+	}
+
+	if coreVersion != "" {
+		for name, libRelease := range toInstall {
+			if selected, ok := selectCompatibleLibraryRelease(resolver, li, coreVersion, libRelease); ok {
+				taskCB(&rpc.TaskProgress{
+					Name:      i18n.Tr("Selecting compatible version for %s", name),
+					Message:   i18n.Tr("Using %s instead of %s for compatibility", selected.Version, libRelease.Version),
+					Completed: true,
+				})
+				toInstall[name] = selected
+			}
 		}
 	}
 
@@ -214,6 +251,47 @@ func installLibrary(lmi *librariesmanager.Installer, downloadsDir *paths.Path, l
 
 	taskCB(&rpc.TaskProgress{Message: i18n.Tr("Installed %s", libRelease), Completed: true})
 	return nil
+}
+
+func selectCompatibleLibraryRelease(resolver *compatibility.Resolver, li *librariesindex.Index, coreVersion string, requested *librariesindex.Release) (*librariesindex.Release, bool) {
+	if resolver == nil || li == nil || requested == nil {
+		return nil, false
+	}
+	indexed := li.Libraries[requested.GetName()]
+	if indexed == nil {
+		return nil, false
+	}
+	candidates := make([]compatibility.LibraryCandidateChoice, 0, len(indexed.Releases))
+	for _, version := range indexed.Versions() {
+		if version == nil {
+			continue
+		}
+		candidates = append(candidates, compatibility.LibraryCandidateChoice{
+			Name:    requested.GetName(),
+			Version: version.String(),
+		})
+	}
+	requestedVersion := ""
+	if requested.GetVersion() != nil {
+		requestedVersion = requested.GetVersion().String()
+	}
+	decision := resolver.ResolveLibrarySelection(coreVersion, requested.GetName(), requestedVersion, candidates)
+	if decision.Outcome != compatibility.OutcomeSelected || decision.SelectedVersion == "" || decision.SelectedVersion == requestedVersion {
+		return nil, false
+	}
+	selected, err := li.FindRelease(requested.GetName(), parseVersionOrNil(decision.SelectedVersion))
+	if err != nil || selected == nil {
+		return nil, false
+	}
+	return selected, true
+}
+
+func parseVersionOrNil(version string) *semver.Version {
+	parsed, err := parseVersion(version)
+	if err != nil {
+		return nil
+	}
+	return parsed
 }
 
 // ZipLibraryInstallStreamResponseToCallbackFunction returns a gRPC stream to be used in ZipLibraryInstall that sends

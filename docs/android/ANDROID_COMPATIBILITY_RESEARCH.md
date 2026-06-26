@@ -144,6 +144,116 @@ rm -rf ~/.arduino15/packages/esp32 ~/.arduino15/staging ~/.cache/arduino ~/.ardu
 ./arduino-cli compile -v --fqbn esp32:esp32:esp32s3 ~/Development/Sketches/Blink
 ```
 
+## 13. Upload / Flash Architecture
+
+- The Arduino CLI upload path is recipe-driven and ultimately executes the
+  selected `upload.pattern`, `program.pattern`, or `bootloader.pattern`.
+  - Evidence: `commands/service_upload.go` resolves the upload tool, handles
+    optional reset behavior, expands the recipe, and then runs the tool.
+- ESP32-family upload recipes are built around `esptool` and serial port
+  properties.
+  - Evidence: ESP32 platform test data shows `tools.esptool.upload.pattern`
+    invoking `esptool` with `--port "{serial.port}"`, `--baud {upload.speed}`,
+    and flash image arguments.
+- `esptool` supports remote serial ports over RFC2217, so a loopback bridge can
+  still preserve serial semantics when a direct PTY is not enough.
+  - Evidence: Espressif remote serial port documentation.
+- A serial-like endpoint is still the cleanest contract for Arduino CLI and
+  serial monitor tooling.
+  - Evidence: Arduino CLI upload is recipe-driven and `pySerial`-backed tools
+    expect a serial port abstraction.
+- Android should therefore own USB acquisition and expose a serial-like
+  endpoint, not a board-specific uploader.
+  - Evidence: Android USB permission model and the Termux API file-descriptor
+    handoff path.
+
+## 14. Android USB Transport Framework
+
+- Termux-native USB access should be treated as a transport design problem, not
+  just an upload-command problem.
+  - Evidence: Android USB host APIs require app-scoped permission and explicit
+    device selection, while Arduino CLI upload is recipe-driven and assumes a
+    transport already exists.
+- `termux-usb` is the current Termux-native acquisition path with the strongest
+  evidence.
+  - Evidence: Termux API source uses `TERMUX_USB_FD` and `termux-callback`, and
+    release notes document USB fd and Android 14 USB fixes.
+- Android USB host access remains app-scoped and permission-gated.
+  - Evidence: `UsbManager.requestPermission(...)` and `UsbDeviceConnection`
+    documentation.
+- The bridge must be descriptor-driven and generic.
+  - Evidence: `usb-serial-for-android` detects CDC/ACM by interface type and
+    exposes raw read/write semantics for multiple serial chip families.
+- The bridge should expose a PTY or RFC2217-compatible endpoint to existing
+  tools.
+  - Evidence: PTYs are a standard serial abstraction and RFC2217 preserves
+    serial semantics across a socket boundary.
+- A companion APK remains a last resort, not the preferred architecture.
+  - Evidence: current project policy prefers Termux-native solutions first.
+
+## 15. Evidence Log
+
+- Native-device evidence from this workstream: `termux-usb -l` enumerates the
+  device, the Android permission dialog appears, permission can be granted, and
+  acquisition can still fail intermittently with `No such device`.
+  - Status: confirmed on the target device by manual observation in this
+    workstream; the failure mode is not yet explained.
+- Upstream Termux API evidence: `termux-api.c` sends USB file descriptors
+  through `termux-callback` and `SCM_RIGHTS`.
+  - Source: [termux-api-package termux-api.c](https://github.com/termux/termux-api-package/blob/master/termux-api.c)
+- Upstream Termux API evidence: release notes mention a fix for USB fd delivery
+  and a fix for Android 14 USB hangs.
+  - Source: [termux-api releases](https://github.com/termux/termux-api/releases)
+- Android USB host evidence: permission is temporary until disconnect and
+  communication is performed with `openDevice`, `claimInterface`, `controlTransfer`,
+  and `bulkTransfer`.
+  - Source: [UsbManager API](https://developer.android.com/reference/android/hardware/usb/UsbManager)
+  - Source: [UsbDeviceConnection API](https://developer.android.com/reference/android/hardware/usb/UsbDeviceConnection)
+- Android USB host evidence: enumeration can happen through attach intents or
+  by querying the connected device list.
+  - Source: [Android USB host overview](https://developer.android.com/develop/connectivity/usb/host)
+- Generic USB serial evidence: `usb-serial-for-android` provides a raw serial
+  port API and detects CDC/ACM by interface type.
+  - Source: [usb-serial-for-android](https://github.com/mik3y/usb-serial-for-android)
+- PTY evidence: a pseudoterminal is a bidirectional master/slave pair.
+  - Source: [pty(7)](https://man7.org/linux/man-pages/man7/pty.7.html)
+- Upload tooling evidence: `esptool` supports RFC2217 remote serial ports and
+  uses pySerial for serial access.
+  - Source: [Remote Serial Ports](https://docs.espressif.com/projects/esptool/en/latest/esp32/remote-serial-ports.html)
+  - Source: [Troubleshooting](https://docs.espressif.com/projects/esptool/en/latest/esp32/troubleshooting.html)
+- App precedent evidence: ArduinoDroid, ESP32_Flasher, and TCPUART all expose
+  Android USB host serial or bridge behavior on this class of hardware.
+  - Source: [ArduinoDroid](https://play.google.com/store/apps/details?id=name.antonsmirnov.android.arduinodroid2)
+  - Source: [ESP32_Flasher](https://play.google.com/store/apps/details?id=com.esp_flash.esp_flash_app)
+  - Source: [TCPUART](https://play.google.com/store/apps/details?hl=en_US&id=com.hardcodedjoy.tcpuart)
+
+## 16. Open Questions
+
+- Why does USB acquisition sometimes succeed and sometimes fail after permission?
+- Is Android re-enumerating the device after permission is granted?
+- Does the device path change between list, permission grant, and open?
+- Is the observed latency a Termux API issue, an Android USB lifecycle issue,
+  or a bridge bug?
+- Is PTY enough for all supported tools, or will RFC2217 be required for some
+  monitor or upload paths?
+- Which package types should automatically run Android post-install patching and
+  self-test today?
+
+## 17. Native Android Experiments
+
+The next experiments to run on device are:
+
+1. `termux-usb -l`
+2. `termux-usb -r <device>`
+3. `termux-usb -e <probe> <device>`
+4. `ls -l /dev/bus/usb/*/*` before and after disconnect/reconnect
+5. dump raw USB descriptors from the opened fd
+6. identify the CDC or vendor-specific serial interface from those descriptors
+7. open the same fd from native code and verify the fd reaches the bridge
+8. expose a PTY and connect a serial monitor to it
+9. run an `esptool` chip-identification probe through the bridge
+10. flash a known-good firmware package and verify the boot output
+
 ## Agent Workflow
 
 Before fixing Android-specific behavior:

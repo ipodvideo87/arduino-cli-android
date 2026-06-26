@@ -23,6 +23,7 @@ import (
 
 	"github.com/arduino/arduino-cli/commands/cmderrors"
 	"github.com/arduino/arduino-cli/commands/internal/instances"
+	"github.com/arduino/arduino-cli/internal/acl/compatibility"
 	"github.com/arduino/arduino-cli/internal/arduino/cores"
 	"github.com/arduino/arduino-cli/internal/arduino/cores/packagemanager"
 	"github.com/arduino/arduino-cli/internal/arduino/libraries"
@@ -32,6 +33,7 @@ import (
 	"github.com/arduino/arduino-cli/internal/i18n"
 	rpc "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/commands/v1"
 	"github.com/arduino/go-paths-helper"
+	semver "go.bug.st/relaxed-semver"
 )
 
 // UpdateIndexStreamResponseToCallbackFunction returns a gRPC stream to be used in PlatformInstall that sends
@@ -109,7 +111,7 @@ func (s *arduinoCoreServerImpl) PlatformInstall(req *rpc.PlatformInstallRequest,
 		}
 		defer releaseLmi()
 
-		if err := s.installLibraries(ctx, li, lmi, libs, pme.DownloadDir, downloadCB, taskCB); err != nil {
+		if err := s.installLibraries(ctx, li, lmi, libs, platformRelease.Version.String(), pme.DownloadDir, downloadCB, taskCB); err != nil {
 			return err
 		}
 
@@ -152,32 +154,74 @@ func (s *arduinoCoreServerImpl) PlatformInstall(req *rpc.PlatformInstallRequest,
 func (s *arduinoCoreServerImpl) installLibraries(
 	ctx context.Context, li *librariesindex.Index, lmi *librariesmanager.Installer,
 	requiredLibraries cores.LibraryDependencies,
+	coreVersion string,
 	downloadsDir *paths.Path,
 	downloadCB rpc.DownloadProgressCB, taskCB rpc.TaskProgressCB,
 ) error {
 	installedLibs := listLibraries(lmi.Explorer, li, false, false)
+	resolver := compatibility.DefaultResolver()
 	for _, libDep := range requiredLibraries {
+		versionToInstall := libDep.Version
+		requestedVersion := ""
+		if libDep.Version != nil {
+			requestedVersion = libDep.Version.String()
+		}
+		if indexed := li.Libraries[libDep.Name]; indexed != nil && len(indexed.Releases) > 0 {
+			candidates := make([]compatibility.LibraryCandidateChoice, 0, len(indexed.Releases))
+			for _, version := range indexed.Versions() {
+				if version == nil {
+					continue
+				}
+				candidates = append(candidates, compatibility.LibraryCandidateChoice{
+					Name:    libDep.Name,
+					Version: version.String(),
+				})
+			}
+			decision := resolver.ResolveLibrarySelection(coreVersion, libDep.Name, requestedVersion, candidates)
+			if decision.SelectedVersion != "" && decision.SelectedVersion != requestedVersion {
+				if selected, err := parseVersion(decision.SelectedVersion); err == nil {
+					versionToInstall = selected
+					taskCB(&rpc.TaskProgress{
+						Name:      i18n.Tr("Selecting compatible version for %s", libDep.Name),
+						Message:   decision.BeginnerMessage,
+						Completed: true,
+					})
+				}
+			}
+		}
 		matcher := func(lib *installedLib) bool {
 			return lib.Library.Name == libDep.Name
 		}
 		if idx := slices.IndexFunc(installedLibs, matcher); idx != -1 {
 			installedVersion := installedLibs[idx].Library.Version
-			if installedVersion.Equal(libDep.Version) {
+			if versionToInstall == nil {
+				versionToInstall = installedVersion
+			}
+			if installedVersion.Equal(versionToInstall) {
 				taskCB(&rpc.TaskProgress{Name: i18n.Tr("Library %s already installed", libDep.Name), Completed: true})
 				continue
 			}
-			if installedVersion.GreaterThanOrEqual(libDep.Version) {
+			if installedVersion.GreaterThanOrEqual(versionToInstall) {
 				taskCB(&rpc.TaskProgress{
 					Name: i18n.Tr("Skipping installation of library %[1]s, because %[2]s is already installed", libDep, installedVersion), Completed: true})
 				continue
 			}
 		}
+		if versionToInstall == nil {
+			if indexed := li.Libraries[libDep.Name]; indexed != nil && indexed.Latest != nil {
+				versionToInstall = indexed.Latest.Version
+			}
+		}
+		if versionToInstall == nil {
+			return fmt.Errorf("library %s does not have a resolvable version", libDep.Name)
+		}
 
 		if err := s.downloadAndInstallLibrary(
 			ctx, li, lmi,
-			libDep.Name, libDep.Version.String(), libraries.User,
+			libDep.Name, versionStringOrEmpty(versionToInstall), libraries.User,
 			true,  // Do not install deps
 			false, // Allow overwrite
+			coreVersion,
 			downloadsDir,
 			taskCB, downloadCB,
 		); err != nil {
@@ -185,4 +229,11 @@ func (s *arduinoCoreServerImpl) installLibraries(
 		}
 	}
 	return nil
+}
+
+func versionStringOrEmpty(version *semver.Version) string {
+	if version == nil {
+		return ""
+	}
+	return version.String()
 }

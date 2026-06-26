@@ -27,8 +27,11 @@ import (
 
 	"github.com/arduino/arduino-cli/commands/cmderrors"
 	"github.com/arduino/arduino-cli/commands/internal/instances"
+	"github.com/arduino/arduino-cli/internal/acl/compatibility"
+	"github.com/arduino/arduino-cli/internal/acl/firmware"
 	"github.com/arduino/arduino-cli/internal/arduino/builder"
 	"github.com/arduino/arduino-cli/internal/arduino/builder/logger"
+	"github.com/arduino/arduino-cli/internal/arduino/libraries"
 	"github.com/arduino/arduino-cli/internal/arduino/libraries/librariesmanager"
 	"github.com/arduino/arduino-cli/internal/arduino/sketch"
 	"github.com/arduino/arduino-cli/internal/arduino/utils"
@@ -38,6 +41,7 @@ import (
 	"github.com/arduino/arduino-cli/pkg/fqbn"
 	rpc "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/commands/v1"
 	paths "github.com/arduino/go-paths-helper"
+	properties "github.com/arduino/go-properties-orderedmap"
 	"github.com/sirupsen/logrus"
 )
 
@@ -376,6 +380,35 @@ func (s *arduinoCoreServerImpl) Compile(req *rpc.CompileRequest, stream rpc.Ardu
 		return &cmderrors.CompileFailedError{Message: err.Error()}
 	}
 
+	if !req.GetCreateCompilationDatabaseOnly() {
+		firmwarePackageDir := s.getFirmwarePackageDir(sk, fqbn)
+		firmwarePackage, err := buildFirmwarePackageForCompile(
+			sketchBuilder.GetBuildPath(),
+			sketchBuilder.GetBuildProperties(),
+			firmwarePackageDir,
+			sk.Name,
+			fqbnIn,
+			targetBoard.BoardID,
+			targetPlatform.Platform.Package.Name,
+			targetPlatform.Version.String(),
+			buildPlatform.Version.String(),
+			sketchBuilder.ExecutableSectionsSize(),
+			sketchBuilder.ImportedLibraries(),
+			sketchBuilder.GetBuildProperties().Get("compiler.path"),
+		)
+		if err != nil {
+			return &cmderrors.CompileFailedError{Message: err.Error()}
+		}
+		if firmwarePackage.Validation.HasFailures() {
+			message := "firmware package validation failed"
+			if len(firmwarePackage.Validation.Errors) > 0 {
+				message = firmwarePackage.Validation.Errors[0]
+			}
+			return &cmderrors.CompileFailedError{Message: message}
+		}
+		r.BuildProperties = append(r.BuildProperties, "acl.firmware_package="+firmwarePackageDir.String())
+	}
+
 	// If the export directory is set we assume you want to export the binaries
 	if req.GetExportDir() != "" {
 		exportBinaries = true
@@ -441,6 +474,115 @@ func (s *arduinoCoreServerImpl) getDefaultSketchBuildPath(sk *sketch.Sketch, ove
 		overriddenBuildCachePath = s.settings.GetBuildCachePath()
 	}
 	return overriddenBuildCachePath.Join("sketches", sk.Hash())
+}
+
+func (s *arduinoCoreServerImpl) getFirmwarePackageDir(sk *sketch.Sketch, fqbn *fqbn.FQBN) *paths.Path {
+	fqbnSuffix := strings.ReplaceAll(fqbn.StringWithoutConfig(), ":", ".")
+	return sk.FullPath.Join("build", fqbnSuffix, "firmware-package")
+}
+
+func buildFirmwarePackageForCompile(
+	buildPath *paths.Path,
+	buildProperties *properties.Map,
+	outputDir *paths.Path,
+	sketchName, fqbnString, boardName, platformPackage, platformVersion, coreVersion string,
+	sections builder.ExecutablesFileSections,
+	importedLibs libraries.List,
+	toolchainVersion string,
+) (firmware.FirmwarePackage, error) {
+	manifest := firmware.BuildInput{
+		BuildPath:        buildPath,
+		OutputDir:        outputDir,
+		Properties:       buildProperties,
+		SketchName:       sketchName,
+		ProjectName:      buildProperties.Get("build.project_name"),
+		FQBN:             fqbnString,
+		Board:            boardName,
+		PlatformPackage:  platformPackage,
+		PlatformVersion:  platformVersion,
+		CoreVersion:      coreVersion,
+		ToolchainVersion: toolchainVersion,
+		Libraries:        libraryRefsFromImported(importedLibs),
+		MemoryUsage:      memoryUsageFromSections(sections),
+		Compatibility:    compatibilityDecisionsFromLibraries(coreVersion, importedLibs),
+	}
+	return firmware.BuildFirmwarePackage(manifest)
+}
+
+func libraryRefsFromImported(importedLibs libraries.List) []firmware.LibraryRef {
+	refs := make([]firmware.LibraryRef, 0, len(importedLibs))
+	for _, lib := range importedLibs {
+		if lib == nil {
+			continue
+		}
+		version := ""
+		if lib.Version != nil {
+			version = lib.Version.String()
+		}
+		path := ""
+		if lib.InstallDir != nil {
+			path = lib.InstallDir.String()
+		}
+		refs = append(refs, firmware.LibraryRef{
+			Name:    lib.Name,
+			Version: version,
+			Path:    path,
+		})
+	}
+	return refs
+}
+
+func compatibilityDecisionsFromLibraries(coreVersion string, importedLibs libraries.List) []compatibility.Decision {
+	resolver := compatibility.DefaultResolver()
+	decisions := make([]compatibility.Decision, 0, len(importedLibs))
+	for _, lib := range importedLibs {
+		if lib == nil {
+			continue
+		}
+		version := ""
+		if lib.Version != nil {
+			version = lib.Version.String()
+		}
+		decision := resolver.ResolveLibrarySelection(coreVersion, lib.Name, version, []compatibility.LibraryCandidateChoice{{
+			Name:    lib.Name,
+			Version: version,
+			Path: func() string {
+				if lib.InstallDir == nil {
+					return ""
+				}
+				return lib.InstallDir.String()
+			}(),
+		}})
+		if decision.Subject == "" {
+			decision.Subject = lib.Name
+		}
+		decisions = append(decisions, decision)
+	}
+	return decisions
+}
+
+func memoryUsageFromSections(sections builder.ExecutablesFileSections) firmware.MemoryUsage {
+	usage := firmware.MemoryUsage{}
+	if len(sections) == 0 {
+		return usage
+	}
+	for _, section := range sections {
+		switch strings.ToLower(section.Name) {
+		case "text":
+			usage.ProgramUsedBytes = uint64(section.Size)
+			usage.ProgramTotalBytes = uint64(section.MaxSize)
+			if section.MaxSize > 0 {
+				usage.ProgramPercent = section.Size * 100 / section.MaxSize
+			}
+		case "data":
+			usage.RAMUsedBytes = uint64(section.Size)
+			usage.RAMTotalBytes = uint64(section.MaxSize)
+			if section.MaxSize > 0 {
+				usage.RAMPercent = section.Size * 100 / section.MaxSize
+			}
+		}
+	}
+	return usage
 }
 
 // maybePurgeBuildCache runs the build files cache purge if the policy conditions are met.

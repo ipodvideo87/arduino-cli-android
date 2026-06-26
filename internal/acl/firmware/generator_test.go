@@ -1,0 +1,93 @@
+package firmware
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/arduino/arduino-cli/internal/acl/compatibility"
+	"github.com/arduino/arduino-cli/internal/acl/diagnostics"
+	paths "github.com/arduino/go-paths-helper"
+	properties "github.com/arduino/go-properties-orderedmap"
+	"github.com/stretchr/testify/require"
+)
+
+func TestBuildFirmwarePackageGeneratesStableArtifactsAndValidation(t *testing.T) {
+	root := t.TempDir()
+	buildDir := filepath.Join(root, "build")
+	outputDir := filepath.Join(root, "package")
+	require.NoError(t, os.MkdirAll(buildDir, 0o755))
+
+	projectName := "sketch.ino"
+	files := map[string][]byte{
+		filepath.Join(buildDir, projectName+".bin"):            []byte("app"),
+		filepath.Join(buildDir, projectName+".elf"):            []byte("elf"),
+		filepath.Join(buildDir, projectName+".map"):            []byte("map"),
+		filepath.Join(buildDir, projectName+".partitions.bin"): []byte("partitions"),
+		filepath.Join(root, "bootloader.bin"):                  []byte("bootloader"),
+		filepath.Join(root, "boot_app0.bin"):                   []byte("boot_app0"),
+	}
+	for path, data := range files {
+		require.NoError(t, os.WriteFile(path, data, 0o644))
+	}
+
+	props := properties.NewMap()
+	props.Set("build.project_name", projectName)
+	props.Set("runtime.platform.path", root)
+	props.Set("tools.esptool.upload.pattern", `esptool write_flash 0xe000 "`+filepath.Join(root, "boot_app0.bin")+`" 0x1000 "`+filepath.Join(root, "bootloader.bin")+`" 0x10000 "`+filepath.Join(buildDir, projectName+".bin")+`" 0x8000 "`+filepath.Join(buildDir, projectName+".partitions.bin")+`"`)
+
+	pkg, err := BuildFirmwarePackage(BuildInput{
+		BuildPath:        paths.New(buildDir),
+		OutputDir:        paths.New(outputDir),
+		Properties:       props,
+		SketchName:       "demo",
+		ProjectName:      projectName,
+		FQBN:             "esp32:esp32:esp32s3",
+		Board:            "esp32s3",
+		PlatformPackage:  "esp32",
+		PlatformVersion:  "3.3.10",
+		CoreVersion:      "3.3.10",
+		ToolchainVersion: "gcc-14.2.0",
+		TargetChip:       "ESP32-S3",
+		Libraries:        []LibraryRef{{Name: "ESPAsyncWebServer", Version: "3.3.0"}},
+		Compatibility: []compatibility.Decision{{
+			Scope:           compatibility.ScopeLibrary,
+			Subject:         "ESPAsyncWebServer",
+			Outcome:         compatibility.OutcomeSelected,
+			SelectedVersion: "3.3.0",
+		}},
+	})
+	require.NoError(t, err)
+	require.Equal(t, diagnostics.StatusPassed, pkg.Validation.Status)
+	require.Contains(t, pkg.Manifest.SketchName, "demo")
+	require.Contains(t, pkg.Manifest.Artifacts[ArtifactApplicationBinary].Path, filepath.Join(outputDir, "artifacts"))
+	require.Contains(t, pkg.Manifest.Artifacts[ArtifactBootloaderBinary].Path, "bootloader.bin")
+	require.Len(t, pkg.FlashPlan.Entries, 4)
+	require.Equal(t, uint32(0x10000), pkg.FlashPlan.SortedEntries()[3].Offset)
+	require.FileExists(t, filepath.Join(outputDir, "manifest.json"))
+	require.FileExists(t, filepath.Join(outputDir, "flash-plan.json"))
+	require.FileExists(t, filepath.Join(outputDir, "validation-report.json"))
+}
+
+func TestBuildFirmwarePackageFailsWhenRequiredArtifactMissing(t *testing.T) {
+	root := t.TempDir()
+	buildDir := filepath.Join(root, "build")
+	require.NoError(t, os.MkdirAll(buildDir, 0o755))
+	projectName := "sketch.ino"
+	require.NoError(t, os.WriteFile(filepath.Join(buildDir, projectName+".elf"), []byte("elf"), 0o644))
+
+	props := properties.NewMap()
+	props.Set("build.project_name", projectName)
+
+	_, err := BuildFirmwarePackage(BuildInput{
+		BuildPath:        paths.New(buildDir),
+		Properties:       props,
+		SketchName:       "demo",
+		ProjectName:      projectName,
+		FQBN:             "arduino:avr:uno",
+		Board:            "uno",
+		CoreVersion:      "1.8.6",
+		ToolchainVersion: "gcc-7.3.0",
+	})
+	require.Error(t, err)
+}
