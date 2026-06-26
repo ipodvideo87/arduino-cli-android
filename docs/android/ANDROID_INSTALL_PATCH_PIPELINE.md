@@ -45,6 +45,11 @@ extraction and before registration. The ACL executor wraps the existing Android
 patcher so the pipeline can record the lifecycle without hardcoding board
 specific behavior into Arduino CLI.
 
+The `permission-runtime-fixes` stage only repairs the copied runtime loader
+execute bits. The broader Android patch stage still owns ELF rewriting and
+platform.txt adjustments, so runtime-permission failures stay isolated from
+full patch failures.
+
 The CLI-facing `arduino-cli acl bootstrap` command now uses the same pipeline
 model in read-only mode so bootstrap checks and installation behavior stay on
 the same architecture.

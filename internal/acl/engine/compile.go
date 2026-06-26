@@ -10,6 +10,9 @@ import (
 
 	"github.com/arduino/arduino-cli/internal/acl/compatibility"
 	"github.com/arduino/arduino-cli/internal/acl/firmware"
+	"github.com/arduino/arduino-cli/pkg/fqbn"
+	paths "github.com/arduino/go-paths-helper"
+	properties "github.com/arduino/go-properties-orderedmap"
 )
 
 type CompileRequest struct {
@@ -49,7 +52,24 @@ type CompileExecution struct {
 	MemoryUsage      firmware.MemoryUsage     `json:"memory_usage,omitempty"`
 	Libraries        []firmware.LibraryRef    `json:"libraries,omitempty"`
 	Compatibility    []compatibility.Decision `json:"compatibility,omitempty"`
-	BuilderResult    map[string]any           `json:"builder_result,omitempty"`
+	BuilderResult    BuilderResultSnapshot    `json:"builder_result,omitempty"`
+}
+
+type BuilderResultSnapshot struct {
+	BuildPath            string                `json:"build_path,omitempty"`
+	BuildProperties      map[string]string     `json:"build_properties,omitempty"`
+	UsedLibraries        []firmware.LibraryRef `json:"used_libraries,omitempty"`
+	ExecutableSections   []SectionSizeSnapshot `json:"executable_sections_size,omitempty"`
+	BoardPlatformPackage string                `json:"board_platform_package,omitempty"`
+	BoardPlatformVersion string                `json:"board_platform_version,omitempty"`
+	BuildPlatformPackage string                `json:"build_platform_package,omitempty"`
+	BuildPlatformVersion string                `json:"build_platform_version,omitempty"`
+}
+
+type SectionSizeSnapshot struct {
+	Name    string `json:"name,omitempty"`
+	Size    int64  `json:"size,omitempty"`
+	MaxSize int64  `json:"max_size,omitempty"`
 }
 
 type CompileRunner interface {
@@ -111,14 +131,14 @@ func (r CompileWorkflowReport) PackageLocation() string {
 }
 
 func compileWorkflowPackageDir(req CompileRequest) string {
-	if strings.TrimSpace(req.OutputDir) != "" {
-		return req.OutputDir
-	}
 	if strings.TrimSpace(req.SketchPath) == "" || strings.TrimSpace(req.FQBN) == "" {
 		return ""
 	}
 	sketchDir := filepath.Dir(req.SketchPath)
 	fqbnSuffix := strings.ReplaceAll(req.FQBN, ":", ".")
+	if parsed, err := fqbn.Parse(req.FQBN); err == nil {
+		fqbnSuffix = strings.ReplaceAll(parsed.StringWithoutConfig(), ":", ".")
+	}
 	return filepath.Join(sketchDir, "build", fqbnSuffix, "firmware-package")
 }
 
@@ -130,6 +150,86 @@ func compileWorkflowReady(pkg firmware.FirmwarePackage, validation firmware.Vali
 		return false
 	}
 	return true
+}
+
+func (b BuilderResultSnapshot) BuildMemoryUsage() firmware.MemoryUsage {
+	usage := firmware.MemoryUsage{}
+	for _, section := range b.ExecutableSections {
+		switch strings.ToLower(section.Name) {
+		case "text":
+			usage.ProgramUsedBytes = uint64(section.Size)
+			usage.ProgramTotalBytes = uint64(section.MaxSize)
+			if section.MaxSize > 0 {
+				usage.ProgramPercent = int(section.Size * 100 / section.MaxSize)
+			}
+		case "data":
+			usage.RAMUsedBytes = uint64(section.Size)
+			usage.RAMTotalBytes = uint64(section.MaxSize)
+			if section.MaxSize > 0 {
+				usage.RAMPercent = int(section.Size * 100 / section.MaxSize)
+			}
+		}
+	}
+	return usage
+}
+
+func (b BuilderResultSnapshot) BuildInput(req CompileRequest) (firmware.BuildInput, error) {
+	buildPath := strings.TrimSpace(b.BuildPath)
+	if buildPath == "" {
+		buildPath = strings.TrimSpace(req.BuildPath)
+	}
+	if buildPath == "" {
+		return firmware.BuildInput{}, fmt.Errorf("build path is required")
+	}
+
+	props := properties.NewMap()
+	for key, value := range b.BuildProperties {
+		props.Set(key, value)
+	}
+
+	parsedFQBN, err := fqbn.Parse(req.FQBN)
+	if err != nil {
+		return firmware.BuildInput{}, err
+	}
+	boardName := parsedFQBN.BoardID
+	toolchainVersion := firstNonEmptyStrings(
+		b.BuildProperties["compiler.path"],
+		b.BuildProperties["runtime.tools.gcc.path"],
+		b.BuildProperties["runtime.tools.xtensa-esp32-elf-gcc.path"],
+	)
+	buildPlatformVersion := firstNonEmptyStrings(b.BuildPlatformVersion, b.BoardPlatformVersion)
+
+	return firmware.BuildInput{
+		BuildPath:        paths.New(buildPath),
+		OutputDir:        paths.New(compileWorkflowPackageDir(req)),
+		Properties:       props,
+		SketchName:       filepathBase(req.SketchPath),
+		ProjectName:      props.Get("build.project_name"),
+		FQBN:             req.FQBN,
+		Board:            boardName,
+		PlatformPackage:  firstNonEmptyStrings(b.BoardPlatformPackage, b.BuildPlatformPackage),
+		PlatformVersion:  firstNonEmptyStrings(b.BoardPlatformVersion, b.BuildPlatformVersion),
+		CoreVersion:      buildPlatformVersion,
+		ToolchainVersion: toolchainVersion,
+		Libraries:        append([]firmware.LibraryRef(nil), b.UsedLibraries...),
+		MemoryUsage:      b.BuildMemoryUsage(),
+	}, nil
+}
+
+func filepathBase(path string) string {
+	if strings.TrimSpace(path) == "" {
+		return ""
+	}
+	return filepath.Base(path)
+}
+
+func firstNonEmptyStrings(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func compileWorkflowBeginner(preflight string, compatibilitySummary string, exec CompileExecution, pkg firmware.FirmwarePackage, validation firmware.ValidationReport) string {

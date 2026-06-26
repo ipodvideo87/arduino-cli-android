@@ -57,7 +57,9 @@ does not replace native Android validation.
 - The ACL engine now exists as the orchestration layer for ordered workflows, structured events, and machine-readable workflow reports.
 - The experimental `acl workflow compile` command now exists and drives the ACL compile workflow on top of the existing compile service path.
 - Successful compiles now produce a stable firmware package with manifest, flash plan, validation report, hashes, and copied artifacts.
+- The ACL compile workflow now reconstructs the firmware package from the compiler snapshot when the on-disk package is missing, so compile success and package-generation failure stay distinct.
 - Platform and tool installs now flow through the shared Android patch pipeline instead of requiring manual permission or chmod repair.
+- The Android install patch pipeline now has a dedicated runtime-permission repair stage that only fixes the copied loader execute bit, while the broader Android patch stage remains responsible for ELF rewriting.
 - Platform and library install paths now consult the compatibility resolver so compatible versions can be preferred over source patching.
 - ACL-facing scanner, verifier, patch-preview, and bootstrap wrapper packages now exist on top of the current architecture.
 - The `arduino-cli acl` command group now exposes scanner, verifier, patch-preview, and bootstrap entry points for CLI-facing diagnostics.

@@ -27,7 +27,7 @@ func (e *AndroidPatchExecutor) Execute(_ context.Context, req StageRequest) (Sta
 	switch req.Stage {
 	case StageDownload, StageExtract, StageRegister, StageSelfTest, StageReady:
 		return StageResult{Status: diagnostics.StatusSkipped, Message: "not applicable to Android patching"}, nil
-	case StageAndroidPatch, StagePermissionRuntimeFixes, StageExecutableValidation:
+	case StageAndroidPatch, StageExecutableValidation:
 		if e.Root == "" {
 			return StageResult{Status: diagnostics.StatusFailed, Message: "install root is required"}, nil
 		}
@@ -41,9 +41,24 @@ func (e *AndroidPatchExecutor) Execute(_ context.Context, req StageRequest) (Sta
 			return StageResult{Status: diagnostics.StatusFailed, Message: err.Error()}, nil
 		}
 		message := "android compatibility patch applied"
-		if req.Stage == StagePermissionRuntimeFixes {
-			message = "runtime permissions repaired"
+		if req.Stage == StageExecutableValidation {
+			message = "android executable validation completed"
 		}
+		return StageResult{
+			Status:  diagnostics.StatusPassed,
+			Message: message,
+			Evidence: []string{
+				".acl/runtime/ld-linux-aarch64.so.1",
+			},
+		}, nil
+	case StagePermissionRuntimeFixes:
+		if e.Root == "" {
+			return StageResult{Status: diagnostics.StatusFailed, Message: "install root is required"}, nil
+		}
+		if err := android.RepairRuntimePermissionsForAndroid(e.Root); err != nil {
+			return StageResult{Status: diagnostics.StatusFailed, Message: err.Error()}, nil
+		}
+		message := "runtime permissions repaired"
 		return StageResult{
 			Status:  diagnostics.StatusPassed,
 			Message: message,

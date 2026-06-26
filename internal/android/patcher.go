@@ -23,6 +23,19 @@ func PatchToolForAndroid(root string) error {
 	return patchInstallTree(root, false, runtime.GOOS)
 }
 
+// RepairRuntimePermissionsForAndroid repairs the runtime loader execute bits
+// without applying the broader ELF patching pass.
+func RepairRuntimePermissionsForAndroid(root string) error {
+	if runtime.GOOS != "android" {
+		return nil
+	}
+	runtimeDir, err := installRuntime(root)
+	if err != nil {
+		return err
+	}
+	return repairExecutableModes(runtimeDir)
+}
+
 func patchInstallTree(root string, patchPlatformTxt bool, goos string) error {
 	if goos != "android" {
 		return nil

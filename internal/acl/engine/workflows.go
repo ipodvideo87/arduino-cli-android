@@ -304,7 +304,14 @@ func runFirmwarePackageHook(_ context.Context, wctx *WorkflowContext) (StepResul
 	}
 	pkg, err := firmware.LoadFirmwarePackage(exec.PackageDir)
 	if err != nil {
-		return StepResult{Status: StepStatusFailed, Message: err.Error(), Beginner: err.Error(), Critical: true}, err
+		if exec.BuilderResult.BuildPath == "" {
+			return StepResult{Status: StepStatusFailed, Message: err.Error(), Beginner: err.Error(), Critical: true}, err
+		}
+		pkg, err = buildFirmwarePackageFromSnapshot(exec, wctx.CompileRequest)
+		if err != nil {
+			wrappedErr := fmt.Errorf("firmware package generation failed: %w", err)
+			return StepResult{Status: StepStatusFailed, Message: wrappedErr.Error(), Beginner: wrappedErr.Error(), Critical: true}, wrappedErr
+		}
 	}
 	wctx.Set("firmware_package", pkg)
 	wctx.Set("compile_execution", exec)
@@ -678,6 +685,18 @@ func compileWorkflowStatus(report CompileWorkflowReport) StepStatus {
 		return StepStatusWarning
 	}
 	return StepStatusPassed
+}
+
+func buildFirmwarePackageFromSnapshot(exec CompileExecution, req CompileRequest) (firmware.FirmwarePackage, error) {
+	input, err := exec.BuilderResult.BuildInput(req)
+	if err != nil {
+		return firmware.FirmwarePackage{}, err
+	}
+	pkg, err := firmware.BuildFirmwarePackage(input)
+	if err != nil {
+		return firmware.FirmwarePackage{}, err
+	}
+	return pkg, nil
 }
 
 func reportStatus(report BootstrapWorkflowReport) StepStatus {

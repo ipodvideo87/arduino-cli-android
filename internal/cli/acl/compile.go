@@ -9,6 +9,7 @@ import (
 
 	"github.com/arduino/arduino-cli/commands"
 	"github.com/arduino/arduino-cli/internal/acl/engine"
+	"github.com/arduino/arduino-cli/internal/acl/firmware"
 	"github.com/arduino/arduino-cli/internal/cli/arguments"
 	"github.com/arduino/arduino-cli/internal/cli/instance"
 	"github.com/arduino/arduino-cli/pkg/fqbn"
@@ -181,7 +182,7 @@ func (r *workflowCompileRunner) Run(ctx context.Context, req engine.CompileReque
 		DoNotExpandBuildProperties: false,
 	}
 
-	server, _ := commands.CompilerServerToStreams(ctx, io.Discard, io.Discard, nil)
+	server, resultCB := commands.CompilerServerToStreams(ctx, io.Discard, io.Discard, nil)
 	if err := r.srv.Compile(compileReq, server); err != nil {
 		return engine.CompileExecution{}, err
 	}
@@ -190,14 +191,134 @@ func (r *workflowCompileRunner) Run(ctx context.Context, req engine.CompileReque
 		publish(engine.Event{Type: engine.EventStepProgress, Step: "compile", Progress: 100, Message: "compile request completed"})
 	}
 
+	snapshot := builderResultSnapshotFromRPC(resultCB())
 	exec := engine.CompileExecution{
 		SketchName:      filepath.Base(req.SketchPath),
 		FQBN:            req.FQBN,
-		BuildPath:       req.BuildPath,
+		BuildPath:       firstNonEmptyString(snapshot.BuildPath, req.BuildPath),
 		PackageDir:      workflowCompilePackageDir(req.SketchPath, req.FQBN),
-		BuildProperties: map[string]string{},
+		BuildProperties: snapshot.BuildProperties,
+		MemoryUsage:     snapshot.BuildMemoryUsage(),
+		Libraries:       append([]firmware.LibraryRef(nil), snapshot.UsedLibraries...),
+		BuilderResult:   snapshot,
+	}
+	exec.PlatformPackage = firstNonEmptyString(snapshot.BoardPlatformPackage, snapshot.BuildPlatformPackage)
+	if snapshot.BoardPlatformVersion != "" {
+		exec.PlatformVersion = snapshot.BoardPlatformVersion
+	}
+	if snapshot.BuildPlatformVersion != "" {
+		exec.CoreVersion = snapshot.BuildPlatformVersion
+	}
+	if toolchain := snapshot.BuildProperties["compiler.path"]; toolchain != "" {
+		exec.ToolchainVersion = toolchain
+	}
+	if exec.Board == "" {
+		exec.Board = boardNameFromFQBN(req.FQBN)
 	}
 	return exec, nil
+}
+
+func builderResultSnapshotFromRPC(result *rpc.BuilderResult) engine.BuilderResultSnapshot {
+	if result == nil {
+		return engine.BuilderResultSnapshot{}
+	}
+	snapshot := engine.BuilderResultSnapshot{
+		BuildPath:            result.GetBuildPath(),
+		BuildProperties:      buildPropertyMap(result.GetBuildProperties()),
+		UsedLibraries:        rpcLibrariesToFirmware(result.GetUsedLibraries()),
+		ExecutableSections:   rpcSectionSizesToSnapshot(result.GetExecutableSectionsSize()),
+		BoardPlatformPackage: platformPackageName(result.GetBoardPlatform()),
+		BoardPlatformVersion: platformVersion(result.GetBoardPlatform()),
+		BuildPlatformPackage: platformPackageName(result.GetBuildPlatform()),
+		BuildPlatformVersion: platformVersion(result.GetBuildPlatform()),
+	}
+	return snapshot
+}
+
+func buildPropertyMap(entries []string) map[string]string {
+	props := make(map[string]string, len(entries))
+	for _, entry := range entries {
+		key, value, ok := strings.Cut(entry, "=")
+		if !ok {
+			continue
+		}
+		props[key] = value
+	}
+	return props
+}
+
+func rpcLibrariesToFirmware(libs []*rpc.Library) []firmware.LibraryRef {
+	if len(libs) == 0 {
+		return nil
+	}
+	out := make([]firmware.LibraryRef, 0, len(libs))
+	for _, lib := range libs {
+		if lib == nil {
+			continue
+		}
+		out = append(out, firmware.LibraryRef{
+			Name:    lib.GetName(),
+			Version: lib.GetVersion(),
+			Path:    lib.GetInstallDir(),
+		})
+	}
+	return out
+}
+
+func rpcSectionSizesToSnapshot(sections []*rpc.ExecutableSectionSize) []engine.SectionSizeSnapshot {
+	if len(sections) == 0 {
+		return nil
+	}
+	out := make([]engine.SectionSizeSnapshot, 0, len(sections))
+	for _, section := range sections {
+		if section == nil {
+			continue
+		}
+		out = append(out, engine.SectionSizeSnapshot{
+			Name:    section.GetName(),
+			Size:    section.GetSize(),
+			MaxSize: section.GetMaxSize(),
+		})
+	}
+	return out
+}
+
+func platformPackageName(ref *rpc.InstalledPlatformReference) string {
+	if ref == nil {
+		return ""
+	}
+	id := ref.GetId()
+	if id == "" {
+		return ""
+	}
+	if packageName, _, ok := strings.Cut(id, ":"); ok {
+		return packageName
+	}
+	return id
+}
+
+func platformVersion(ref *rpc.InstalledPlatformReference) string {
+	if ref == nil {
+		return ""
+	}
+	return ref.GetVersion()
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func boardNameFromFQBN(raw string) string {
+	parsed, err := fqbn.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	return parsed.BoardID
 }
 
 func workflowCompilePackageDir(sketchPath, fqbnString string) string {

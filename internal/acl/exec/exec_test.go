@@ -243,7 +243,7 @@ func TestRunApplyUsesBackendCommandAndPreservesCWD(t *testing.T) {
 }
 
 func TestRunApplyCapturesStdoutStderrAndExitCode(t *testing.T) {
-	target := writeExecutableScript(t, `#!/usr/bin/env bash
+	target := writeExecutableScript(t, "#!"+testShellPath(t)+`
 echo "loader-stdout:$PWD"
 echo "loader-stderr:$1:$2:$3" >&2
 exit 7
@@ -282,7 +282,7 @@ exit 7
 }
 
 func TestExecutePlanReturnsStartErrorForMissingCommand(t *testing.T) {
-	target := writeExecutableScript(t, "#!/usr/bin/env bash\nexit 0\n")
+	target := writeExecutableScript(t, "#!"+testShellPath(t)+"\nexit 0\n")
 	hostArch := hostArchitecture(t, mustExecutable(t))
 	missingCommand := filepath.Join(t.TempDir(), "missing-command")
 	planner := NewPlanner(t.TempDir())
@@ -332,7 +332,7 @@ func TestBuildPlanRejectsInvalidActiveRuntime(t *testing.T) {
 }
 
 func TestExecutePlanDirectExecDoesNotRequireLibrarySearchPath(t *testing.T) {
-	target := writeExecutableScript(t, "#!/usr/bin/env bash\nexit 0\n")
+	target := writeExecutableScript(t, "#!"+testShellPath(t)+"\nexit 0\n")
 	hostArch := hostArchitecture(t, mustExecutable(t))
 	planner := NewPlanner(t.TempDir())
 	planner.inspect = func(string) (aclscan.Inspection, error) {
@@ -831,4 +831,15 @@ func writeExecutableScript(t *testing.T, body string) string {
 	path := filepath.Join(t.TempDir(), "loader.sh")
 	require.NoError(t, os.WriteFile(path, []byte(strings.TrimSpace(body)+"\n"), 0o755))
 	return path
+}
+
+func testShellPath(t *testing.T) string {
+	t.Helper()
+	if runtime.GOOS == "android" {
+		if prefix := os.Getenv("PREFIX"); prefix != "" {
+			return filepath.Join(prefix, "bin", "sh")
+		}
+		return "/data/data/com.termux/files/usr/bin/sh"
+	}
+	return "/usr/bin/env bash"
 }

@@ -93,6 +93,8 @@ Use it to capture confirmed behavior, evidence, and open questions before making
   - Evidence: `readelf -d` on the patched `cc1plus`.
 - A present ELF executable can still fail with `fork/exec ...: no such file or directory` on native Android when its PT_INTERP points at an unavailable loader path.
   - Evidence: native builtin `ctags` failure before patching, where `file` and `readelf` showed an AArch64 ELF with `PT_INTERP /lib/ld-linux-aarch64.so.1`.
+- Shell-script test fixtures that use `/usr/bin/env bash` do not generalize to native Termux; Android-aware exec tests now resolve a shell from `PREFIX/bin/sh` when `GOOS=android`.
+  - Evidence: repository test update in `internal/acl/exec/exec_test.go` after the native Termux `fork/exec ... loader.sh: no such file or directory` failure.
 
 ## 8. GCC / Binutils Internal Executables
 
@@ -118,6 +120,8 @@ Use it to capture confirmed behavior, evidence, and open questions before making
   - Evidence: native AVR and ESP32 core installs now succeed after the shared extractor fix.
 - Runtime closure now copies required glibc runtime libraries into `.acl/runtime`.
   - Evidence: native validation and the runtime closure implementation.
+- The install pipeline now treats `permission-runtime-fixes` as a runtime execute-bit repair stage instead of rerunning the broader ELF patch pass.
+  - Evidence: repository update in `internal/acl/install/android_executor.go` after the native Termux stage failure on permission repair.
 - GCC internal executable patching now uses wrapper launch instead of interpreter rewrite.
   - Evidence: repository implementation, unit tests, and native Termux validation that now gets past the earlier `cc1plus` startup crash.
 - Debug-only tools such as OpenOCD and GDB remain skipped for Android patching.
