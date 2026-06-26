@@ -51,6 +51,7 @@ does not replace native Android validation.
 - Termux USB enumeration and permission flow are functional, but acquisition timing still needs root-cause analysis.
 - The ACL transport manager now exists as a capability-based selector for native serial, Android USB fd, PTY, RFC2217, and future transports.
 - The ACL firmware package foundation now exists, including the build manifest, flash plan, firmware package wrapper, and binary validator.
+- The firmware package now also emits `analysis.json` and `README_FLASHING.txt`, and the ACL compile path uses metadata-first bootloader detection with an app-only fallback warning when the bootloader artifacts are incomplete.
 - The ACL compatibility layer now exists as a rule-based decision layer for runtime, library, firmware, and transport compatibility.
 - The ACL diagnostics workflow now exists as a shared pending/running/passed/warning/failed/skipped status model.
 - The Android install patch pipeline now has a formal status-tracking foundation for download, extract, patch, runtime-fix, validation, register, self-test, and ready stages.

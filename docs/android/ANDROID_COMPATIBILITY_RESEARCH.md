@@ -97,6 +97,8 @@ Use it to capture confirmed behavior, evidence, and open questions before making
   - Evidence: repository test update in `internal/acl/exec/exec_test.go` after the native Termux `fork/exec ... loader.sh: no such file or directory` failure.
 - The Arduino-ESP32 core exposes the ESP32-S3 bootloader in its flash recipe metadata, including `build.bootloader_addr=0x1000` and the bootloader/partition/boot_app0/application flash sequence in `recipe.hooks.objcopy.postobjcopy.*.pattern`.
   - Evidence: upstream `espressif/arduino-esp32` `platform.txt` on GitHub.
+- The practical package source of truth for ESP32-S3 full-flash layout is the generated `flash_args` file when present; it reflects the actual bootloader/partition/boot_app0/application offsets and is safer to consume than guessing from partially expanded build properties.
+  - Evidence: repository firmware-package resolver now prefers `flash_args` and falls back to build-property pattern parsing and platform-path resolution when that file is absent.
 
 ## 8. GCC / Binutils Internal Executables
 
@@ -128,6 +130,8 @@ Use it to capture confirmed behavior, evidence, and open questions before making
   - Evidence: repository implementation, unit tests, and native Termux validation that now gets past the earlier `cc1plus` startup crash.
 - ESP32-S3 firmware packages now need to carry the bootloader artifact and boot flash entry when the core exposes that metadata, otherwise the package should be treated as incomplete rather than silently app-only.
   - Evidence: repository firmware-package tests plus the upstream Arduino-ESP32 flash recipe metadata.
+- When metadata is incomplete, the firmware package generator now falls back to app-only with a warning instead of failing normal compile; explicit full-flash requests still fail validation when the bootloader file is missing.
+  - Evidence: repository firmware-package tests.
 - Debug-only tools such as OpenOCD and GDB remain skipped for Android patching.
   - Evidence: `internal/android/patcher.go` and tests.
 - Termux environment scrubbing is preserved.

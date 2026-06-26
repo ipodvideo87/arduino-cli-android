@@ -16,31 +16,42 @@ import (
 	"time"
 
 	"github.com/arduino/arduino-cli/internal/acl/compatibility"
+	"github.com/arduino/arduino-cli/internal/acl/diagnostics"
 	paths "github.com/arduino/go-paths-helper"
 	properties "github.com/arduino/go-properties-orderedmap"
 )
 
 type BuildInput struct {
-	BuildPath        *paths.Path
-	OutputDir        *paths.Path
-	Properties       *properties.Map
-	PackageMode      string
-	SketchName       string
-	ProjectName      string
-	FQBN             string
-	Board            string
-	PlatformPackage  string
-	PlatformVersion  string
-	CoreVersion      string
-	ToolchainVersion string
-	TargetChip       string
-	TargetFamily     string
-	Libraries        []LibraryRef
-	MemoryUsage      MemoryUsage
-	Compatibility    []compatibility.Decision
+	BuildPath          *paths.Path
+	OutputDir          *paths.Path
+	Properties         *properties.Map
+	PackageMode        string
+	SketchName         string
+	ProjectName        string
+	FQBN               string
+	Board              string
+	PlatformPackage    string
+	PlatformVersion    string
+	CoreVersion        string
+	ToolchainVersion   string
+	TargetChip         string
+	TargetFamily       string
+	Libraries          []LibraryRef
+	MemoryUsage        MemoryUsage
+	ExecutableSections []SectionUsage
+	Compatibility      []compatibility.Decision
 }
 
 var flashPlanPattern = regexp.MustCompile(`(?i)(0x[0-9a-f]+)\s+"([^"]+)"`)
+
+type buildMetadataResolution struct {
+	Source           string
+	FlashArgsPath    string
+	BootloaderSource string
+	BootloaderPath   string
+	BootloaderOffset string
+	Notes            []string
+}
 
 func BuildFirmwarePackage(input BuildInput) (FirmwarePackage, error) {
 	if input.BuildPath == nil {
@@ -56,9 +67,15 @@ func BuildFirmwarePackage(input BuildInput) (FirmwarePackage, error) {
 		input.SketchName = input.ProjectName
 	}
 
+	artifacts, resolution, err := collectBuildArtifacts(input.BuildPath, input.Properties, input.ProjectName)
+	if err != nil {
+		return FirmwarePackage{}, err
+	}
+	packageMode := packageModeForBuild(input.PackageMode, artifacts)
+
 	manifest := BuildManifest{
 		SchemaVersion:    "1",
-		PackageMode:      packageModeForBuild(input.PackageMode, input.Properties),
+		PackageMode:      packageMode,
 		SketchName:       input.SketchName,
 		ProjectName:      input.ProjectName,
 		Board:            input.Board,
@@ -83,19 +100,29 @@ func BuildFirmwarePackage(input BuildInput) (FirmwarePackage, error) {
 		manifest.BuiltAt = time.Now().UTC().Format(time.RFC3339Nano)
 	}
 
-	artifacts, err := collectBuildArtifacts(input.BuildPath, input.Properties, manifest.ProjectName)
-	if err != nil {
-		return FirmwarePackage{}, err
-	}
 	manifest.Artifacts = artifacts
 
-	flashPlan := buildFlashPlan(input.BuildPath, input.Properties, artifacts, manifest.TargetChip, manifest.PackageMode)
+	flashPlan := buildFlashPlan(input.BuildPath, input.Properties, artifacts, manifest.TargetChip, manifest.PackageMode, resolution)
 	flashPlan.PackageMode = manifest.PackageMode
 	pkg := FirmwarePackage{
 		Manifest:  manifest,
 		FlashPlan: flashPlan,
 	}
+	pkg.Analysis = buildFirmwareAnalysis(input, manifest, flashPlan, resolution)
 	pkg.Validation = NewBinaryValidator().Validate(pkg)
+	if len(resolution.Notes) > 0 {
+		pkg.Analysis.Notes = append(pkg.Analysis.Notes, resolution.Notes...)
+		pkg.Validation.Warnings = appendUniqueStrings(pkg.Validation.Warnings, diagnosticWarningNotes(resolution.Notes)...)
+		if pkg.Validation.Status == diagnostics.StatusPassed && len(pkg.Validation.Warnings) > 0 {
+			pkg.Validation.Status = diagnostics.StatusWarning
+		}
+	}
+	if strings.EqualFold(input.PackageMode, "") && strings.EqualFold(pkg.Manifest.PackageMode, "app-only") && !hasFullFlashArtifacts(artifacts) {
+		warning := "bootloader metadata is incomplete; falling back to app-only package"
+		pkg.Validation.Warnings = append(pkg.Validation.Warnings, warning)
+		pkg.Validation.Status = diagnostics.StatusWarning
+		pkg.Analysis.Notes = append(pkg.Analysis.Notes, warning)
+	}
 
 	if input.OutputDir != nil {
 		var copyErr error
@@ -104,6 +131,18 @@ func BuildFirmwarePackage(input BuildInput) (FirmwarePackage, error) {
 			return FirmwarePackage{}, copyErr
 		}
 		pkg.Validation = NewBinaryValidator().Validate(pkg)
+		if len(resolution.Notes) > 0 {
+			pkg.Analysis.Notes = appendUniqueStrings(pkg.Analysis.Notes, resolution.Notes...)
+			pkg.Validation.Warnings = appendUniqueStrings(pkg.Validation.Warnings, diagnosticWarningNotes(resolution.Notes)...)
+		}
+		if strings.EqualFold(input.PackageMode, "") && strings.EqualFold(pkg.Manifest.PackageMode, "app-only") && !hasFullFlashArtifacts(artifacts) {
+			warning := "bootloader metadata is incomplete; falling back to app-only package"
+			pkg.Analysis.Notes = appendUniqueStrings(pkg.Analysis.Notes, warning)
+			pkg.Validation.Warnings = appendUniqueStrings(pkg.Validation.Warnings, warning)
+			if pkg.Validation.Status == diagnostics.StatusPassed {
+				pkg.Validation.Status = diagnostics.StatusWarning
+			}
+		}
 		if err := pkg.writeMetadata(input.OutputDir.String()); err != nil {
 			return FirmwarePackage{}, err
 		}
@@ -130,6 +169,16 @@ func LoadFirmwarePackage(dir string) (FirmwarePackage, error) {
 			return FirmwarePackage{}, err
 		}
 		pkg.Validation = NewBinaryValidator().Validate(pkg)
+	}
+	if err := readJSON(filepath.Join(root, "analysis.json"), &pkg.Analysis); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return FirmwarePackage{}, err
+		}
+	}
+	if data, err := os.ReadFile(filepath.Join(root, "README_FLASHING.txt")); err == nil {
+		pkg.Readme = string(data)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return FirmwarePackage{}, err
 	}
 	if pkg.Validation.PackageName == "" {
 		pkg.Validation.PackageName = firstNonEmpty(pkg.Manifest.ProjectName, pkg.Manifest.SketchName, pkg.Manifest.Board)
@@ -183,6 +232,8 @@ func (p FirmwarePackage) WriteToDir(dir string) (FirmwarePackage, error) {
 	}
 	clone.FlashPlan = rewriteFlashPlanPaths(p.FlashPlan, clone.Manifest.Artifacts)
 	clone.Validation = p.Validation
+	clone.Analysis = p.Analysis
+	clone.Readme = p.Readme
 	return clone, nil
 }
 
@@ -193,6 +244,8 @@ func (p FirmwarePackage) writeMetadata(dir string) error {
 	manifestPath := filepath.Join(dir, "manifest.json")
 	flashPlanPath := filepath.Join(dir, "flash-plan.json")
 	validationPath := filepath.Join(dir, "validation-report.json")
+	analysisPath := filepath.Join(dir, "analysis.json")
+	readmePath := filepath.Join(dir, "README_FLASHING.txt")
 
 	if err := writeJSON(manifestPath, p.Manifest); err != nil {
 		return err
@@ -201,6 +254,16 @@ func (p FirmwarePackage) writeMetadata(dir string) error {
 		return err
 	}
 	if err := writeJSON(validationPath, p.Validation); err != nil {
+		return err
+	}
+	if err := writeJSON(analysisPath, p.Analysis); err != nil {
+		return err
+	}
+	readme := strings.TrimSpace(p.Readme)
+	if readme == "" {
+		readme = defaultFlashingReadme(p)
+	}
+	if err := os.WriteFile(readmePath, []byte(readme+"\n"), 0o644); err != nil {
 		return err
 	}
 	return nil
@@ -223,13 +286,14 @@ func readJSON(path string, value any) error {
 	return json.Unmarshal(data, value)
 }
 
-func collectBuildArtifacts(buildPath *paths.Path, props *properties.Map, projectName string) (map[ArtifactKind]Artifact, error) {
+func collectBuildArtifacts(buildPath *paths.Path, props *properties.Map, projectName string) (map[ArtifactKind]Artifact, buildMetadataResolution, error) {
 	artifacts := map[ArtifactKind]Artifact{}
+	resolution := buildMetadataResolution{}
 	if buildPath == nil {
-		return artifacts, fmt.Errorf("build path is required")
+		return artifacts, resolution, fmt.Errorf("build path is required")
 	}
 	if projectName == "" {
-		return artifacts, fmt.Errorf("build.project_name is required")
+		return artifacts, resolution, fmt.Errorf("build.project_name is required")
 	}
 
 	sourcePaths := map[ArtifactKind]string{
@@ -240,7 +304,44 @@ func collectBuildArtifacts(buildPath *paths.Path, props *properties.Map, project
 		ArtifactPartitionTableBinary: buildPath.Join(projectName + ".partitions.bin").String(),
 	}
 
-	for kind, path := range resolveArtifactSourcesFromPatterns(buildPath, props) {
+	if entries, flashArgsPath := parseFlashArgsEntries(buildPath); len(entries) > 0 {
+		resolution.Source = "flash_args"
+		resolution.FlashArgsPath = flashArgsPath
+		resolution.Notes = append(resolution.Notes, "flash metadata source: flash_args")
+		for _, entry := range entries {
+			if entry.Artifact == "" || entry.Path == "" {
+				continue
+			}
+			sourcePaths[entry.Artifact] = entry.Path
+			if entry.Artifact == ArtifactBootloaderBinary {
+				resolution.BootloaderSource = "flash_args"
+				resolution.BootloaderPath = entry.Path
+				resolution.BootloaderOffset = fmt.Sprintf("0x%x", entry.Offset)
+			}
+		}
+	} else if entries := parsePatternEntries(props); len(entries) > 0 {
+		resolution.Source = "build_properties"
+		resolution.Notes = append(resolution.Notes, "flash metadata source: build properties")
+		for _, entry := range entries {
+			if entry.Artifact == "" || entry.Path == "" {
+				continue
+			}
+			sourcePaths[entry.Artifact] = entry.Path
+			if entry.Artifact == ArtifactBootloaderBinary {
+				resolution.BootloaderSource = "build_properties"
+				resolution.BootloaderPath = entry.Path
+				resolution.BootloaderOffset = fmt.Sprintf("0x%x", entry.Offset)
+			}
+		}
+	} else {
+		resolution.Source = "filesystem"
+		resolution.Notes = append(resolution.Notes, "flash metadata source: filesystem fallback")
+	}
+
+	for kind, path := range resolveArtifactSourcesFromProperties(buildPath, props) {
+		if strings.TrimSpace(path) == "" {
+			continue
+		}
 		sourcePaths[kind] = path
 	}
 
@@ -260,18 +361,18 @@ func collectBuildArtifacts(buildPath *paths.Path, props *properties.Map, project
 			if kind == ArtifactMAP || kind == ArtifactBootApp0Binary || kind == ArtifactBootloaderBinary || kind == ArtifactPartitionTableBinary {
 				continue
 			}
-			return nil, fmt.Errorf("artifact %s: %w", kind, err)
+			return nil, resolution, fmt.Errorf("artifact %s: %w", kind, err)
 		}
 		info, err := os.Stat(path)
 		if err != nil {
-			return nil, err
+			return nil, resolution, err
 		}
 		if info.Size() <= 0 {
-			return nil, fmt.Errorf("artifact %s is empty", kind)
+			return nil, resolution, fmt.Errorf("artifact %s is empty", kind)
 		}
 		hash, err := sha256File(path)
 		if err != nil {
-			return nil, err
+			return nil, resolution, err
 		}
 		artifacts[kind] = Artifact{
 			Kind:     kind,
@@ -283,15 +384,33 @@ func collectBuildArtifacts(buildPath *paths.Path, props *properties.Map, project
 	}
 
 	if _, ok := artifacts[ArtifactApplicationBinary]; !ok {
-		return nil, fmt.Errorf("artifact %s is required", ArtifactApplicationBinary)
+		return nil, resolution, fmt.Errorf("artifact %s is required", ArtifactApplicationBinary)
 	}
 	if _, ok := artifacts[ArtifactELF]; !ok {
-		return nil, fmt.Errorf("artifact %s is required", ArtifactELF)
+		return nil, resolution, fmt.Errorf("artifact %s is required", ArtifactELF)
 	}
-	return artifacts, nil
+	if artifact, ok := artifacts[ArtifactBootloaderBinary]; ok {
+		resolution.BootloaderPath = artifact.Path
+		if resolution.BootloaderSource == "" {
+			resolution.BootloaderSource = "artifact"
+		}
+	}
+	if _, ok := artifacts[ArtifactBootloaderBinary]; !ok {
+		reason := "bootloader artifact not found in build output"
+		if resolution.BootloaderSource != "" {
+			reason += "; metadata source was " + resolution.BootloaderSource
+		} else if firstBuildProperty(props, "build.bootloader.file", "bootloader.file") == "" {
+			reason += "; bootloader file metadata was not provided"
+		}
+		if firstBuildProperty(props, "build.bootloader_addr") == "" {
+			reason += "; bootloader offset metadata was not provided"
+		}
+		resolution.Notes = append(resolution.Notes, reason)
+	}
+	return artifacts, resolution, nil
 }
 
-func buildFlashPlan(buildPath *paths.Path, props *properties.Map, artifacts map[ArtifactKind]Artifact, targetChip string, packageMode string) FlashPlan {
+func buildFlashPlan(buildPath *paths.Path, props *properties.Map, artifacts map[ArtifactKind]Artifact, targetChip string, packageMode string, resolution buildMetadataResolution) FlashPlan {
 	plan := FlashPlan{
 		TargetChip:        targetChip,
 		RequiredArtifacts: requiredFlashArtifacts(artifacts, packageMode),
@@ -300,10 +419,16 @@ func buildFlashPlan(buildPath *paths.Path, props *properties.Map, artifacts map[
 		return plan
 	}
 
-	if entries := parsePatternEntries(props); len(entries) > 0 {
-		plan.Entries = append(plan.Entries, entries...)
-	} else {
+	if strings.EqualFold(packageMode, "app-only") {
 		plan.Entries = append(plan.Entries, defaultFlashPlanEntries(artifacts, packageMode)...)
+	} else {
+		if entries, _ := parseFlashArgsEntries(buildPath); len(entries) > 0 {
+			plan.Entries = append(plan.Entries, entries...)
+		} else if entries := parsePatternEntries(props); len(entries) > 0 {
+			plan.Entries = append(plan.Entries, entries...)
+		} else {
+			plan.Entries = append(plan.Entries, defaultFlashPlanEntries(artifacts, packageMode)...)
+		}
 	}
 	sort.SliceStable(plan.Entries, func(i, j int) bool {
 		if plan.Entries[i].Offset != plan.Entries[j].Offset {
@@ -311,6 +436,9 @@ func buildFlashPlan(buildPath *paths.Path, props *properties.Map, artifacts map[
 		}
 		return plan.Entries[i].Artifact < plan.Entries[j].Artifact
 	})
+	if len(resolution.Notes) > 0 {
+		plan.Notes = append(plan.Notes, resolution.Notes...)
+	}
 	return plan
 }
 
@@ -357,6 +485,51 @@ func parsePatternEntries(props *properties.Map) []FlashPlanEntry {
 	return nil
 }
 
+func parseFlashArgsEntries(buildPath *paths.Path) ([]FlashPlanEntry, string) {
+	if buildPath == nil {
+		return nil, ""
+	}
+	flashArgsPath := buildPath.Join("flash_args").String()
+	data, err := os.ReadFile(flashArgsPath)
+	if err != nil {
+		return nil, ""
+	}
+	lines := strings.Split(string(data), "\n")
+	entries := make([]FlashPlanEntry, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "--") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		offset, err := parseHexOffset(fields[0])
+		if err != nil {
+			continue
+		}
+		path := strings.Trim(fields[1], `"'`)
+		if path == "" {
+			continue
+		}
+		if !filepath.IsAbs(path) {
+			path = buildPath.Join(path).String()
+		}
+		entries = append(entries, FlashPlanEntry{
+			Offset:      offset,
+			Artifact:    inferArtifactKind(path, offset),
+			Path:        filepath.Clean(path),
+			Required:    true,
+			Description: "derived from flash_args",
+		})
+	}
+	if len(entries) == 0 {
+		return nil, flashArgsPath
+	}
+	return entries, flashArgsPath
+}
+
 func defaultFlashPlanEntries(artifacts map[ArtifactKind]Artifact, packageMode string) []FlashPlanEntry {
 	entries := []FlashPlanEntry{}
 	add := func(offset uint32, kind ArtifactKind, required bool) {
@@ -380,7 +553,7 @@ func defaultFlashPlanEntries(artifacts map[ArtifactKind]Artifact, packageMode st
 	return entries
 }
 
-func resolveArtifactSourcesFromPatterns(buildPath *paths.Path, props *properties.Map) map[ArtifactKind]string {
+func resolveArtifactSourcesFromProperties(buildPath *paths.Path, props *properties.Map) map[ArtifactKind]string {
 	resolved := map[ArtifactKind]string{}
 	for _, entry := range parsePatternEntries(props) {
 		if entry.Artifact == "" || entry.Path == "" {
@@ -388,26 +561,27 @@ func resolveArtifactSourcesFromPatterns(buildPath *paths.Path, props *properties
 		}
 		resolved[entry.Artifact] = entry.Path
 	}
-	if len(resolved) > 0 {
-		return resolved
-	}
 	if buildPath == nil || props == nil {
 		return resolved
 	}
 	platformPath := props.Get("runtime.platform.path")
 	if platformPath != "" {
-		if path := filepath.Join(platformPath, "tools", "partitions", "boot_app0.bin"); fileExists(path) {
-			resolved[ArtifactBootApp0Binary] = path
-		}
-		if bootloader := firstBuildProperty(props, "build.bootloader.file", "bootloader.file"); bootloader != "" {
-			candidates := []string{
-				filepath.Join(platformPath, "bootloaders", bootloader),
-				filepath.Join(platformPath, "tools", "sdk", "bin", bootloader),
+		if _, ok := resolved[ArtifactBootApp0Binary]; !ok {
+			if path := filepath.Join(platformPath, "tools", "partitions", "boot_app0.bin"); fileExists(path) {
+				resolved[ArtifactBootApp0Binary] = path
 			}
-			for _, candidate := range candidates {
-				if fileExists(candidate) {
-					resolved[ArtifactBootloaderBinary] = candidate
-					break
+		}
+		if _, ok := resolved[ArtifactBootloaderBinary]; !ok {
+			if bootloader := firstBuildProperty(props, "build.bootloader.file", "bootloader.file"); bootloader != "" {
+				candidates := []string{
+					filepath.Join(platformPath, "bootloaders", bootloader),
+					filepath.Join(platformPath, "tools", "sdk", "bin", bootloader),
+				}
+				for _, candidate := range candidates {
+					if fileExists(candidate) {
+						resolved[ArtifactBootloaderBinary] = candidate
+						break
+					}
 				}
 			}
 		}
@@ -415,33 +589,178 @@ func resolveArtifactSourcesFromPatterns(buildPath *paths.Path, props *properties
 	return resolved
 }
 
-func packageModeForBuild(requested string, props *properties.Map) string {
+func packageModeForBuild(requested string, artifacts map[ArtifactKind]Artifact) string {
 	mode := strings.ToLower(strings.TrimSpace(requested))
 	if mode != "" {
 		return mode
 	}
-	if expectsFullFlash(props) {
+	if hasFullFlashArtifacts(artifacts) {
 		return "full-flash"
 	}
 	return "app-only"
 }
 
-func expectsFullFlash(props *properties.Map) bool {
-	if props == nil {
+func hasFullFlashArtifacts(artifacts map[ArtifactKind]Artifact) bool {
+	if len(artifacts) == 0 {
 		return false
 	}
-	if firstBuildProperty(props, "build.bootloader_addr", "build.bootloader.file", "bootloader.file") != "" {
-		return true
-	}
-	if pattern := parsePatternEntries(props); len(pattern) > 0 {
-		for _, entry := range pattern {
-			switch entry.Artifact {
-			case ArtifactBootloaderBinary, ArtifactBootApp0Binary, ArtifactPartitionTableBinary:
-				return true
-			}
+	required := []ArtifactKind{ArtifactApplicationBinary, ArtifactBootloaderBinary, ArtifactPartitionTableBinary, ArtifactBootApp0Binary}
+	for _, kind := range required {
+		artifact, ok := artifacts[kind]
+		if !ok || strings.TrimSpace(artifact.Path) == "" {
+			return false
 		}
 	}
-	return false
+	return true
+}
+
+func buildFirmwareAnalysis(input BuildInput, manifest BuildManifest, flashPlan FlashPlan, resolution buildMetadataResolution) FirmwareAnalysis {
+	analysis := FirmwareAnalysis{
+		SchemaVersion:    "1",
+		PackageMode:      manifest.PackageMode,
+		ProjectName:      manifest.ProjectName,
+		SketchName:       manifest.SketchName,
+		Board:            manifest.Board,
+		FQBN:             manifest.FQBN,
+		PlatformPackage:  manifest.PlatformPackage,
+		PlatformVersion:  manifest.PlatformVersion,
+		CoreVersion:      manifest.CoreVersion,
+		ToolchainVersion: manifest.ToolchainVersion,
+		TargetChip:       manifest.TargetChip,
+		TargetFamily:     manifest.TargetFamily,
+		BuildID:          manifest.BuildID,
+		BuiltAt:          manifest.BuiltAt,
+		Usage: FirmwareAnalysisUsage{
+			ProgramUsedBytes:  manifest.MemoryUsage.ProgramUsedBytes,
+			ProgramTotalBytes: manifest.MemoryUsage.ProgramTotalBytes,
+			ProgramPercent:    manifest.MemoryUsage.ProgramPercent,
+			RAMUsedBytes:      manifest.MemoryUsage.RAMUsedBytes,
+			RAMTotalBytes:     manifest.MemoryUsage.RAMTotalBytes,
+			RAMPercent:        manifest.MemoryUsage.RAMPercent,
+		},
+		Source: FirmwareAnalysisSource{
+			MetadataSource:   resolution.Source,
+			BootloaderSource: resolution.BootloaderSource,
+			BootloaderPath:   resolution.BootloaderPath,
+			BootloaderOffset: resolution.BootloaderOffset,
+			FlashArgsPath:    resolution.FlashArgsPath,
+			Notes:            append([]string(nil), resolution.Notes...),
+		},
+		LinkerSections:   append([]SectionUsage(nil), input.ExecutableSections...),
+		LargestFunctions: FirmwareAnalysisBucket{Status: "unavailable", Reason: "largest functions analysis is not implemented yet"},
+		LargestLibraries: FirmwareAnalysisBucket{Status: "unavailable", Reason: "largest libraries analysis is not implemented yet"},
+		Symbols: FirmwareAnalysisSymbols{
+			Status: "unavailable",
+			Reason: "symbol analysis is not implemented yet",
+		},
+		Optimization: FirmwareAnalysisBucket{Status: "partial", Reason: "optimization metadata is derived from build properties only"},
+		CallGraph:    FirmwareAnalysisBucket{Status: "unavailable", Reason: "call graph analysis is not implemented yet"},
+		Extensions:   map[string]any{"schema_family": "firmware-package-analysis"},
+	}
+	if len(analysis.LinkerSections) == 0 {
+		analysis.LinkerSections = []SectionUsage{
+			{Name: "text", Size: int64(manifest.MemoryUsage.ProgramUsedBytes), MaxSize: int64(manifest.MemoryUsage.ProgramTotalBytes)},
+			{Name: "data", Size: int64(manifest.MemoryUsage.RAMUsedBytes), MaxSize: int64(manifest.MemoryUsage.RAMTotalBytes)},
+		}
+	}
+	if len(flashPlan.Notes) > 0 {
+		analysis.Notes = append(analysis.Notes, flashPlan.Notes...)
+	}
+	if manifest.PackageMode == "app-only" && resolution.BootloaderPath == "" {
+		analysis.Notes = append(analysis.Notes, "bootloader metadata was not available; app-only package was selected")
+	}
+	return analysis
+}
+
+func defaultFlashingReadme(pkg FirmwarePackage) string {
+	packageMode := strings.TrimSpace(pkg.Manifest.PackageMode)
+	if packageMode == "" {
+		packageMode = "app-only"
+	}
+	validationStatus := string(pkg.Validation.Status)
+	if validationStatus == "" {
+		validationStatus = "pending"
+	}
+	lines := []string{
+		"Firmware Package",
+		"",
+		"This package is the canonical compile output for flashing and build review.",
+		"",
+		"Package mode: " + packageMode,
+		"Validation status: " + validationStatus,
+		"",
+		"Artifact guide:",
+		"- application.bin: the sketch image to flash at 0x10000",
+		"- firmware.elf: raw ELF for analysis and debugging",
+		"- firmware.map: linker map for size and symbol inspection",
+	}
+	if packageMode == "full-flash" {
+		lines = append(lines,
+			"- bootloader.bin: flash at 0x1000",
+			"- partitions.bin: flash at 0x8000",
+			"- boot_app0.bin: flash at 0xE000",
+		)
+	}
+	lines = append(lines, "", "Artifacts:")
+	for _, kind := range pkg.ArtifactKinds() {
+		artifact := pkg.Manifest.Artifacts[kind]
+		lines = append(lines, fmt.Sprintf("- %s -> %s", kind, filepath.Base(artifact.Path)))
+	}
+	if len(pkg.FlashPlan.Entries) > 0 {
+		lines = append(lines, "", "Flash plan:")
+		for _, entry := range pkg.FlashPlan.SortedEntries() {
+			lines = append(lines, fmt.Sprintf("- 0x%x %s", entry.Offset, entry.Artifact))
+		}
+	}
+	if len(pkg.Validation.Warnings) > 0 {
+		lines = append(lines, "", "Warnings:")
+		for _, warning := range pkg.Validation.Warnings {
+			lines = append(lines, "- "+warning)
+		}
+	}
+	lines = append(lines,
+		"",
+		"Beginner flashing:",
+		"1. Open manifest.json to confirm the package contents.",
+		"2. Review validation-report.json for any warnings or errors.",
+		"3. If the package is full-flash, use the flash plan offsets in flash-plan.json.",
+		"",
+		"Professional flashing:",
+		"1. Use flash-plan.json as the authoritative offset map.",
+		"2. Use analysis.json for build-size and memory context.",
+		"3. Treat firmware.elf and firmware.map as the raw reference artifacts.",
+	)
+	return strings.Join(lines, "\n")
+}
+
+func appendUniqueStrings(dst []string, values ...string) []string {
+	seen := map[string]struct{}{}
+	for _, value := range dst {
+		seen[value] = struct{}{}
+	}
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		dst = append(dst, value)
+	}
+	return dst
+}
+
+func diagnosticWarningNotes(notes []string) []string {
+	warnings := make([]string, 0, len(notes))
+	for _, note := range notes {
+		lower := strings.ToLower(note)
+		if strings.Contains(lower, "warning") || strings.Contains(lower, "missing") || strings.Contains(lower, "falling back") {
+			warnings = append(warnings, note)
+		}
+	}
+	return warnings
 }
 
 func rewriteFlashPlanPaths(plan FlashPlan, artifacts map[ArtifactKind]Artifact) FlashPlan {

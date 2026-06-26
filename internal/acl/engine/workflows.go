@@ -316,7 +316,8 @@ func runFirmwarePackageHook(_ context.Context, wctx *WorkflowContext) (StepResul
 	wctx.Set("firmware_package", pkg)
 	wctx.Set("compile_execution", exec)
 	message := "firmware package generated at " + exec.PackageDir
-	professional := []string{"package path: " + exec.PackageDir}
+	professional := pkg.ProfessionalDetails()
+	professional = append(professional, "package path: "+exec.PackageDir)
 	if pkg.Manifest.MemoryUsage.ProgramTotalBytes > 0 || pkg.Manifest.MemoryUsage.RAMTotalBytes > 0 {
 		professional = append(professional, fmt.Sprintf("memory usage: flash %d/%d (%d%%), ram %d/%d (%d%%)",
 			pkg.Manifest.MemoryUsage.ProgramUsedBytes, pkg.Manifest.MemoryUsage.ProgramTotalBytes, pkg.Manifest.MemoryUsage.ProgramPercent,

@@ -36,23 +36,24 @@ type CompileRequest struct {
 }
 
 type CompileExecution struct {
-	SketchName       string                   `json:"sketch_name,omitempty"`
-	FQBN             string                   `json:"fqbn,omitempty"`
-	Board            string                   `json:"board,omitempty"`
-	PlatformPackage  string                   `json:"platform_package,omitempty"`
-	PlatformVersion  string                   `json:"platform_version,omitempty"`
-	CoreVersion      string                   `json:"core_version,omitempty"`
-	ToolchainVersion string                   `json:"toolchain_version,omitempty"`
-	TargetChip       string                   `json:"target_chip,omitempty"`
-	TargetFamily     string                   `json:"target_family,omitempty"`
-	BuildPath        string                   `json:"build_path,omitempty"`
-	OutputDir        string                   `json:"output_dir,omitempty"`
-	PackageDir       string                   `json:"package_dir,omitempty"`
-	BuildProperties  map[string]string        `json:"build_properties,omitempty"`
-	MemoryUsage      firmware.MemoryUsage     `json:"memory_usage,omitempty"`
-	Libraries        []firmware.LibraryRef    `json:"libraries,omitempty"`
-	Compatibility    []compatibility.Decision `json:"compatibility,omitempty"`
-	BuilderResult    BuilderResultSnapshot    `json:"builder_result,omitempty"`
+	SketchName         string                   `json:"sketch_name,omitempty"`
+	FQBN               string                   `json:"fqbn,omitempty"`
+	Board              string                   `json:"board,omitempty"`
+	PlatformPackage    string                   `json:"platform_package,omitempty"`
+	PlatformVersion    string                   `json:"platform_version,omitempty"`
+	CoreVersion        string                   `json:"core_version,omitempty"`
+	ToolchainVersion   string                   `json:"toolchain_version,omitempty"`
+	TargetChip         string                   `json:"target_chip,omitempty"`
+	TargetFamily       string                   `json:"target_family,omitempty"`
+	BuildPath          string                   `json:"build_path,omitempty"`
+	OutputDir          string                   `json:"output_dir,omitempty"`
+	PackageDir         string                   `json:"package_dir,omitempty"`
+	BuildProperties    map[string]string        `json:"build_properties,omitempty"`
+	MemoryUsage        firmware.MemoryUsage     `json:"memory_usage,omitempty"`
+	ExecutableSections []firmware.SectionUsage  `json:"executable_sections,omitempty"`
+	Libraries          []firmware.LibraryRef    `json:"libraries,omitempty"`
+	Compatibility      []compatibility.Decision `json:"compatibility,omitempty"`
+	BuilderResult      BuilderResultSnapshot    `json:"builder_result,omitempty"`
 }
 
 type BuilderResultSnapshot struct {
@@ -200,20 +201,36 @@ func (b BuilderResultSnapshot) BuildInput(req CompileRequest) (firmware.BuildInp
 	buildPlatformVersion := firstNonEmptyStrings(b.BuildPlatformVersion, b.BoardPlatformVersion)
 
 	return firmware.BuildInput{
-		BuildPath:        paths.New(buildPath),
-		OutputDir:        paths.New(compileWorkflowPackageDir(req)),
-		Properties:       props,
-		SketchName:       filepathBase(req.SketchPath),
-		ProjectName:      props.Get("build.project_name"),
-		FQBN:             req.FQBN,
-		Board:            boardName,
-		PlatformPackage:  firstNonEmptyStrings(b.BoardPlatformPackage, b.BuildPlatformPackage),
-		PlatformVersion:  firstNonEmptyStrings(b.BoardPlatformVersion, b.BuildPlatformVersion),
-		CoreVersion:      buildPlatformVersion,
-		ToolchainVersion: toolchainVersion,
-		Libraries:        append([]firmware.LibraryRef(nil), b.UsedLibraries...),
-		MemoryUsage:      b.BuildMemoryUsage(),
+		BuildPath:          paths.New(buildPath),
+		OutputDir:          paths.New(compileWorkflowPackageDir(req)),
+		Properties:         props,
+		SketchName:         filepathBase(req.SketchPath),
+		ProjectName:        props.Get("build.project_name"),
+		FQBN:               req.FQBN,
+		Board:              boardName,
+		PlatformPackage:    firstNonEmptyStrings(b.BoardPlatformPackage, b.BuildPlatformPackage),
+		PlatformVersion:    firstNonEmptyStrings(b.BoardPlatformVersion, b.BuildPlatformVersion),
+		CoreVersion:        buildPlatformVersion,
+		ToolchainVersion:   toolchainVersion,
+		Libraries:          append([]firmware.LibraryRef(nil), b.UsedLibraries...),
+		MemoryUsage:        b.BuildMemoryUsage(),
+		ExecutableSections: sectionUsageFromSnapshot(b.ExecutableSections),
 	}, nil
+}
+
+func sectionUsageFromSnapshot(sections []SectionSizeSnapshot) []firmware.SectionUsage {
+	if len(sections) == 0 {
+		return nil
+	}
+	out := make([]firmware.SectionUsage, 0, len(sections))
+	for _, section := range sections {
+		out = append(out, firmware.SectionUsage{
+			Name:    section.Name,
+			Size:    section.Size,
+			MaxSize: section.MaxSize,
+		})
+	}
+	return out
 }
 
 func filepathBase(path string) string {

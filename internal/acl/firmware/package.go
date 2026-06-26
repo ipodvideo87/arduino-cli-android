@@ -64,6 +64,12 @@ type MemoryUsage struct {
 	RAMPercent        int    `json:"ram_percent,omitempty"`
 }
 
+type SectionUsage struct {
+	Name    string `json:"name,omitempty"`
+	Size    int64  `json:"size,omitempty"`
+	MaxSize int64  `json:"max_size,omitempty"`
+}
+
 type BuildManifest struct {
 	SchemaVersion    string                    `json:"schema_version,omitempty"`
 	PackageMode      string                    `json:"package_mode,omitempty"`
@@ -105,7 +111,71 @@ type FlashPlan struct {
 type FirmwarePackage struct {
 	Manifest   BuildManifest    `json:"manifest"`
 	FlashPlan  FlashPlan        `json:"flash_plan"`
+	Analysis   FirmwareAnalysis `json:"analysis,omitempty"`
 	Validation ValidationReport `json:"validation_report"`
+	Readme     string           `json:"readme,omitempty"`
+}
+
+type FirmwareAnalysis struct {
+	SchemaVersion    string                  `json:"schema_version,omitempty"`
+	PackageMode      string                  `json:"package_mode,omitempty"`
+	ProjectName      string                  `json:"project_name,omitempty"`
+	SketchName       string                  `json:"sketch_name,omitempty"`
+	Board            string                  `json:"board,omitempty"`
+	FQBN             string                  `json:"fqbn,omitempty"`
+	PlatformPackage  string                  `json:"platform_package,omitempty"`
+	PlatformVersion  string                  `json:"platform_version,omitempty"`
+	CoreVersion      string                  `json:"core_version,omitempty"`
+	ToolchainVersion string                  `json:"toolchain_version,omitempty"`
+	TargetChip       string                  `json:"target_chip,omitempty"`
+	TargetFamily     string                  `json:"target_family,omitempty"`
+	BuildID          string                  `json:"build_id,omitempty"`
+	BuiltAt          string                  `json:"built_at,omitempty"`
+	Source           FirmwareAnalysisSource  `json:"source,omitempty"`
+	Usage            FirmwareAnalysisUsage   `json:"usage,omitempty"`
+	LinkerSections   []SectionUsage          `json:"linker_sections,omitempty"`
+	LargestFunctions FirmwareAnalysisBucket  `json:"largest_functions,omitempty"`
+	LargestLibraries FirmwareAnalysisBucket  `json:"largest_libraries,omitempty"`
+	Symbols          FirmwareAnalysisSymbols `json:"symbol_analysis,omitempty"`
+	Optimization     FirmwareAnalysisBucket  `json:"optimization,omitempty"`
+	CallGraph        FirmwareAnalysisBucket  `json:"call_graph,omitempty"`
+	Notes            []string                `json:"notes,omitempty"`
+	Extensions       map[string]any          `json:"extensions,omitempty"`
+}
+
+type FirmwareAnalysisSource struct {
+	MetadataSource   string   `json:"metadata_source,omitempty"`
+	BootloaderSource string   `json:"bootloader_source,omitempty"`
+	BootloaderPath   string   `json:"bootloader_path,omitempty"`
+	BootloaderOffset string   `json:"bootloader_offset,omitempty"`
+	FlashArgsPath    string   `json:"flash_args_path,omitempty"`
+	Notes            []string `json:"notes,omitempty"`
+}
+
+type FirmwareAnalysisUsage struct {
+	ProgramUsedBytes  uint64 `json:"program_used_bytes,omitempty"`
+	ProgramTotalBytes uint64 `json:"program_total_bytes,omitempty"`
+	ProgramPercent    int    `json:"program_percent,omitempty"`
+	RAMUsedBytes      uint64 `json:"ram_used_bytes,omitempty"`
+	RAMTotalBytes     uint64 `json:"ram_total_bytes,omitempty"`
+	RAMPercent        int    `json:"ram_percent,omitempty"`
+}
+
+type FirmwareAnalysisBucket struct {
+	Status string   `json:"status,omitempty"`
+	Reason string   `json:"reason,omitempty"`
+	Notes  []string `json:"notes,omitempty"`
+}
+
+type FirmwareAnalysisSymbols struct {
+	Status     string         `json:"status,omitempty"`
+	Reason     string         `json:"reason,omitempty"`
+	Total      int            `json:"total,omitempty"`
+	Defined    int            `json:"defined,omitempty"`
+	Undefined  int            `json:"undefined,omitempty"`
+	Weak       int            `json:"weak,omitempty"`
+	Notes      []string       `json:"notes,omitempty"`
+	Extensions map[string]any `json:"extensions,omitempty"`
 }
 
 type ValidationCheck struct {
@@ -228,6 +298,24 @@ func (p FirmwarePackage) ProfessionalDetails() []string {
 	}
 	if p.Validation.Status != "" {
 		details = append(details, "validation status: "+string(p.Validation.Status))
+	}
+	if p.Analysis.Source.MetadataSource != "" {
+		details = append(details, "metadata source: "+p.Analysis.Source.MetadataSource)
+	}
+	if p.Analysis.Source.BootloaderSource != "" {
+		details = append(details, "bootloader source: "+p.Analysis.Source.BootloaderSource)
+	}
+	if p.Analysis.Source.BootloaderPath != "" {
+		details = append(details, "bootloader path: "+p.Analysis.Source.BootloaderPath)
+	}
+	if p.Analysis.Source.BootloaderOffset != "" {
+		details = append(details, "bootloader offset: "+p.Analysis.Source.BootloaderOffset)
+	}
+	for _, note := range p.Analysis.Notes {
+		details = append(details, note)
+	}
+	for _, warning := range p.Validation.Warnings {
+		details = append(details, "warning: "+warning)
 	}
 	return details
 }

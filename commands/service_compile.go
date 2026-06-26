@@ -491,20 +491,21 @@ func buildFirmwarePackageForCompile(
 	toolchainVersion string,
 ) (firmware.FirmwarePackage, error) {
 	manifest := firmware.BuildInput{
-		BuildPath:        buildPath,
-		OutputDir:        outputDir,
-		Properties:       buildProperties,
-		SketchName:       sketchName,
-		ProjectName:      buildProperties.Get("build.project_name"),
-		FQBN:             fqbnString,
-		Board:            boardName,
-		PlatformPackage:  platformPackage,
-		PlatformVersion:  platformVersion,
-		CoreVersion:      coreVersion,
-		ToolchainVersion: toolchainVersion,
-		Libraries:        libraryRefsFromImported(importedLibs),
-		MemoryUsage:      memoryUsageFromSections(sections),
-		Compatibility:    compatibilityDecisionsFromLibraries(coreVersion, importedLibs),
+		BuildPath:          buildPath,
+		OutputDir:          outputDir,
+		Properties:         buildProperties,
+		SketchName:         sketchName,
+		ProjectName:        buildProperties.Get("build.project_name"),
+		FQBN:               fqbnString,
+		Board:              boardName,
+		PlatformPackage:    platformPackage,
+		PlatformVersion:    platformVersion,
+		CoreVersion:        coreVersion,
+		ToolchainVersion:   toolchainVersion,
+		Libraries:          libraryRefsFromImported(importedLibs),
+		MemoryUsage:        memoryUsageFromSections(sections),
+		ExecutableSections: sectionUsageFromBuilderSections(sections),
+		Compatibility:      compatibilityDecisionsFromLibraries(coreVersion, importedLibs),
 	}
 	return firmware.BuildFirmwarePackage(manifest)
 }
@@ -583,6 +584,21 @@ func memoryUsageFromSections(sections builder.ExecutablesFileSections) firmware.
 		}
 	}
 	return usage
+}
+
+func sectionUsageFromBuilderSections(sections builder.ExecutablesFileSections) []firmware.SectionUsage {
+	if len(sections) == 0 {
+		return nil
+	}
+	out := make([]firmware.SectionUsage, 0, len(sections))
+	for _, section := range sections {
+		out = append(out, firmware.SectionUsage{
+			Name:    section.Name,
+			Size:    int64(section.Size),
+			MaxSize: int64(section.MaxSize),
+		})
+	}
+	return out
 }
 
 // maybePurgeBuildCache runs the build files cache purge if the policy conditions are met.
