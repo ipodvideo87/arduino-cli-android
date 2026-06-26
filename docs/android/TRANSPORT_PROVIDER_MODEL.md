@@ -18,12 +18,15 @@ The provider model gives ACL a reusable way to:
 
 ## Current Repository Shape
 
-`internal/acl/transport` already implements the selector/registry core:
+`internal/acl/transport` already implements the selector/registry core and the
+compile-safe provider boundary:
 
 - `TransportManager`
 - `TransportDescriptor`
 - `SelectionRequest`
 - `TransportSelection`
+- provider/session/permission/endpoint/diagnostics contracts
+- fake-provider tests
 
 That is the first layer of the provider model.
 
@@ -168,4 +171,3 @@ The provider model is partially implemented as selection infrastructure and
 documented as a reusable architecture.
 
 The actual open/close/protocol/endpoint providers remain future implementation.
-

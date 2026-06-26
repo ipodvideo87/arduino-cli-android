@@ -7,6 +7,9 @@ It is not an implementation.
 It does not perform upload.
 It does not perform USB flashing.
 
+The underlying provider/session/endpoint contracts now exist as compile-safe
+ACL infrastructure, but the workflow itself remains future work.
+
 ## Goal
 
 The upload workflow should let ACL and future GUI layers ask one question:
@@ -116,4 +119,3 @@ The workflow should be able to consume:
 
 The architecture should be transport-driven, provider-based, and protocol-aware.
 The upload workflow should not be the layer that knows Android USB details.
-

@@ -7,6 +7,9 @@ It is not an implementation.
 It does not open a live monitor session.
 It does not change runtime behavior.
 
+The transport/session/export contracts now exist as compile-safe ACL
+infrastructure, but live monitoring remains a future workflow.
+
 ## Goal
 
 The serial monitor workflow should provide a tool-facing view of the same
@@ -100,4 +103,3 @@ single workflow report rather than learning Android USB details.
 
 The monitor architecture should reuse the same provider model as upload.
 That keeps serial monitoring consistent with the rest of the transport stack.
-

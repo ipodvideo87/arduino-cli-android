@@ -75,6 +75,9 @@ Native Termux validation always takes priority over container or desktop validat
 - Prefer descriptor-driven USB serial detection and PTY-based tool integration over board-specific serial assumptions.
 - Treat transport discovery, permission, connection, protocol, upload, monitor,
   and diagnostics as distinct reusable layers.
+- Prefer the compile-safe transport provider contracts in
+  `internal/acl/transport` for future transport work; do not jump directly to
+  Android USB API calls or board-specific serial code.
 
 ## Project Goals
 - Run Arduino CLI natively on Android.

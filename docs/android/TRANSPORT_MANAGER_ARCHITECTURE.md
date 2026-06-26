@@ -54,6 +54,13 @@ It does not:
 The transport layer underneath the manager will later provide the concrete open,
 read, write, and close behavior.
 
+Current repository shape:
+
+- `internal/acl/transport` now includes compile-safe provider/session/
+  diagnostics contracts in addition to the selector core.
+- Fake providers and manager tests cover registration, selection, permission,
+  diagnostics, and session-opening behavior without touching real Android USB.
+
 ## Selection Policy
 
 Selection should be capability-first.

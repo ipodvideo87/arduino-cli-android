@@ -21,6 +21,7 @@
 - Emulated ARM64 smoke-test provider
 - USB transport research and architecture docs
 - USB transport provider model and upload/monitor previews
+- Transport provider skeleton, diagnostics models, and fake-provider tests
 
 ## Next Milestones
 

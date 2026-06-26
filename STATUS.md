@@ -95,6 +95,9 @@ Repository cleanup:
 - The Android USB transport research, architecture, provider model, and upload
   / serial-monitor preview docs now exist as the design basis for future
   transport work.
+- The transport provider skeleton now exists as compile-safe provider,
+  permission, session, endpoint-export, and diagnostics contracts with
+  fake-provider tests, but it still does not touch real Android USB APIs.
 - Platform and tool installs now flow through the shared Android patch pipeline instead of requiring manual permission or chmod repair.
 - The Android install patch pipeline now has a dedicated runtime-permission repair stage that only fixes the copied loader execute bit, while the broader Android patch stage remains responsible for ELF rewriting.
 - Platform and library install paths now consult the compatibility resolver so compatible versions can be preferred over source patching.
@@ -108,6 +111,7 @@ Repository cleanup:
 - Design a reusable native Android USB transport framework inside the existing Termux ecosystem.
 - Define a generic Android upload and monitor bridge that stays board-agnostic, descriptor-driven, and provider-based.
 - Validate firmware upload and serial monitor behavior through the new transport implementation on real hardware.
+- Implement the first real transport provider runtime after the contract layer is proven stable.
 - Finish the Android preflight and dry-run reporting surfaces so they can be consumed by future UI workspaces.
 - Keep the development workflow aligned with the two-environment model: native Termux as the source of truth, Ubuntu/proot as a tooling environment.
 - Polish the ACL CLI diagnostic surfaces and wire them into future workspace UI layers.

@@ -65,7 +65,11 @@ It should not:
 
 Current repository state:
 
-- `internal/acl/transport` already provides a selector/registry core.
+- `internal/acl/transport` already provides a selector/registry core plus
+  compile-safe provider, session, endpoint-export, permission, and diagnostics
+  contracts.
+- Fake providers and tests exercise the boundary without real Android USB
+  access.
 
 ### 3. Discovery
 
@@ -239,4 +243,3 @@ The architecture is stable if the system can answer these questions cleanly:
 
 That is the reusable foundation for every future hardware interaction in this
 project.
-
