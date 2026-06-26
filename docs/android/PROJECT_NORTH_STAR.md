@@ -13,6 +13,12 @@ order to compile, inspect, package, validate, or eventually flash firmware.
 - Beginner is not a lesser product. It is Professional mode with automation and
   progressive disclosure.
 - The system should reduce complexity without reducing capability.
+- The validation system should also be layered: static analysis, host smoke
+  tests, emulated preflight, native Termux, and real hardware each have a
+  defined confidence boundary.
+- Every validation provider should emit a human-readable summary and a
+  machine-readable report so the ACL Engine and future GUIs can compare results
+  without re-discovering context.
 - ESP32-S3 is the first validation target, not the architecture.
 - The architecture should scale to more boards, transports, and frontends.
 
@@ -22,4 +28,3 @@ order to compile, inspect, package, validate, or eventually flash firmware.
   internals.
 - The backend should remain reusable across future workspaces and applications.
 - The platform should make the same engine useful to both beginners and experts.
-

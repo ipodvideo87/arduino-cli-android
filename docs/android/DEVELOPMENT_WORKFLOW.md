@@ -5,6 +5,8 @@
 - Plan before coding when architecture is involved.
 - Implement in small milestones.
 - Run focused tests first.
+- Run emulated ARM64 validation when native Termux is unavailable and the
+  validation scripts are usable.
 - Run native Termux validation when Android behavior is affected.
 - Run real hardware validation before claiming upload or flash success.
 - Update docs and `STATUS.md` when behavior or evidence changes.
@@ -17,6 +19,9 @@
 - When unsure, document the assumption and the open question.
 - Treat queued branches as reference material unless reviewed and intentionally
   merged.
+- Use explicit installation for validation bootstraps. The default action is
+  inspect/report only.
+- Record which validation provider was used in docs and status updates.
 
 ## Git Practices
 
@@ -30,4 +35,4 @@
 - Do not merge to `main` until real Android validation is complete.
 - Do not claim success beyond the validation level actually achieved.
 - Keep preflight, emulated, native, and hardware evidence distinct.
-
+- Do not claim Android success from emulation.

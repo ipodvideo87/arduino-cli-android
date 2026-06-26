@@ -14,6 +14,7 @@ to recover context quickly and accurately.
 - What has been validated.
 - What is still unknown.
 - What future agents should not accidentally undo.
+- What validation provider was used and what confidence boundary it proves.
 
 ## Operating Rules
 
@@ -23,4 +24,6 @@ to recover context quickly and accurately.
 - Prefer explicit evidence over implied understanding.
 - Record unknowns clearly instead of silently filling gaps with assumptions.
 - Keep `STATUS.md` aligned with the current validated state.
-
+- Keep validation provider reports, scripts, and the research log in versioned
+  docs so future contributors do not have to reconstruct the evidence chain from
+  chat history.

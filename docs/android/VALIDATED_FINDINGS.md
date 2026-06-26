@@ -51,3 +51,11 @@ This file is a logbook of tested findings from the project history.
 - Confidence: high
 - Notes: this is the current canonical flash layout target for full-flash packages
 
+- Environment: current Ubuntu/proot development environment for emulated
+  validation research
+- Command/evidence: `uname -m`, `/dev/kvm` probe, `command -v qemu-aarch64`, and
+  `command -v apt-get`
+- Result: ARM64 user-mode smoke testing is practical; a full Android emulator is
+  not yet proven practical here because `/dev/kvm` is absent
+- Confidence: medium
+- Notes: this is a host-environment finding, not an Android-device claim

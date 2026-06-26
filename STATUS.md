@@ -21,12 +21,15 @@ does not replace native Android validation.
 - Development Workflow: [docs/android/DEVELOPMENT_WORKFLOW.md](docs/android/DEVELOPMENT_WORKFLOW.md)
 - Validation Policy: [docs/android/VALIDATION_POLICY.md](docs/android/VALIDATION_POLICY.md)
 - Roadmap: [docs/android/ROADMAP.md](docs/android/ROADMAP.md)
+- Validation Environment Research: [docs/android/VALIDATION_ENVIRONMENT_RESEARCH.md](docs/android/VALIDATION_ENVIRONMENT_RESEARCH.md)
+- Emulated ARM64 Smoke Test Workflow: [docs/android/EMULATED_ARM64_SMOKE_TEST_WORKFLOW.md](docs/android/EMULATED_ARM64_SMOKE_TEST_WORKFLOW.md)
 - Firmware Package Spec: [docs/specifications/FIRMWARE_PACKAGE_SPEC.md](docs/specifications/FIRMWARE_PACKAGE_SPEC.md)
 - Validated Findings: [docs/android/VALIDATED_FINDINGS.md](docs/android/VALIDATED_FINDINGS.md)
 
 Current validation posture:
 - Native Termux remains the source of truth for Android behavior.
 - Unit tests and CLI/build verification are useful, but not sufficient for Android claims.
+- Emulated ARM64 smoke tests are useful preflight checks only and do not prove Android success.
 - USB flashing is still unimplemented and must not be claimed as complete.
 
 ## Completed Milestones
@@ -77,6 +80,7 @@ Current validation posture:
 - Successful compiles now produce a stable firmware package with manifest, flash plan, validation report, hashes, and copied artifacts.
 - ESP32-S3 firmware packages now include the bootloader artifact and full-flash flash-plan entry when the Arduino core exposes the bootloader recipe metadata.
 - The ACL compile workflow now reconstructs the firmware package from the compiler snapshot when the on-disk package is missing, so compile success and package-generation failure stay distinct.
+- The validation-environment research docs and emulated ARM64 smoke-test workflow now exist as layered preflight guidance.
 - Platform and tool installs now flow through the shared Android patch pipeline instead of requiring manual permission or chmod repair.
 - The Android install patch pipeline now has a dedicated runtime-permission repair stage that only fixes the copied loader execute bit, while the broader Android patch stage remains responsible for ELF rewriting.
 - Platform and library install paths now consult the compatibility resolver so compatible versions can be preferred over source patching.

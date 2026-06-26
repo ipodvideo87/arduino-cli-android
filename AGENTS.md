@@ -22,6 +22,8 @@ Native Termux validation always takes priority over container or desktop validat
   - [docs/android/DEVELOPMENT_WORKFLOW.md](docs/android/DEVELOPMENT_WORKFLOW.md)
   - [docs/android/VALIDATION_POLICY.md](docs/android/VALIDATION_POLICY.md)
   - [docs/android/ROADMAP.md](docs/android/ROADMAP.md)
+  - [docs/android/VALIDATION_ENVIRONMENT_RESEARCH.md](docs/android/VALIDATION_ENVIRONMENT_RESEARCH.md)
+  - [docs/android/EMULATED_ARM64_SMOKE_TEST_WORKFLOW.md](docs/android/EMULATED_ARM64_SMOKE_TEST_WORKFLOW.md)
   - [docs/specifications/FIRMWARE_PACKAGE_SPEC.md](docs/specifications/FIRMWARE_PACKAGE_SPEC.md)
   - [docs/android/VALIDATED_FINDINGS.md](docs/android/VALIDATED_FINDINGS.md)
 - Before making Android-specific changes, also read [docs/android/ANDROID_COMPATIBILITY_RESEARCH.md](docs/android/ANDROID_COMPATIBILITY_RESEARCH.md).

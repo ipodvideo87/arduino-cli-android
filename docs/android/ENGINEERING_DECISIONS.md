@@ -26,6 +26,21 @@ These decisions use an ADR-style format.
   layers.
 - Validation/evidence if available: `acl workflow` command surfaces and engine tests.
 
+## Validation is provider-based and report-driven
+
+- Status: accepted
+- Context: The project needs a layered validation ecosystem with explicit
+  confidence boundaries instead of a single hardcoded smoke test.
+- Decision: each validation provider should emit a human-readable summary and a
+  structured machine-readable report, and the common schema should carry
+  environment details, tests run, tests skipped, warnings, limitations,
+  actions taken, results, and validation level.
+- Alternatives considered: ad hoc shell scripts with unstructured console output.
+- Consequences: the ACL Engine and future GUI layers can compare provider
+  results, preserve institutional memory, and avoid overclaiming success.
+- Validation/evidence if available: the new validation-environment research and
+  emulated ARM64 smoke-test workflow docs.
+
 ## Beginner, Advanced, Professional are UI layers
 
 - Status: accepted
@@ -68,6 +83,21 @@ These decisions use an ADR-style format.
 - Alternatives considered: relying on Ubuntu/proot or build success alone.
 - Consequences: native Termux remains the source of truth for Android compile claims.
 - Validation/evidence if available: project policy and native validation history.
+
+## Explicit installation is opt-in in validation bootstrap mode
+
+- Status: accepted
+- Context: validation bootstraps should be safe by default and not mutate the
+  host unless the user explicitly asks for it.
+- Decision: default bootstrap behavior is report-only; installation only occurs
+  when the user requests `bootstrap --install` or sets an equivalent explicit
+  installation flag.
+- Alternatives considered: implicit package installation during inspection or
+  verification.
+- Consequences: environment checks remain safe and repeatable for existing
+  setups and clean installs alike.
+- Validation/evidence if available: validation workflow policy and bootstrap
+  script design.
 
 ## Real hardware validation is required for upload/flash claims
 
@@ -112,4 +142,3 @@ These decisions use an ADR-style format.
   breaking the UI contract.
 - Validation/evidence if available: firmware package schema and analysis placeholder
   implementation.
-

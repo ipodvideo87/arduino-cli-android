@@ -17,6 +17,8 @@
 - ValidationReport
 - `analysis.json`
 - `README_FLASHING.txt`
+- Validation-environment research
+- Emulated ARM64 smoke-test provider
 
 ## Next Milestones
 
@@ -30,10 +32,13 @@
 - Add library/platform manager UX
 - Improve firmware analysis
 - Expand multi-board support
+- Add GitHub Actions validation providers
+- Add desktop validation providers
+- Add Termux-like rootfs and Bionic/sysroot preflight providers if they prove
+  useful
 
 ## Roadmap Notes
 
 - ESP32-S3 remains the first validation target.
 - The architecture should stay board-agnostic so other platforms can be added
   without rewriting the workflow model.
-
