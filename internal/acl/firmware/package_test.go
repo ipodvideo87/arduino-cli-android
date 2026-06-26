@@ -45,6 +45,7 @@ func TestFirmwarePackageValidateAndBinaryValidator(t *testing.T) {
 	artifacts := createFirmwareArtifacts(t, root)
 	pkg := FirmwarePackage{
 		Manifest: BuildManifest{
+			PackageMode:      "full-flash",
 			Board:            "esp32s3",
 			FQBN:             "esp32:esp32:esp32s3",
 			CoreVersion:      "3.3.10",
@@ -61,7 +62,8 @@ func TestFirmwarePackageValidateAndBinaryValidator(t *testing.T) {
 			TargetChip: "ESP32-S3",
 		},
 		FlashPlan: FlashPlan{
-			TargetChip: "ESP32-S3",
+			PackageMode: "full-flash",
+			TargetChip:  "ESP32-S3",
 			Entries: []FlashPlanEntry{
 				{Offset: 0x1000, Artifact: ArtifactBootloaderBinary, Path: artifacts[ArtifactBootloaderBinary].Path},
 				{Offset: 0x8000, Artifact: ArtifactPartitionTableBinary, Path: artifacts[ArtifactPartitionTableBinary].Path},
@@ -80,6 +82,7 @@ func TestFirmwarePackageValidateAndBinaryValidator(t *testing.T) {
 	require.Contains(t, report.Checks[0].Name, "manifest")
 	require.Contains(t, report.Checks[1].Name, "flash-plan")
 	require.Equal(t, "ESP32-S3", report.TargetChip)
+	require.Equal(t, "full-flash", report.PackageMode)
 }
 
 func TestBinaryValidatorFailsForMissingArtifactFile(t *testing.T) {
@@ -114,6 +117,34 @@ func TestBinaryValidatorFailsForMissingArtifactFile(t *testing.T) {
 	require.Equal(t, diagnostics.StatusFailed, report.Status)
 	require.NotEmpty(t, report.Errors)
 	require.True(t, report.HasFailures())
+}
+
+func TestBinaryValidatorWarnsForAppOnlyPackageWithoutBootloader(t *testing.T) {
+	root := t.TempDir()
+	artifacts := createFirmwareArtifacts(t, root)
+	delete(artifacts, ArtifactBootloaderBinary)
+	delete(artifacts, ArtifactBootApp0Binary)
+
+	pkg := FirmwarePackage{
+		Manifest: BuildManifest{
+			PackageMode:      "app-only",
+			Board:            "mkr1000",
+			FQBN:             "arduino:samd:mkr1000",
+			CoreVersion:      "1.8.13",
+			ToolchainVersion: "11.3.1",
+			Artifacts:        artifacts,
+		},
+		FlashPlan: FlashPlan{
+			PackageMode: "app-only",
+			Entries: []FlashPlanEntry{
+				{Offset: 0x10000, Artifact: ArtifactApplicationBinary, Path: artifacts[ArtifactApplicationBinary].Path},
+			},
+		},
+	}
+
+	report := NewBinaryValidator().Validate(pkg)
+	require.Equal(t, diagnostics.StatusWarning, report.Status)
+	require.Contains(t, report.Warnings[0], "bootloader")
 }
 
 func TestFirmwarePackageArtifactLookup(t *testing.T) {

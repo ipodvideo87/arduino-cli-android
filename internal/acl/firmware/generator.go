@@ -24,6 +24,7 @@ type BuildInput struct {
 	BuildPath        *paths.Path
 	OutputDir        *paths.Path
 	Properties       *properties.Map
+	PackageMode      string
 	SketchName       string
 	ProjectName      string
 	FQBN             string
@@ -57,6 +58,7 @@ func BuildFirmwarePackage(input BuildInput) (FirmwarePackage, error) {
 
 	manifest := BuildManifest{
 		SchemaVersion:    "1",
+		PackageMode:      packageModeForBuild(input.PackageMode, input.Properties),
 		SketchName:       input.SketchName,
 		ProjectName:      input.ProjectName,
 		Board:            input.Board,
@@ -87,7 +89,8 @@ func BuildFirmwarePackage(input BuildInput) (FirmwarePackage, error) {
 	}
 	manifest.Artifacts = artifacts
 
-	flashPlan := buildFlashPlan(input.BuildPath, input.Properties, artifacts, manifest.TargetChip)
+	flashPlan := buildFlashPlan(input.BuildPath, input.Properties, artifacts, manifest.TargetChip, manifest.PackageMode)
+	flashPlan.PackageMode = manifest.PackageMode
 	pkg := FirmwarePackage{
 		Manifest:  manifest,
 		FlashPlan: flashPlan,
@@ -231,12 +234,13 @@ func collectBuildArtifacts(buildPath *paths.Path, props *properties.Map, project
 
 	sourcePaths := map[ArtifactKind]string{
 		ArtifactApplicationBinary:    buildPath.Join(projectName + ".bin").String(),
+		ArtifactBootloaderBinary:     buildPath.Join(projectName + ".bootloader.bin").String(),
 		ArtifactELF:                  buildPath.Join(projectName + ".elf").String(),
 		ArtifactMAP:                  buildPath.Join(projectName + ".map").String(),
 		ArtifactPartitionTableBinary: buildPath.Join(projectName + ".partitions.bin").String(),
 	}
 
-	for kind, path := range resolveArtifactSourcesFromUploadPattern(buildPath, props) {
+	for kind, path := range resolveArtifactSourcesFromPatterns(buildPath, props) {
 		sourcePaths[kind] = path
 	}
 
@@ -253,7 +257,7 @@ func collectBuildArtifacts(buildPath *paths.Path, props *properties.Map, project
 			continue
 		}
 		if _, err := os.Stat(path); err != nil {
-			if kind == ArtifactMAP || kind == ArtifactBootApp0Binary {
+			if kind == ArtifactMAP || kind == ArtifactBootApp0Binary || kind == ArtifactBootloaderBinary || kind == ArtifactPartitionTableBinary {
 				continue
 			}
 			return nil, fmt.Errorf("artifact %s: %w", kind, err)
@@ -287,19 +291,19 @@ func collectBuildArtifacts(buildPath *paths.Path, props *properties.Map, project
 	return artifacts, nil
 }
 
-func buildFlashPlan(buildPath *paths.Path, props *properties.Map, artifacts map[ArtifactKind]Artifact, targetChip string) FlashPlan {
+func buildFlashPlan(buildPath *paths.Path, props *properties.Map, artifacts map[ArtifactKind]Artifact, targetChip string, packageMode string) FlashPlan {
 	plan := FlashPlan{
 		TargetChip:        targetChip,
-		RequiredArtifacts: requiredFlashArtifacts(artifacts),
+		RequiredArtifacts: requiredFlashArtifacts(artifacts, packageMode),
 	}
 	if len(artifacts) == 0 {
 		return plan
 	}
 
-	if entries := parseUploadPatternEntries(props); len(entries) > 0 {
+	if entries := parsePatternEntries(props); len(entries) > 0 {
 		plan.Entries = append(plan.Entries, entries...)
 	} else {
-		plan.Entries = append(plan.Entries, defaultFlashPlanEntries(artifacts)...)
+		plan.Entries = append(plan.Entries, defaultFlashPlanEntries(artifacts, packageMode)...)
 	}
 	sort.SliceStable(plan.Entries, func(i, j int) bool {
 		if plan.Entries[i].Offset != plan.Entries[j].Offset {
@@ -310,14 +314,14 @@ func buildFlashPlan(buildPath *paths.Path, props *properties.Map, artifacts map[
 	return plan
 }
 
-func parseUploadPatternEntries(props *properties.Map) []FlashPlanEntry {
+func parsePatternEntries(props *properties.Map) []FlashPlanEntry {
 	if props == nil {
 		return nil
 	}
 	keys := props.Keys()
 	sort.Strings(keys)
 	for _, key := range keys {
-		if !strings.HasSuffix(key, ".upload.pattern") && key != "upload.pattern" {
+		if !strings.HasSuffix(key, ".pattern") {
 			continue
 		}
 		value := strings.TrimSpace(props.ExpandPropsInString(props.Get(key)))
@@ -353,7 +357,7 @@ func parseUploadPatternEntries(props *properties.Map) []FlashPlanEntry {
 	return nil
 }
 
-func defaultFlashPlanEntries(artifacts map[ArtifactKind]Artifact) []FlashPlanEntry {
+func defaultFlashPlanEntries(artifacts map[ArtifactKind]Artifact, packageMode string) []FlashPlanEntry {
 	entries := []FlashPlanEntry{}
 	add := func(offset uint32, kind ArtifactKind, required bool) {
 		artifact, ok := artifacts[kind]
@@ -368,17 +372,17 @@ func defaultFlashPlanEntries(artifacts map[ArtifactKind]Artifact) []FlashPlanEnt
 		})
 	}
 	add(0x10000, ArtifactApplicationBinary, true)
-	add(0x1000, ArtifactBootloaderBinary, true)
-	add(0x8000, ArtifactPartitionTableBinary, true)
-	if _, ok := artifacts[ArtifactBootApp0Binary]; ok {
-		add(0xE000, ArtifactBootApp0Binary, false)
+	if packageMode == "full-flash" {
+		add(0x1000, ArtifactBootloaderBinary, true)
+		add(0x8000, ArtifactPartitionTableBinary, true)
+		add(0xE000, ArtifactBootApp0Binary, true)
 	}
 	return entries
 }
 
-func resolveArtifactSourcesFromUploadPattern(buildPath *paths.Path, props *properties.Map) map[ArtifactKind]string {
+func resolveArtifactSourcesFromPatterns(buildPath *paths.Path, props *properties.Map) map[ArtifactKind]string {
 	resolved := map[ArtifactKind]string{}
-	for _, entry := range parseUploadPatternEntries(props) {
+	for _, entry := range parsePatternEntries(props) {
 		if entry.Artifact == "" || entry.Path == "" {
 			continue
 		}
@@ -409,6 +413,35 @@ func resolveArtifactSourcesFromUploadPattern(buildPath *paths.Path, props *prope
 		}
 	}
 	return resolved
+}
+
+func packageModeForBuild(requested string, props *properties.Map) string {
+	mode := strings.ToLower(strings.TrimSpace(requested))
+	if mode != "" {
+		return mode
+	}
+	if expectsFullFlash(props) {
+		return "full-flash"
+	}
+	return "app-only"
+}
+
+func expectsFullFlash(props *properties.Map) bool {
+	if props == nil {
+		return false
+	}
+	if firstBuildProperty(props, "build.bootloader_addr", "build.bootloader.file", "bootloader.file") != "" {
+		return true
+	}
+	if pattern := parsePatternEntries(props); len(pattern) > 0 {
+		for _, entry := range pattern {
+			switch entry.Artifact {
+			case ArtifactBootloaderBinary, ArtifactBootApp0Binary, ArtifactPartitionTableBinary:
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func rewriteFlashPlanPaths(plan FlashPlan, artifacts map[ArtifactKind]Artifact) FlashPlan {
@@ -538,12 +571,10 @@ func buildID(parts ...string) string {
 	return hex.EncodeToString(sum[:8])
 }
 
-func requiredFlashArtifacts(artifacts map[ArtifactKind]Artifact) []ArtifactKind {
+func requiredFlashArtifacts(artifacts map[ArtifactKind]Artifact, packageMode string) []ArtifactKind {
 	required := []ArtifactKind{ArtifactApplicationBinary}
-	for _, kind := range []ArtifactKind{ArtifactBootloaderBinary, ArtifactPartitionTableBinary, ArtifactBootApp0Binary} {
-		if _, ok := artifacts[kind]; ok {
-			required = append(required, kind)
-		}
+	if strings.EqualFold(packageMode, "full-flash") {
+		required = append(required, ArtifactBootloaderBinary, ArtifactPartitionTableBinary, ArtifactBootApp0Binary)
 	}
 	return required
 }

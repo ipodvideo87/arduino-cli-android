@@ -95,6 +95,8 @@ Use it to capture confirmed behavior, evidence, and open questions before making
   - Evidence: native builtin `ctags` failure before patching, where `file` and `readelf` showed an AArch64 ELF with `PT_INTERP /lib/ld-linux-aarch64.so.1`.
 - Shell-script test fixtures that use `/usr/bin/env bash` do not generalize to native Termux; Android-aware exec tests now resolve a shell from `PREFIX/bin/sh` when `GOOS=android`.
   - Evidence: repository test update in `internal/acl/exec/exec_test.go` after the native Termux `fork/exec ... loader.sh: no such file or directory` failure.
+- The Arduino-ESP32 core exposes the ESP32-S3 bootloader in its flash recipe metadata, including `build.bootloader_addr=0x1000` and the bootloader/partition/boot_app0/application flash sequence in `recipe.hooks.objcopy.postobjcopy.*.pattern`.
+  - Evidence: upstream `espressif/arduino-esp32` `platform.txt` on GitHub.
 
 ## 8. GCC / Binutils Internal Executables
 
@@ -124,6 +126,8 @@ Use it to capture confirmed behavior, evidence, and open questions before making
   - Evidence: repository update in `internal/acl/install/android_executor.go` after the native Termux stage failure on permission repair.
 - GCC internal executable patching now uses wrapper launch instead of interpreter rewrite.
   - Evidence: repository implementation, unit tests, and native Termux validation that now gets past the earlier `cc1plus` startup crash.
+- ESP32-S3 firmware packages now need to carry the bootloader artifact and boot flash entry when the core exposes that metadata, otherwise the package should be treated as incomplete rather than silently app-only.
+  - Evidence: repository firmware-package tests plus the upstream Arduino-ESP32 flash recipe metadata.
 - Debug-only tools such as OpenOCD and GDB remain skipped for Android patching.
   - Evidence: `internal/android/patcher.go` and tests.
 - Termux environment scrubbing is preserved.

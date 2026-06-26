@@ -66,6 +66,7 @@ type MemoryUsage struct {
 
 type BuildManifest struct {
 	SchemaVersion    string                    `json:"schema_version,omitempty"`
+	PackageMode      string                    `json:"package_mode,omitempty"`
 	SketchName       string                    `json:"sketch_name,omitempty"`
 	ProjectName      string                    `json:"project_name,omitempty"`
 	Board            string                    `json:"board"`
@@ -93,6 +94,7 @@ type FlashPlanEntry struct {
 }
 
 type FlashPlan struct {
+	PackageMode       string           `json:"package_mode,omitempty"`
 	TargetChip        string           `json:"target_chip,omitempty"`
 	TransportHint     string           `json:"transport_hint,omitempty"`
 	RequiredArtifacts []ArtifactKind   `json:"required_artifacts,omitempty"`
@@ -117,6 +119,7 @@ type ValidationCheck struct {
 
 type ValidationReport struct {
 	PackageName string             `json:"package_name,omitempty"`
+	PackageMode string             `json:"package_mode,omitempty"`
 	Board       string             `json:"board,omitempty"`
 	FQBN        string             `json:"fqbn,omitempty"`
 	TargetChip  string             `json:"target_chip,omitempty"`
@@ -220,6 +223,9 @@ func (p FirmwarePackage) ProfessionalDetails() []string {
 	if p.FlashPlan.TargetChip != "" {
 		details = append(details, "target chip: "+p.FlashPlan.TargetChip)
 	}
+	if p.Manifest.PackageMode != "" {
+		details = append(details, "package mode: "+p.Manifest.PackageMode)
+	}
 	if p.Validation.Status != "" {
 		details = append(details, "validation status: "+string(p.Validation.Status))
 	}
@@ -268,7 +274,11 @@ func (p FlashPlan) Validate() error {
 	}
 	required := p.RequiredArtifacts
 	if len(required) == 0 {
-		required = defaultFlashArtifactKinds
+		if strings.EqualFold(p.PackageMode, "app-only") {
+			required = []ArtifactKind{ArtifactApplicationBinary}
+		} else {
+			required = defaultFlashArtifactKinds
+		}
 	}
 	seenOffsets := map[uint32]struct{}{}
 	seenArtifacts := map[ArtifactKind]struct{}{}
@@ -308,6 +318,9 @@ func (p FlashPlan) RequiredArtifactKinds() []ArtifactKind {
 	if len(p.RequiredArtifacts) > 0 {
 		return append([]ArtifactKind(nil), p.RequiredArtifacts...)
 	}
+	if strings.EqualFold(p.PackageMode, "app-only") {
+		return []ArtifactKind{ArtifactApplicationBinary}
+	}
 	return append([]ArtifactKind(nil), defaultFlashArtifactKinds...)
 }
 
@@ -342,6 +355,7 @@ func (v *DefaultBinaryValidator) Validate(pkg FirmwarePackage) ValidationReport 
 	}
 	report := ValidationReport{
 		PackageName: firstNonEmpty(pkg.Manifest.ProjectName, pkg.Manifest.SketchName, pkg.Manifest.Board),
+		PackageMode: firstNonEmpty(pkg.Manifest.PackageMode, pkg.FlashPlan.PackageMode),
 		Board:       pkg.Manifest.Board,
 		FQBN:        pkg.Manifest.FQBN,
 		TargetChip:  firstNonEmpty(pkg.Manifest.TargetChip, pkg.FlashPlan.TargetChip),
@@ -440,20 +454,42 @@ func (v *DefaultBinaryValidator) Validate(pkg FirmwarePackage) ValidationReport 
 	for _, kind := range requiredKinds {
 		artifact, ok := pkg.Artifact(kind)
 		if !ok {
+			message := "artifact is missing from manifest"
+			switch kind {
+			case ArtifactBootloaderBinary:
+				message = "bootloader artifact is missing from manifest"
+			case ArtifactPartitionTableBinary:
+				message = "partition table artifact is missing from manifest"
+			case ArtifactBootApp0Binary:
+				message = "boot_app0 artifact is missing from manifest"
+			case ArtifactApplicationBinary:
+				message = "application artifact is missing from manifest"
+			}
 			addCheck(ValidationCheck{
 				Name:     fmt.Sprintf("flash-plan:%s", kind),
 				Status:   diagnostics.StatusFailed,
-				Message:  "artifact is missing from manifest",
+				Message:  message,
 				Required: true,
 			})
 			continue
 		}
 		entry, ok := pkg.FlashPlan.entryForArtifact(kind)
 		if !ok {
+			message := "artifact is missing from flash plan"
+			switch kind {
+			case ArtifactBootloaderBinary:
+				message = "bootloader artifact is missing from flash plan"
+			case ArtifactPartitionTableBinary:
+				message = "partition table artifact is missing from flash plan"
+			case ArtifactBootApp0Binary:
+				message = "boot_app0 artifact is missing from flash plan"
+			case ArtifactApplicationBinary:
+				message = "application artifact is missing from flash plan"
+			}
 			addCheck(ValidationCheck{
 				Name:     fmt.Sprintf("flash-plan:%s", kind),
 				Status:   diagnostics.StatusFailed,
-				Message:  "artifact is missing from flash plan",
+				Message:  message,
 				Required: true,
 			})
 			continue
@@ -475,6 +511,17 @@ func (v *DefaultBinaryValidator) Validate(pkg FirmwarePackage) ValidationReport 
 			Path:     entry.Path,
 			Required: true,
 		})
+	}
+
+	if strings.EqualFold(report.PackageMode, "app-only") {
+		if _, ok := pkg.Artifact(ArtifactBootloaderBinary); !ok {
+			addCheck(ValidationCheck{
+				Name:     "bootloader",
+				Status:   diagnostics.StatusWarning,
+				Message:  "bootloader artifact is not present in app-only package mode",
+				Required: false,
+			})
+		}
 	}
 
 	if pkg.Manifest.TargetChip == "" && pkg.FlashPlan.TargetChip == "" {
