@@ -42,7 +42,7 @@ inspect the historical diffs.
 ## Repository Cleanup Complete
 
 - Cleanup date: 2026-06-26
-- Cleanup commit: pending final cleanup commit after branch deletion
+- Cleanup commit: `3ee863e1` (`record branch cleanup`)
 - Deleted branches:
   - `feat/acl-scanner-json-report-iu0ky-queued`
   - `feat/acl-scanner-shebang-interp-check-smpdc-queued`
