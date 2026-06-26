@@ -30,6 +30,11 @@ Native Termux validation always takes priority over container or desktop validat
 - Before designing Android upload or flashing behavior, also read
   [docs/android/ANDROID_UPLOAD_ARCHITECTURE.md](docs/android/ANDROID_UPLOAD_ARCHITECTURE.md)
   and [docs/android/ANDROID_USB_TRANSPORT_FRAMEWORK.md](docs/android/ANDROID_USB_TRANSPORT_FRAMEWORK.md)
+  and [docs/android/USB_TRANSPORT_RESEARCH.md](docs/android/USB_TRANSPORT_RESEARCH.md)
+  and [docs/android/USB_TRANSPORT_ARCHITECTURE.md](docs/android/USB_TRANSPORT_ARCHITECTURE.md)
+  and [docs/android/TRANSPORT_PROVIDER_MODEL.md](docs/android/TRANSPORT_PROVIDER_MODEL.md)
+  and [docs/android/UPLOAD_WORKFLOW_PREVIEW.md](docs/android/UPLOAD_WORKFLOW_PREVIEW.md)
+  and [docs/android/SERIAL_MONITOR_PREVIEW.md](docs/android/SERIAL_MONITOR_PREVIEW.md)
   and the current milestone document under `docs/android/`.
 - If the behavior is not already documented there, research it before guessing.
 - Add new confirmed Android/Termux findings to that file as part of the same work.
@@ -68,6 +73,8 @@ Native Termux validation always takes priority over container or desktop validat
 - Ensure builtin tools are included in the Android patching flow when they are installed under `packages/builtin/tools/...`.
 - Use a transport abstraction for Android upload paths instead of hardcoding `/dev/ttyUSB*` or `/dev/ttyACM*`.
 - Prefer descriptor-driven USB serial detection and PTY-based tool integration over board-specific serial assumptions.
+- Treat transport discovery, permission, connection, protocol, upload, monitor,
+  and diagnostics as distinct reusable layers.
 
 ## Project Goals
 - Run Arduino CLI natively on Android.

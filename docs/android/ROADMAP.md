@@ -19,6 +19,8 @@
 - `README_FLASHING.txt`
 - Validation-environment research
 - Emulated ARM64 smoke-test provider
+- USB transport research and architecture docs
+- USB transport provider model and upload/monitor previews
 
 ## Next Milestones
 
@@ -36,6 +38,8 @@
 - Add desktop validation providers
 - Add Termux-like rootfs and Bionic/sysroot preflight providers if they prove
   useful
+- Implement the first transport provider runtime after the architecture is
+  proven stable
 
 ## Roadmap Notes
 

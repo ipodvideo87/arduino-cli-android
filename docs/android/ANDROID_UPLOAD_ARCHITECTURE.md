@@ -6,6 +6,11 @@ Termux. It is a design record, not an implementation report.
 The architecture is generic. ESP32-S3 is the first validation target, not the
 design center.
 
+The preview-level workflow details now live in:
+
+- [Upload Workflow Preview](UPLOAD_WORKFLOW_PREVIEW.md)
+- [Serial Monitor Preview](SERIAL_MONITOR_PREVIEW.md)
+
 ## Scope
 
 The goal is to make Android upload and serial monitor support work without
@@ -155,6 +160,9 @@ UX implication:
 The compile path now emits a stable firmware package and the install paths now
 run through the shared Android patch pipeline. That is infrastructure only; it
 does not yet prove end-to-end Android USB flashing.
+
+The transport architecture itself is still a design milestone, not runtime
+behavior.
 
 ## Validation Plan
 

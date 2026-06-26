@@ -2,6 +2,9 @@
 
 The transport manager is the capability-based selection layer for ACL.
 
+The deeper provider model is documented in
+[Transport Provider Model](TRANSPORT_PROVIDER_MODEL.md).
+
 It lives in `internal/acl/transport` and is responsible for answering one
 question:
 
@@ -76,3 +79,4 @@ Professional mode can show:
 
 - `internal/acl/transport`
 - [Android USB Transport Framework](ANDROID_USB_TRANSPORT_FRAMEWORK.md)
+- [Transport Provider Model](TRANSPORT_PROVIDER_MODEL.md)

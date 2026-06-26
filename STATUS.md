@@ -23,6 +23,11 @@ does not replace native Android validation.
 - Roadmap: [docs/android/ROADMAP.md](docs/android/ROADMAP.md)
 - Validation Environment Research: [docs/android/VALIDATION_ENVIRONMENT_RESEARCH.md](docs/android/VALIDATION_ENVIRONMENT_RESEARCH.md)
 - Emulated ARM64 Smoke Test Workflow: [docs/android/EMULATED_ARM64_SMOKE_TEST_WORKFLOW.md](docs/android/EMULATED_ARM64_SMOKE_TEST_WORKFLOW.md)
+- USB Transport Research: [docs/android/USB_TRANSPORT_RESEARCH.md](docs/android/USB_TRANSPORT_RESEARCH.md)
+- USB Transport Architecture: [docs/android/USB_TRANSPORT_ARCHITECTURE.md](docs/android/USB_TRANSPORT_ARCHITECTURE.md)
+- Transport Provider Model: [docs/android/TRANSPORT_PROVIDER_MODEL.md](docs/android/TRANSPORT_PROVIDER_MODEL.md)
+- Upload Workflow Preview: [docs/android/UPLOAD_WORKFLOW_PREVIEW.md](docs/android/UPLOAD_WORKFLOW_PREVIEW.md)
+- Serial Monitor Preview: [docs/android/SERIAL_MONITOR_PREVIEW.md](docs/android/SERIAL_MONITOR_PREVIEW.md)
 - Firmware Package Spec: [docs/specifications/FIRMWARE_PACKAGE_SPEC.md](docs/specifications/FIRMWARE_PACKAGE_SPEC.md)
 - Validated Findings: [docs/android/VALIDATED_FINDINGS.md](docs/android/VALIDATED_FINDINGS.md)
 
@@ -87,6 +92,9 @@ Repository cleanup:
 - ESP32-S3 firmware packages now include the bootloader artifact and full-flash flash-plan entry when the Arduino core exposes the bootloader recipe metadata.
 - The ACL compile workflow now reconstructs the firmware package from the compiler snapshot when the on-disk package is missing, so compile success and package-generation failure stay distinct.
 - The validation-environment research docs and emulated ARM64 smoke-test workflow now exist as layered preflight guidance.
+- The Android USB transport research, architecture, provider model, and upload
+  / serial-monitor preview docs now exist as the design basis for future
+  transport work.
 - Platform and tool installs now flow through the shared Android patch pipeline instead of requiring manual permission or chmod repair.
 - The Android install patch pipeline now has a dedicated runtime-permission repair stage that only fixes the copied loader execute bit, while the broader Android patch stage remains responsible for ELF rewriting.
 - Platform and library install paths now consult the compatibility resolver so compatible versions can be preferred over source patching.
@@ -98,7 +106,7 @@ Repository cleanup:
 ## Work In Progress
 
 - Design a reusable native Android USB transport framework inside the existing Termux ecosystem.
-- Define a generic Android upload and monitor bridge that stays board-agnostic and descriptor-driven.
+- Define a generic Android upload and monitor bridge that stays board-agnostic, descriptor-driven, and provider-based.
 - Validate firmware upload and serial monitor behavior through the new transport implementation on real hardware.
 - Finish the Android preflight and dry-run reporting surfaces so they can be consumed by future UI workspaces.
 - Keep the development workflow aligned with the two-environment model: native Termux as the source of truth, Ubuntu/proot as a tooling environment.
@@ -129,4 +137,4 @@ Repository cleanup:
 
 ## Next Engineering Milestone
 
-Finish the generic native Android USB serial bridge, validate upload and monitor flow on real hardware, and move Android post-install repair into a shared automatic pipeline. In parallel, refine the ACL CLI diagnostic surfaces for future UI consumption.
+Finish the generic native Android USB transport bridge, validate upload and monitor flow on real hardware, and move Android post-install repair into a shared automatic pipeline. In parallel, refine the ACL CLI diagnostic surfaces for future UI consumption.
