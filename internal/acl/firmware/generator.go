@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -108,6 +109,40 @@ func BuildFirmwarePackage(input BuildInput) (FirmwarePackage, error) {
 	return pkg, nil
 }
 
+func LoadFirmwarePackage(dir string) (FirmwarePackage, error) {
+	if strings.TrimSpace(dir) == "" {
+		return FirmwarePackage{}, fmt.Errorf("package directory is required")
+	}
+	root := filepath.Clean(dir)
+
+	var pkg FirmwarePackage
+	if err := readJSON(filepath.Join(root, "manifest.json"), &pkg.Manifest); err != nil {
+		return FirmwarePackage{}, err
+	}
+	if err := readJSON(filepath.Join(root, "flash-plan.json"), &pkg.FlashPlan); err != nil {
+		return FirmwarePackage{}, err
+	}
+	if err := readJSON(filepath.Join(root, "validation-report.json"), &pkg.Validation); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return FirmwarePackage{}, err
+		}
+		pkg.Validation = NewBinaryValidator().Validate(pkg)
+	}
+	if pkg.Validation.PackageName == "" {
+		pkg.Validation.PackageName = firstNonEmpty(pkg.Manifest.ProjectName, pkg.Manifest.SketchName, pkg.Manifest.Board)
+	}
+	if pkg.Validation.Board == "" {
+		pkg.Validation.Board = pkg.Manifest.Board
+	}
+	if pkg.Validation.FQBN == "" {
+		pkg.Validation.FQBN = pkg.Manifest.FQBN
+	}
+	if pkg.Validation.TargetChip == "" {
+		pkg.Validation.TargetChip = firstNonEmpty(pkg.Manifest.TargetChip, pkg.FlashPlan.TargetChip)
+	}
+	return pkg, nil
+}
+
 func (p FirmwarePackage) WriteToDir(dir string) (FirmwarePackage, error) {
 	if strings.TrimSpace(dir) == "" {
 		return p, fmt.Errorf("output directory is required")
@@ -175,6 +210,14 @@ func writeJSON(path string, value any) error {
 	}
 	data = append(data, '\n')
 	return os.WriteFile(path, data, 0o644)
+}
+
+func readJSON(path string, value any) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, value)
 }
 
 func collectBuildArtifacts(buildPath *paths.Path, props *properties.Map, projectName string) (map[ArtifactKind]Artifact, error) {

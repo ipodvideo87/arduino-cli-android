@@ -45,6 +45,10 @@ extraction and before registration. The ACL executor wraps the existing Android
 patcher so the pipeline can record the lifecycle without hardcoding board
 specific behavior into Arduino CLI.
 
+The CLI-facing `arduino-cli acl bootstrap` command now uses the same pipeline
+model in read-only mode so bootstrap checks and installation behavior stay on
+the same architecture.
+
 ## Stage Model
 
 The canonical stages are:
@@ -74,6 +78,7 @@ The shared stage should be invoked from:
 - core install
 - tool install
 - any future package install path that carries executables
+- CLI bootstrap checks and dry-run validation surfaces
 
 Source-only libraries should not be forced through ELF repair unless they
 contain executable payloads.

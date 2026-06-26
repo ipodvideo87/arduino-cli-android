@@ -21,6 +21,26 @@ type ValidationReport struct {
 	Notes    []string            `json:"notes,omitempty"`
 }
 
+func (r ValidationReport) JSON() ([]byte, error) {
+	return json.MarshalIndent(r, "", "  ")
+}
+
+func (r ValidationReport) BeginnerSummary() string {
+	if r.Summary.Passed {
+		return "validation passed"
+	}
+	return fmt.Sprintf("validation failed with %d errors and %d warnings", r.Summary.Errors, r.Summary.Warnings)
+}
+
+func (r ValidationReport) FindingsDetails() []string {
+	details := make([]string, 0, len(r.Findings)+len(r.Notes))
+	for _, finding := range r.Findings {
+		details = append(details, fmt.Sprintf("%s [%s/%s]: %s", finding.RelativePath, finding.Severity, finding.CompatibilityCategory, strings.Join(finding.Messages, "; ")))
+	}
+	details = append(details, r.Notes...)
+	return details
+}
+
 type ValidationSummary struct {
 	TotalFilesScanned        int  `json:"total_files_scanned"`
 	ExecutableELFs           int  `json:"executable_elf_count"`
@@ -98,10 +118,6 @@ func (s *Scanner) Validate(root string) (ValidationReport, error) {
 		return ValidationReport{}, err
 	}
 	return ValidateReport(report), nil
-}
-
-func (r ValidationReport) JSON() ([]byte, error) {
-	return json.MarshalIndent(r, "", "  ")
 }
 
 func FormatValidationReport(report ValidationReport) string {

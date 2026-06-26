@@ -230,6 +230,18 @@ func (m PatchManifest) Summary() string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
+func (m PatchManifest) StageSummaries() []string {
+	summaries := make([]string, 0, len(m.Stages))
+	for _, stage := range m.Stages {
+		line := fmt.Sprintf("%s: %s", stage.Name, stage.Status)
+		if stage.Message != "" {
+			line += " (" + stage.Message + ")"
+		}
+		summaries = append(summaries, line)
+	}
+	return summaries
+}
+
 func (m PatchManifest) Clone() PatchManifest {
 	clone := m
 	clone.Stages = append([]PatchStage(nil), m.Stages...)

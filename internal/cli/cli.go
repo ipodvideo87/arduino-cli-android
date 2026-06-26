@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/arduino/arduino-cli/internal/cli/acl"
 	"github.com/arduino/arduino-cli/internal/cli/board"
 	"github.com/arduino/arduino-cli/internal/cli/burnbootloader"
 	"github.com/arduino/arduino-cli/internal/cli/cache"
@@ -146,6 +147,7 @@ func NewCommand(srv rpc.ArduinoCoreServiceServer) *cobra.Command {
 
 	cmd.AddCommand(board.NewCommand(srv))
 	cmd.AddCommand(cache.NewCommand(srv))
+	cmd.AddCommand(acl.NewCommand(srv))
 	cmd.AddCommand(compile.NewCommand(srv, settings))
 	cmd.AddCommand(completion.NewCommand())
 	cmd.AddCommand(config.NewCommand(srv, settings))

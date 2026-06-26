@@ -54,16 +54,26 @@ does not replace native Android validation.
 - The ACL compatibility layer now exists as a rule-based decision layer for runtime, library, firmware, and transport compatibility.
 - The ACL diagnostics workflow now exists as a shared pending/running/passed/warning/failed/skipped status model.
 - The Android install patch pipeline now has a formal status-tracking foundation for download, extract, patch, runtime-fix, validation, register, self-test, and ready stages.
+- The ACL engine now exists as the orchestration layer for ordered workflows, structured events, and machine-readable workflow reports.
+- The experimental `acl workflow compile` command now exists and drives the ACL compile workflow on top of the existing compile service path.
 - Successful compiles now produce a stable firmware package with manifest, flash plan, validation report, hashes, and copied artifacts.
 - Platform and tool installs now flow through the shared Android patch pipeline instead of requiring manual permission or chmod repair.
 - Platform and library install paths now consult the compatibility resolver so compatible versions can be preferred over source patching.
+- ACL-facing scanner, verifier, patch-preview, and bootstrap wrapper packages now exist on top of the current architecture.
+- The `arduino-cli acl` command group now exposes scanner, verifier, patch-preview, and bootstrap entry points for CLI-facing diagnostics.
+- The `arduino-cli acl workflow` experimental subcommands now expose the ACL engine for bootstrap and diagnostics workflows.
+- Bootstrap reporting now reuses the Android install patch pipeline in read-only form and carries the known `.acl/runtime/ld-linux-aarch64.so.1` permission-denied evidence path in validation details.
 
 ## Work In Progress
 
 - Design a reusable native Android USB transport framework inside the existing Termux ecosystem.
 - Define a generic Android upload and monitor bridge that stays board-agnostic and descriptor-driven.
 - Validate firmware upload and serial monitor behavior through the new transport implementation on real hardware.
+- Finish the Android preflight and dry-run reporting surfaces so they can be consumed by future UI workspaces.
 - Keep the development workflow aligned with the two-environment model: native Termux as the source of truth, Ubuntu/proot as a tooling environment.
+- Polish the ACL CLI diagnostic surfaces and wire them into future workspace UI layers.
+- Validate the experimental ACL compile workflow end-to-end on real sketches and tighten the report surface before promoting it further.
+- Extend the ACL engine with flash hooks once the lower-level hooks are ready to use end-to-end.
 
 ## Known Blockers
 
@@ -88,4 +98,4 @@ does not replace native Android validation.
 
 ## Next Engineering Milestone
 
-Finish the generic native Android USB serial bridge, validate upload and monitor flow on real hardware, and move Android post-install repair into a shared automatic pipeline.
+Finish the generic native Android USB serial bridge, validate upload and monitor flow on real hardware, and move Android post-install repair into a shared automatic pipeline. In parallel, refine the ACL CLI diagnostic surfaces for future UI consumption.

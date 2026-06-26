@@ -47,6 +47,22 @@ The firmware package validator, Android patch pipeline, and compatibility
 reports already use this shared status vocabulary in code. The UI can consume
 the same shape later without changing the backend model.
 
+The CLI ACL commands also reuse the same vocabulary:
+
+- `acl scan`
+- `acl verify`
+- `acl patch-preview`
+- `acl bootstrap`
+- `acl workflow compile`
+- `acl workflow bootstrap`
+- `acl workflow diagnostics`
+
+That keeps beginner summaries, advanced step lists, and professional traces on
+one status model instead of inventing separate progress encodings.
+
+The orchestration layer that emits these reports lives in
+[ACL Engine Architecture](ACL_ENGINE_ARCHITECTURE.md).
+
 ## UI Implication
 
 The UI can render the same workflow in three ways:

@@ -40,6 +40,22 @@ type Report struct {
 	Extras  map[string]interface{} `json:"extras,omitempty"`
 }
 
+func (r Report) JSON() ([]byte, error) {
+	return json.MarshalIndent(r, "", "  ")
+}
+
+func (r Report) BeginnerSummary() string {
+	return fmt.Sprintf("%d entries scanned, %d warnings", r.Summary.TotalEntries, len(r.Notes))
+}
+
+func (r Report) ProfessionalDetails() []string {
+	details := make([]string, 0, len(r.Entries))
+	for _, entry := range r.Entries {
+		details = append(details, fmt.Sprintf("%s: %s (%s)", entry.RelativePath, entry.ExecutableType, entry.CompatibilityCategory))
+	}
+	return details
+}
+
 type Summary struct {
 	TotalByCategory map[string]int `json:"total_by_category"`
 	TotalByType     map[string]int `json:"total_by_type"`
@@ -392,10 +408,6 @@ func DefaultPackagesRoot() (string, error) {
 		return "", err
 	}
 	return filepath.Join(home, ".arduino15", "packages"), nil
-}
-
-func (r Report) JSON() ([]byte, error) {
-	return json.MarshalIndent(r, "", "  ")
 }
 
 func FormatReport(report Report) string {

@@ -38,6 +38,9 @@ Native Termux validation always takes priority over container or desktop validat
 - The Android post-install pipeline should be shared and automatic: extract, patch or repair, validate, register, and self-test. Platform and tool installers should call it; library installs should opt in only when they contain executable payloads.
 - Treat compatibility as a first-class layer. Prefer compatible library selection over source patching, record compatibility decisions in build and install reports, and surface beginner-friendly and professional detail separately.
 - Successful compiles should emit a first-class firmware package and install flows should pass through the shared Android patch pipeline, but USB flashing remains a separate milestone until proven on-device.
+- The `arduino-cli acl` command group is the CLI-facing diagnostic surface for scanner, verifier, patch preview, and bootstrap workflows. Keep its beginner/professional separation aligned with the underlying ACL reports.
+- The ACL engine is the orchestration boundary for future workspace and GUI calls. Prefer adding workflow steps there instead of teaching UI layers to call scanner/verifier/patch-preview utilities directly.
+- The known `.acl/runtime/ld-linux-aarch64.so.1` permission-denied case should remain visible in validation and bootstrap evidence instead of being hidden behind a manual repair step.
 
 ## Core Principles
 - Android-first engineering.

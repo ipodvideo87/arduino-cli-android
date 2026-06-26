@@ -170,6 +170,62 @@ func (p FirmwarePackage) Validate() error {
 	return nil
 }
 
+func (r ValidationReport) BeginnerSummary() string {
+	switch {
+	case r.Status == diagnostics.StatusFailed || len(r.Errors) > 0:
+		if len(r.Errors) > 0 {
+			return "validation failed: " + r.Errors[0]
+		}
+		return "validation failed"
+	case r.Status == diagnostics.StatusWarning || len(r.Warnings) > 0:
+		if len(r.Warnings) > 0 {
+			return "validation warning: " + r.Warnings[0]
+		}
+		return "validation warning"
+	case r.Status == diagnostics.StatusPassed:
+		return "validation passed"
+	default:
+		return "validation pending"
+	}
+}
+
+func (p FirmwarePackage) BeginnerSummary() string {
+	parts := []string{}
+	if summary := p.Validation.BeginnerSummary(); strings.TrimSpace(summary) != "" {
+		parts = append(parts, summary)
+	}
+	if len(parts) == 0 {
+		return "firmware package ready"
+	}
+	return strings.Join(parts, "; ")
+}
+
+func (p FirmwarePackage) ProfessionalDetails() []string {
+	details := []string{}
+	if p.Manifest.ProjectName != "" {
+		details = append(details, "project: "+p.Manifest.ProjectName)
+	}
+	if p.Manifest.Board != "" {
+		details = append(details, "board: "+p.Manifest.Board)
+	}
+	if p.Manifest.FQBN != "" {
+		details = append(details, "fqbn: "+p.Manifest.FQBN)
+	}
+	if p.Manifest.CoreVersion != "" {
+		details = append(details, "core version: "+p.Manifest.CoreVersion)
+	}
+	if p.Manifest.ToolchainVersion != "" {
+		details = append(details, "toolchain version: "+p.Manifest.ToolchainVersion)
+	}
+	if p.FlashPlan.TargetChip != "" {
+		details = append(details, "target chip: "+p.FlashPlan.TargetChip)
+	}
+	if p.Validation.Status != "" {
+		details = append(details, "validation status: "+string(p.Validation.Status))
+	}
+	return details
+}
+
 func (m BuildManifest) Validate() error {
 	switch {
 	case strings.TrimSpace(m.Board) == "":
