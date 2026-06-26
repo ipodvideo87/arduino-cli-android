@@ -12,6 +12,23 @@ Native Termux on Android is the production target and final validation environme
 Ubuntu inside `proot-distro` is used for development tooling and repository work, but it
 does not replace native Android validation.
 
+## Living Institutional Memory
+
+- Project North Star: [docs/android/PROJECT_NORTH_STAR.md](docs/android/PROJECT_NORTH_STAR.md)
+- Living Institutional Memory: [docs/android/LIVING_INSTITUTIONAL_MEMORY.md](docs/android/LIVING_INSTITUTIONAL_MEMORY.md)
+- Engineering Decisions: [docs/android/ENGINEERING_DECISIONS.md](docs/android/ENGINEERING_DECISIONS.md)
+- Architecture Overview: [docs/android/ARCHITECTURE_OVERVIEW.md](docs/android/ARCHITECTURE_OVERVIEW.md)
+- Development Workflow: [docs/android/DEVELOPMENT_WORKFLOW.md](docs/android/DEVELOPMENT_WORKFLOW.md)
+- Validation Policy: [docs/android/VALIDATION_POLICY.md](docs/android/VALIDATION_POLICY.md)
+- Roadmap: [docs/android/ROADMAP.md](docs/android/ROADMAP.md)
+- Firmware Package Spec: [docs/specifications/FIRMWARE_PACKAGE_SPEC.md](docs/specifications/FIRMWARE_PACKAGE_SPEC.md)
+- Validated Findings: [docs/android/VALIDATED_FINDINGS.md](docs/android/VALIDATED_FINDINGS.md)
+
+Current validation posture:
+- Native Termux remains the source of truth for Android behavior.
+- Unit tests and CLI/build verification are useful, but not sufficient for Android claims.
+- USB flashing is still unimplemented and must not be claimed as complete.
+
 ## Completed Milestones
 
 - The repository has been freshly cloned and rebuilt from GitHub.

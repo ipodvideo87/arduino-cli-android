@@ -14,7 +14,17 @@ There are intentionally two Linux environments in this project:
 Native Termux validation always takes priority over container or desktop validation.
 
 ## Android Research Policy
-- Before making Android-specific changes, read [docs/android/ANDROID_COMPATIBILITY_RESEARCH.md](docs/android/ANDROID_COMPATIBILITY_RESEARCH.md).
+- Before making Android-specific changes or any architecture-level change, read:
+  - [docs/android/PROJECT_NORTH_STAR.md](docs/android/PROJECT_NORTH_STAR.md)
+  - [docs/android/LIVING_INSTITUTIONAL_MEMORY.md](docs/android/LIVING_INSTITUTIONAL_MEMORY.md)
+  - [docs/android/ENGINEERING_DECISIONS.md](docs/android/ENGINEERING_DECISIONS.md)
+  - [docs/android/ARCHITECTURE_OVERVIEW.md](docs/android/ARCHITECTURE_OVERVIEW.md)
+  - [docs/android/DEVELOPMENT_WORKFLOW.md](docs/android/DEVELOPMENT_WORKFLOW.md)
+  - [docs/android/VALIDATION_POLICY.md](docs/android/VALIDATION_POLICY.md)
+  - [docs/android/ROADMAP.md](docs/android/ROADMAP.md)
+  - [docs/specifications/FIRMWARE_PACKAGE_SPEC.md](docs/specifications/FIRMWARE_PACKAGE_SPEC.md)
+  - [docs/android/VALIDATED_FINDINGS.md](docs/android/VALIDATED_FINDINGS.md)
+- Before making Android-specific changes, also read [docs/android/ANDROID_COMPATIBILITY_RESEARCH.md](docs/android/ANDROID_COMPATIBILITY_RESEARCH.md).
 - Before designing Android upload or flashing behavior, also read
   [docs/android/ANDROID_UPLOAD_ARCHITECTURE.md](docs/android/ANDROID_UPLOAD_ARCHITECTURE.md)
   and [docs/android/ANDROID_USB_TRANSPORT_FRAMEWORK.md](docs/android/ANDROID_USB_TRANSPORT_FRAMEWORK.md)
@@ -38,6 +48,8 @@ Native Termux validation always takes priority over container or desktop validat
 - The Android post-install pipeline should be shared and automatic: extract, patch or repair, validate, register, and self-test. Platform and tool installers should call it; library installs should opt in only when they contain executable payloads.
 - Treat compatibility as a first-class layer. Prefer compatible library selection over source patching, record compatibility decisions in build and install reports, and surface beginner-friendly and professional detail separately.
 - Successful compiles should emit a first-class firmware package and install flows should pass through the shared Android patch pipeline, but USB flashing remains a separate milestone until proven on-device.
+- Keep docs and `STATUS.md` updated when architecture, assumptions, or validation evidence changes.
+- Do not claim success beyond the validation level actually achieved.
 - The `arduino-cli acl` command group is the CLI-facing diagnostic surface for scanner, verifier, patch preview, and bootstrap workflows. Keep its beginner/professional separation aligned with the underlying ACL reports.
 - The ACL engine is the orchestration boundary for future workspace and GUI calls. Prefer adding workflow steps there instead of teaching UI layers to call scanner/verifier/patch-preview utilities directly.
 - The known `.acl/runtime/ld-linux-aarch64.so.1` permission-denied case should remain visible in validation and bootstrap evidence instead of being hidden behind a manual repair step.
@@ -103,6 +115,8 @@ Do not claim a milestone is complete until it has been verified through real-wor
 - Future work must be clearly identified as planned, experimental, or unverified.
 - Avoid absolute statements unless they have been validated.
 - Every change should leave the documentation in a more accurate state than before.
+- Push after completed validated change sets unless instructed otherwise.
+- When unsure, document assumptions and open questions explicitly.
 
 ## Repository Status
 - `STATUS.md` is the canonical snapshot of current project progress.
@@ -113,6 +127,7 @@ Do not claim a milestone is complete until it has been verified through real-wor
 - `STATUS.md` should always identify known blockers.
 - `STATUS.md` should always identify the next engineering milestone.
 - Update `STATUS.md` whenever a milestone meaningfully changes.
+- Treat the docs listed above as living institutional memory and keep them current.
 
 ## Proof Before Claims
 - Document functionality as complete only after it has been demonstrated through reproducible validation.
