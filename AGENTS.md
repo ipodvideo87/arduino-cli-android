@@ -131,6 +131,19 @@ Do not claim a milestone is complete until it has been verified through real-wor
 - Update `STATUS.md` whenever a milestone meaningfully changes.
 - Treat the docs listed above as living institutional memory and keep them current.
 
+## Repository Hygiene
+
+- Experimental branches are temporary.
+- Once a branch's useful ideas have been implemented, documented, intentionally
+  rejected, or preserved elsewhere, review it for retirement.
+- Prefer preserving knowledge in implementation, architecture, engineering
+  decisions, specifications, validation findings, and living institutional
+  memory rather than in stale Git branches.
+- Future agents should treat queued branches as disposable after review, not as
+  archives of record.
+- Keep `STATUS.md` and the Android docs aligned with the current branch and
+  cleanup posture.
+
 ## Proof Before Claims
 - Document functionality as complete only after it has been demonstrated through reproducible validation.
 - `Implemented` means the code path exists, but may not have been exercised beyond basic development.

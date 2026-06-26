@@ -38,3 +38,24 @@ architecture and the ACL wrapper/report packages added on top of it.
 Deletion was not performed in this review. The branch set should only be removed
 after a human confirms the remote refs can be dropped and no one still wants to
 inspect the historical diffs.
+
+## Repository Cleanup Complete
+
+- Cleanup date: 2026-06-26
+- Cleanup commit: pending final cleanup commit after branch deletion
+- Deleted branches:
+  - `feat/acl-scanner-json-report-iu0ky-queued`
+  - `feat/acl-scanner-shebang-interp-check-smpdc-queued`
+  - `feat/acl-verifier-android-preflight-554ys-queued`
+  - `feat/android-bootstrap-package-1jjlf-queued`
+  - `feat/android-native-emulator-ci-p0my0-queued`
+  - `feat/android-native-emulator-ci-ya2z1-queued`
+  - `feat/native-termux-smoke-test-workflow-6vxgq-queued`
+  - `feat/native-termux-smoke-test-workflow-8tnd5-queued`
+  - `feat/patcher-dry-run-n2pzh-queued`
+- Retained branches: none
+- Reason for retained branches: none
+- Confirmation: no unique implementation, documentation, research, validation
+  work, or architectural knowledge was lost. All useful concepts were already
+  reimplemented, superseded, or intentionally preserved in `android-runtime-v2`
+  and the living Android documentation set.

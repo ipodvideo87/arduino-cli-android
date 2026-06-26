@@ -32,6 +32,12 @@ Current validation posture:
 - Emulated ARM64 smoke tests are useful preflight checks only and do not prove Android success.
 - USB flashing is still unimplemented and must not be claimed as complete.
 
+Repository cleanup:
+- The queued-branch review is complete.
+- `android-runtime-v2` is the canonical development branch for current Android work.
+- Superseded `*-queued` branches are being retired only after their useful ideas
+  have been preserved in docs, code, or validation history.
+
 ## Completed Milestones
 
 - The repository has been freshly cloned and rebuilt from GitHub.
