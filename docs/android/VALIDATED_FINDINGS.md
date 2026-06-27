@@ -78,6 +78,15 @@ This file is a logbook of tested findings from the project history.
   upload, flashing, or serial monitor behavior
 
 - Environment: native Termux on Samsung A17 / Android 16
+- Command/evidence: `./arduino-cli acl transport probe-fd --device /dev/bus/usb/001/002 --details`
+  and `./arduino-cli --json acl transport probe-fd --device /dev/bus/usb/001/002`
+- Result: the official `probe-fd` command is native-Termux validated for
+  fd handoff, fd observation, and fd inspection
+- Confidence: high
+- Notes: this does not validate byte-stream read/write, serial bridge, upload,
+  flashing, or serial monitor behavior
+
+- Environment: native Termux on Samsung A17 / Android 16
 - Command/evidence: `./arduino-cli acl transport list`,
   `./arduino-cli acl transport diagnose --details`,
   `termux-usb -l`, and `./arduino-cli acl transport acquire --device

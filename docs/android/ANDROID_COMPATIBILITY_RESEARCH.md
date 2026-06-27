@@ -197,12 +197,14 @@ rm -rf ~/.arduino15/packages/esp32 ~/.arduino15/staging ~/.cache/arduino ~/.ardu
     and the `arduino-cli acl transport list|diagnose|acquire|probe-fd` command
     group.
   - Validation checklist: `docs/android/MILESTONE_TERMUX_USB_PROVIDER.md`
-- Native Termux validation now confirms discovery and permission acquisition on
-  Samsung A17 / Android 16, while file-descriptor handoff remains unvalidated.
+- Native Termux validation now confirms discovery, permission acquisition, and
+  official fd-handoff diagnostics on Samsung A17 / Android 16, while
+  byte-stream support remains unvalidated.
   - Evidence: `termux-usb -l` returns `/dev/bus/usb/001/002`, `acl transport
     list` reports one device, `acl transport diagnose --details` reports the
-    same path and the `TERMUX_USB_FD` limitation, and `acl transport acquire`
-    reports permission granted.
+    same path and the `TERMUX_USB_FD` limitation, `acl transport acquire`
+    reports permission granted, and `acl transport probe-fd --details` reports
+    `fd_source=environment` and `fd_inspectable=true`
 - The repository now also contains a bounded `probe-fd` / `probe-fd-helper`
   implementation that records `TERMUX_USB_FD` handoff evidence without
   claiming a usable stream.

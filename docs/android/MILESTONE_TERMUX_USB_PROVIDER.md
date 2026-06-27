@@ -15,6 +15,9 @@ Validated behaviors:
 
 - discovery
 - permission acquisition
+- TERMUX_USB_FD handoff
+- fd observation
+- fd inspection
 
 Not validated by this milestone:
 
@@ -22,7 +25,7 @@ Not validated by this milestone:
 - flashing
 - serial monitor
 - usable byte-stream endpoint
-- TERMUX_USB_FD handoff probe on native Termux
+- byte-stream read/write
 
 ## Scope
 
@@ -249,20 +252,23 @@ Observed on the Samsung A17 / Android 16 / native Termux environment:
   - now constructs `termux-usb -r -E -e "./arduino-cli acl transport probe-fd-helper --json" /dev/bus/usb/001/002`
   - if `termux-usb` returns `No such device` before helper JSON appears, that is
     a handoff/acquisition failure
+- `./arduino-cli --json acl transport probe-fd --device /dev/bus/usb/001/002`
+  - JSON output is validated
 
 Validated conclusion:
 
 - discovery is native-Termux validated
 - permission acquisition is native-Termux validated
-- file-descriptor handoff remains unvalidated
+- TERMUX_USB_FD handoff is native-Termux validated
+- fd observation is native-Termux validated
+- fd inspection is native-Termux validated
 - upload, flashing, and serial monitor remain unvalidated
 
 Next recommended milestone:
 
-- `TERMUX_USB_FD` handoff probe / byte-stream bridge foundation
-- native-Termux validation of `acl transport probe-fd`
-- validate both `-E` and argv handoff paths on native Termux and record the
-  observed `fd_source` in the findings log
+- bounded byte-stream bridge foundation
+- validate `read_state` and `write_state` without claiming upload or serial
+  bridge success
 
 ## What Success Means
 

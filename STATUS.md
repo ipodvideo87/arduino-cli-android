@@ -46,6 +46,8 @@ Current validation posture:
   the earlier TERMUX_USB_FD mismatch.
 - Native Termux has now confirmed the working probe shape:
   `termux-usb -r -E -e "./arduino-cli acl transport probe-fd-helper --json" /dev/bus/usb/001/002`.
+- Native Termux has now validated `./arduino-cli acl transport probe-fd --device /dev/bus/usb/001/002 --details`
+  and `./arduino-cli --json acl transport probe-fd --device /dev/bus/usb/001/002`.
 - USB flashing is still unimplemented and must not be claimed as complete.
 
 Repository cleanup:
@@ -132,6 +134,8 @@ Repository cleanup:
   record the observed `fd_source` in `docs/android/VALIDATED_FINDINGS.md`.
 - Keep the `probe-fd` diagnostics aligned with the native `-E -e` handoff shape
   so helper JSON is only parsed after the helper has actually launched.
+- Start bounded byte-stream bridge foundation work only after read/write probing
+  has a concrete, native-Termux validation plan.
 - Finish the Android preflight and dry-run reporting surfaces so they can be consumed by future UI workspaces.
 - Keep the development workflow aligned with the two-environment model: native Termux as the source of truth, Ubuntu/proot as a tooling environment.
 - Polish the ACL CLI diagnostic surfaces and wire them into future workspace UI layers.
@@ -156,8 +160,9 @@ Repository cleanup:
 - Native Android upload/flash architecture is not yet implemented end-to-end; it still needs a reusable USB host and serial bridge before upload is marked complete.
 - The cause of the intermittent `termux-usb` acquisition/opening failures remains unknown.
 - Termux USB discovery and permission acquisition are now validated on Samsung A17 / Android 16, but `TERMUX_USB_FD` handoff remains unproven.
-- The bounded TERMUX_USB_FD probe exists in code and tests, but native Termux
-  validation of the fixed env/argv fd-source handling is still pending.
+- The bounded TERMUX_USB_FD probe exists in code and tests, and native Termux
+  validation of the official `probe-fd` command now confirms fd handoff,
+  observation, and inspection.
 - Successful proot execution does not prove Android-native compatibility.
 - Firmware upload on real hardware has not yet been demonstrated.
 - The Android USB transport bridge is not yet implemented, so end-to-end upload remains unproven.
