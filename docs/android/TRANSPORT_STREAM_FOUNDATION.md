@@ -54,6 +54,12 @@ The main `TransportStream` contract stays intentionally small. More specialized
 behaviors are optional interfaces so future transports can expose only what they
 actually support.
 
+Stability note:
+
+- the transport API is stabilizing
+- `StreamSession` is the preferred session name
+- `ByteStreamSession` exists only as a compatibility alias
+
 ## Lifecycle Model
 
 The stream report now has explicit lifecycle states:
@@ -184,4 +190,3 @@ The stream layer is meant to be consumed by:
 - future desktop validation providers
 
 Those consumers should depend on `TransportStream`, not on Android USB APIs.
-

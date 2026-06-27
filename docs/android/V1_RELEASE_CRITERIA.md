@@ -30,6 +30,7 @@ Status values:
 | Validation Engine | In Progress | Unit tests and native validation policies exist; provider coverage is still expanding. |
 | Android Transport | Native Validated | Discovery, permission, diagnostics, and fd-handoff evidence are validated on native Termux. |
 | Transport Stream Foundation | Implemented | Bounded stream contracts and diagnostics exist; native byte-stream validation is still pending. |
+| Transport API | Stabilizing | Provider, manager, session, and stream contracts are acceptable for upload-engine foundation work; breaking changes are not expected. |
 | Upload Engine | Planned | Must consume transport providers/streams, not Android USB internals. |
 | Flash Engine | Planned | Must remain transport-based and device-agnostic. |
 | Serial Monitor | Planned | Must consume the same transport stream contract. |
@@ -49,10 +50,11 @@ Before claiming V1 release readiness:
 4. The transport stream layer must have native validation for bounded byte
    stream behavior if upload or monitor features depend on it.
 5. Documentation and validation findings must match the implemented behavior.
+6. The transport API should remain additive unless a concrete contract bug makes a
+   breaking change necessary.
 
 ## Current Non-Goals
 
 - USB flashing is not yet a release claim.
 - Serial monitor behavior is not yet a release claim.
 - Transport stream byte-read/byte-write behavior is still experimental.
-

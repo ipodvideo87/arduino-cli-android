@@ -407,15 +407,14 @@ type TransportSession interface {
 	Diagnostics() TransportDiagnosticsReport
 }
 
-type ByteStreamSession interface {
-	TransportSession
-	Stream() (TransportStream, error)
-}
-
+// StreamSession is the preferred name for a session that can expose a byte stream.
 type StreamSession interface {
 	TransportSession
 	Stream() (TransportStream, error)
 }
+
+// ByteStreamSession is retained for compatibility. Prefer StreamSession.
+type ByteStreamSession = StreamSession
 
 type ControlLineSession interface {
 	TransportSession
@@ -555,6 +554,47 @@ type TransportStreamDiagnosticsReport struct {
 	Metadata         map[string]string       `json:"metadata,omitempty"`
 }
 
+func (r TransportStreamDiagnosticsReport) HasContent() bool {
+	return strings.TrimSpace(r.SchemaVersion) != "" ||
+		r.Status != "" ||
+		strings.TrimSpace(r.Provider) != "" ||
+		r.ProviderKind != "" ||
+		strings.TrimSpace(r.Device.Provider) != "" ||
+		strings.TrimSpace(r.Device.DisplayName) != "" ||
+		strings.TrimSpace(r.Device.StableID) != "" ||
+		r.State != "" ||
+		strings.TrimSpace(r.StateReason) != "" ||
+		r.FDEnvPresent ||
+		strings.TrimSpace(r.FDEnvValue) != "" ||
+		r.FDObserved ||
+		r.FDValid ||
+		r.FDInspectable ||
+		strings.TrimSpace(r.FDSource) != "" ||
+		strings.TrimSpace(r.HandoffMode) != "" ||
+		len(r.HelperArgs) > 0 ||
+		strings.TrimSpace(r.TermuxUSBCommand) != "" ||
+		r.StreamSupported ||
+		r.StreamProven ||
+		r.Timeouts != (TransportStreamTimeouts{}) ||
+		r.BytesRead != 0 ||
+		r.BytesWritten != 0 ||
+		!r.LastActivity.IsZero() ||
+		strings.TrimSpace(r.CloseReason) != "" ||
+		strings.TrimSpace(r.DisconnectReason) != "" ||
+		r.ReadState != "" ||
+		r.WriteState != "" ||
+		r.CloseState != "" ||
+		r.EOFState != "" ||
+		r.DisconnectState != "" ||
+		len(r.Warnings) > 0 ||
+		len(r.Limitations) > 0 ||
+		len(r.Traces) > 0 ||
+		strings.TrimSpace(r.Beginner) != "" ||
+		len(r.Professional) > 0 ||
+		strings.TrimSpace(r.NextStep) != "" ||
+		len(r.Metadata) > 0
+}
+
 func (r TransportStreamDiagnosticsReport) BeginnerSummary() string {
 	if strings.TrimSpace(r.Beginner) != "" {
 		return r.Beginner
@@ -587,6 +627,12 @@ func (r TransportStreamDiagnosticsReport) ProfessionalDetails() []string {
 	if r.StateReason != "" {
 		details = append(details, "state reason: "+r.StateReason)
 	}
+	if r.StreamSupported {
+		details = append(details, "stream supported: true")
+	}
+	if r.StreamProven {
+		details = append(details, "stream proven: true")
+	}
 	if r.FDEnvPresent {
 		details = append(details, "TERMUX_USB_FD present")
 	}
@@ -610,6 +656,21 @@ func (r TransportStreamDiagnosticsReport) ProfessionalDetails() []string {
 	}
 	if r.TermuxUSBCommand != "" {
 		details = append(details, "termux-usb command: "+r.TermuxUSBCommand)
+	}
+	if r.ReadState != "" {
+		details = append(details, "read state: "+string(r.ReadState))
+	}
+	if r.WriteState != "" {
+		details = append(details, "write state: "+string(r.WriteState))
+	}
+	if r.CloseState != "" {
+		details = append(details, "close state: "+string(r.CloseState))
+	}
+	if r.EOFState != "" {
+		details = append(details, "eof state: "+string(r.EOFState))
+	}
+	if r.DisconnectState != "" {
+		details = append(details, "disconnect state: "+string(r.DisconnectState))
 	}
 	if r.Timeouts.Read != 0 || r.Timeouts.Write != 0 || r.Timeouts.Idle != 0 {
 		details = append(details, fmt.Sprintf("timeouts: read=%s write=%s idle=%s", r.Timeouts.Read, r.Timeouts.Write, r.Timeouts.Idle))

@@ -142,3 +142,19 @@ These decisions use an ADR-style format.
   breaking the UI contract.
 - Validation/evidence if available: firmware package schema and analysis placeholder
   implementation.
+
+## Transport API is stabilizing before upload depends on it
+
+- Status: accepted
+- Context: Upload and monitor workflows will depend on the transport provider,
+  manager, session, and stream contracts, so those contracts need to settle
+  before the next layer is built.
+- Decision: treat the current transport API as stabilizing; keep changes
+  additive when possible and preserve compatibility aliases such as
+  `ByteStreamSession`.
+- Alternatives considered: freezing the API now with no further refinements;
+  leaving the contract fully experimental until upload is complete.
+- Consequences: upload work can build on a clear contract boundary while the
+  stream implementation remains experimentally validated.
+- Validation/evidence if available: transport provider tests, stream wrapper
+  tests, and native Termux fd-handoff diagnostics.

@@ -25,6 +25,7 @@ Native Termux validation always takes priority over container or desktop validat
   - [docs/android/VALIDATION_ENVIRONMENT_RESEARCH.md](docs/android/VALIDATION_ENVIRONMENT_RESEARCH.md)
   - [docs/android/EMULATED_ARM64_SMOKE_TEST_WORKFLOW.md](docs/android/EMULATED_ARM64_SMOKE_TEST_WORKFLOW.md)
   - [docs/android/TRANSPORT_STREAM_FOUNDATION.md](docs/android/TRANSPORT_STREAM_FOUNDATION.md)
+  - [docs/android/TRANSPORT_API_STABILIZATION.md](docs/android/TRANSPORT_API_STABILIZATION.md)
   - [docs/android/V1_RELEASE_CRITERIA.md](docs/android/V1_RELEASE_CRITERIA.md)
   - [docs/specifications/FIRMWARE_PACKAGE_SPEC.md](docs/specifications/FIRMWARE_PACKAGE_SPEC.md)
   - [docs/android/VALIDATED_FINDINGS.md](docs/android/VALIDATED_FINDINGS.md)
@@ -68,6 +69,7 @@ Native Termux validation always takes priority over container or desktop validat
 - Treat compatibility as a first-class layer. Prefer compatible library selection over source patching, record compatibility decisions in build and install reports, and surface beginner-friendly and professional detail separately.
 - Successful compiles should emit a first-class firmware package and install flows should pass through the shared Android patch pipeline, but USB flashing remains a separate milestone until proven on-device.
 - Treat the transport stream foundation as reusable infrastructure. Keep byte-stream claims experimental until native Termux validation proves them, and preserve stream diagnostics even when live byte-stream support is unavailable.
+- Read [docs/android/TRANSPORT_API_STABILIZATION.md](docs/android/TRANSPORT_API_STABILIZATION.md) before changing transport contracts. Prefer additive changes; breaking changes should be exceptional and clearly justified.
 - Keep docs and `STATUS.md` updated when architecture, assumptions, or validation evidence changes.
 - Do not claim success beyond the validation level actually achieved.
 - The `arduino-cli acl` command group is the CLI-facing diagnostic surface for scanner, verifier, patch preview, and bootstrap workflows. Keep its beginner/professional separation aligned with the underlying ACL reports.

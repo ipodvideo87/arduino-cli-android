@@ -27,6 +27,7 @@ does not replace native Android validation.
 - USB Transport Architecture: [docs/android/USB_TRANSPORT_ARCHITECTURE.md](docs/android/USB_TRANSPORT_ARCHITECTURE.md)
 - Transport Provider Model: [docs/android/TRANSPORT_PROVIDER_MODEL.md](docs/android/TRANSPORT_PROVIDER_MODEL.md)
 - Transport Stream Foundation: [docs/android/TRANSPORT_STREAM_FOUNDATION.md](docs/android/TRANSPORT_STREAM_FOUNDATION.md)
+- Transport API Stabilization: [docs/android/TRANSPORT_API_STABILIZATION.md](docs/android/TRANSPORT_API_STABILIZATION.md)
 - Termux USB Provider Validation Checklist: [docs/android/MILESTONE_TERMUX_USB_PROVIDER.md](docs/android/MILESTONE_TERMUX_USB_PROVIDER.md)
 - V1 Release Criteria: [docs/android/V1_RELEASE_CRITERIA.md](docs/android/V1_RELEASE_CRITERIA.md)
 - Upload Workflow Preview: [docs/android/UPLOAD_WORKFLOW_PREVIEW.md](docs/android/UPLOAD_WORKFLOW_PREVIEW.md)
@@ -46,6 +47,9 @@ Current validation posture:
 - The transport stream foundation now exists as a reusable bounded stream
   wrapper and report model; the stream state is still experimental until native
   Termux byte-stream validation proves read/write behavior.
+- The transport API is now considered stabilizing: the provider/manager/session/
+  stream contracts are acceptable for upload-engine foundation work, while the
+  byte-stream implementation itself remains experimental.
 - The probe now uses `termux-usb -r -E -e <helper> <device>` and the helper
   accepts both environment and positional-argument fd sources, which resolves
   the earlier TERMUX_USB_FD mismatch.

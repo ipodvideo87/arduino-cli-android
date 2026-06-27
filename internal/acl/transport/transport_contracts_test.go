@@ -394,3 +394,54 @@ func TestTransportManagerDiagnosticsUsesProviderDiagnostics(t *testing.T) {
 	require.Equal(t, diagnostics.StatusPassed, report.PermissionStatus)
 	require.Equal(t, diagnostics.StatusPassed, report.ConnectionStatus)
 }
+
+func TestMergeDiagnosticsPreservesStreamProbeDetails(t *testing.T) {
+	base := TransportDiagnosticsReport{
+		SchemaVersion:    "1",
+		Status:           diagnostics.StatusPassed,
+		DiscoveryStatus:  diagnostics.StatusPassed,
+		PermissionStatus: diagnostics.StatusSkipped,
+		ConnectionStatus: diagnostics.StatusSkipped,
+	}
+	overlay := TransportDiagnosticsReport{
+		StreamProbe: TransportStreamDiagnosticsReport{
+			SchemaVersion:    "1",
+			Status:           diagnostics.StatusWarning,
+			Provider:         "termuxusb",
+			Beginner:         "TERMUX_USB_FD observed via environment",
+			Professional:     []string{"fd handoff observed", "stream support remains experimental"},
+			NextStep:         "validate bounded read/write behavior before claiming stream support",
+			State:            TransportStreamStateExperimental,
+			StateReason:      "experimental stream bridge",
+			ReadState:        StreamObservationExperimental,
+			WriteState:       StreamObservationExperimental,
+			CloseState:       StreamObservationExperimental,
+			EOFState:         StreamObservationExperimental,
+			DisconnectState:  StreamObservationExperimental,
+			FDObserved:       true,
+			FDValid:          true,
+			FDInspectable:    true,
+			FDSource:         "environment",
+			HandoffMode:      "env",
+			StreamSupported:  false,
+			StreamProven:     false,
+			HelperArgs:       []string{"probe-fd-helper", "--json"},
+			TermuxUSBCommand: "termux-usb -r -E -e helper /dev/bus/usb/001/002",
+		},
+	}
+
+	merged := mergeDiagnostics(base, overlay)
+
+	require.Equal(t, diagnostics.StatusWarning, merged.StreamProbe.Status)
+	require.Equal(t, "termuxusb", merged.StreamProbe.Provider)
+	require.Equal(t, "TERMUX_USB_FD observed via environment", merged.StreamProbe.Beginner)
+	require.Contains(t, merged.StreamProbe.Professional, "fd handoff observed")
+	require.Equal(t, "validate bounded read/write behavior before claiming stream support", merged.StreamProbe.NextStep)
+	require.Equal(t, TransportStreamStateExperimental, merged.StreamProbe.State)
+	require.Equal(t, StreamObservationExperimental, merged.StreamProbe.ReadState)
+	require.True(t, merged.StreamProbe.FDObserved)
+	require.Equal(t, "environment", merged.StreamProbe.FDSource)
+	require.Equal(t, "env", merged.StreamProbe.HandoffMode)
+	require.Equal(t, []string{"probe-fd-helper", "--json"}, merged.StreamProbe.HelperArgs)
+	require.Equal(t, "termux-usb -r -E -e helper /dev/bus/usb/001/002", merged.StreamProbe.TermuxUSBCommand)
+}

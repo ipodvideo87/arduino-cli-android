@@ -287,3 +287,10 @@ The architecture is stable if the system can answer these questions cleanly:
 
 That is the reusable foundation for every future hardware interaction in this
 project.
+
+Transport API status:
+
+- stabilizing
+- breaking changes are not expected before upload-engine foundation work
+- byte-stream behavior remains experimental until native Termux read/write
+  validation proves the stream path

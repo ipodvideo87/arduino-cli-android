@@ -48,6 +48,8 @@ Current implementation note:
 - the probe now uses `termux-usb -r -E -e <helper> <device>` and the helper
   accepts both env and argv fd sources so diagnostics can distinguish
   `termux-usb -E` from `termux-usb -e`
+- the transport API is stabilizing; `StreamSession` is the preferred name and
+  `ByteStreamSession` is retained as a compatibility alias
 - byte-stream access, upload, and monitor behavior remain future work
 
 ## Provider Categories

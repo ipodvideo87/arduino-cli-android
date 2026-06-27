@@ -469,7 +469,7 @@ func mergeDiagnostics(base, overlay TransportDiagnosticsReport) TransportDiagnos
 	if overlay.SelectedEndpoint.Kind != "" || overlay.SelectedEndpoint.Path != "" || overlay.SelectedEndpoint.URL != "" {
 		base.SelectedEndpoint = overlay.SelectedEndpoint
 	}
-	if overlay.StreamProbe.SchemaVersion != "" || overlay.StreamProbe.Status != "" || overlay.StreamProbe.Provider != "" || overlay.StreamProbe.State != "" || overlay.StreamProbe.StateReason != "" || overlay.StreamProbe.FDEnvPresent || overlay.StreamProbe.StreamSupported || overlay.StreamProbe.StreamProven || overlay.StreamProbe.Timeouts != (TransportStreamTimeouts{}) || overlay.StreamProbe.BytesRead != 0 || overlay.StreamProbe.BytesWritten != 0 || !overlay.StreamProbe.LastActivity.IsZero() || overlay.StreamProbe.CloseReason != "" || overlay.StreamProbe.DisconnectReason != "" || len(overlay.StreamProbe.Traces) > 0 {
+	if overlay.StreamProbe.HasContent() {
 		base.StreamProbe = overlay.StreamProbe
 	}
 	if overlay.StreamStatus != "" {

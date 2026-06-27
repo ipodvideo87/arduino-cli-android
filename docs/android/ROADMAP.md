@@ -25,6 +25,7 @@
 - Termux USB transport provider, command traces, and safe CLI diagnostics
 - Termux USB fd-handoff probe and transport-stream diagnostics foundation
 - Transport Stream Foundation
+- Transport API Stabilization
 
 ## Next Milestones
 
@@ -36,6 +37,7 @@
 - Validate the transport stream foundation on native Termux
 - Implement the upload workflow
 - Implement the serial monitor workflow
+- Validate the transport API stabilization boundary before upload depends on it
 - Add GUI/workspaces
 - Add project manager UX
 - Add library/platform manager UX
