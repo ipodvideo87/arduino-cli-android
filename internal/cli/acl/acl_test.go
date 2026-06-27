@@ -324,14 +324,15 @@ func TestACLWorkflowUploadCommandJSON(t *testing.T) {
 		return aclengine.WorkflowReport{
 			Name:     "upload",
 			Status:   aclengine.StepStatusPassed,
-			Beginner: "upload dry-run completed",
-			Result: upload.UploadReport{
+			Beginner: "upload execution prepared",
+			Result: upload.UploadExecutionReport{
 				SchemaVersion: "1",
 				Status:        acldiagnostics.StatusPassed,
 				DryRun:        true,
-				Beginner:      "upload dry-run ready",
-				Professional:  []string{"dry-run: true"},
-				Plan: upload.UploadPlan{
+				PrepareOnly:   true,
+				Beginner:      "upload execution prepared",
+				Professional:  []string{"prepare-only: true"},
+				Plan: upload.UploadExecutionPlan{
 					PackageDir: packageDir,
 				},
 			},
@@ -365,7 +366,8 @@ func TestACLWorkflowUploadCommandHelpIsDryRunOnly(t *testing.T) {
 
 	output := buf.String()
 	require.Contains(t, output, "upload <firmware-package>")
-	require.Contains(t, output, "dry-run only by design")
+	require.Contains(t, output, "prepare-only by design")
+	require.Contains(t, output, "ordered upload execution plan")
 	require.NotContains(t, output, "--dry-run")
 	require.NotContains(t, output, "--package")
 }
@@ -379,14 +381,15 @@ func TestACLWorkflowUploadCommandTextAndDetails(t *testing.T) {
 		return aclengine.WorkflowReport{
 			Name:     "upload",
 			Status:   aclengine.StepStatusWarning,
-			Beginner: "upload dry-run completed with warnings",
-			Result: upload.UploadReport{
+			Beginner: "upload execution prepared with warnings",
+			Result: upload.UploadExecutionReport{
 				SchemaVersion: "1",
 				Status:        acldiagnostics.StatusWarning,
 				DryRun:        true,
-				Beginner:      "upload dry-run completed with warnings",
-				Professional:  []string{"dry-run: true", "ready: true"},
-				Plan: upload.UploadPlan{
+				PrepareOnly:   true,
+				Beginner:      "upload execution prepared with warnings",
+				Professional:  []string{"prepare-only: true", "ready: true"},
+				Plan: upload.UploadExecutionPlan{
 					PackageDir: packageDir,
 				},
 			},
@@ -404,9 +407,9 @@ func TestACLWorkflowUploadCommandTextAndDetails(t *testing.T) {
 
 	output := buf.String()
 	require.Contains(t, output, "ACL Workflow Upload")
-	require.Contains(t, output, "upload dry-run completed with warnings")
-	require.Contains(t, output, "dry-run: true")
-	require.Equal(t, 1, strings.Count(output, "dry-run: true"))
+	require.Contains(t, output, "upload execution prepared with warnings")
+	require.Contains(t, output, "prepare-only: true")
+	require.Equal(t, 1, strings.Count(output, "prepare-only: true"))
 }
 
 func TestACLTransportListCommandJSON(t *testing.T) {

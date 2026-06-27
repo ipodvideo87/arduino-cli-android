@@ -1,14 +1,16 @@
 # Upload Engine Architecture
 
-This document defines the ACL-side upload engine boundary that sits between
-firmware packaging and future transport execution.
+This document defines the ACL-side upload boundary that sits between firmware
+packaging and future transport execution.
 
-It is transport-neutral, board-neutral, and currently dry-run only.
+It is transport-neutral, board-neutral, and currently prepare-only.
 
 ## Current Contract
 
-The upload engine consumes a firmware package and derives an ordered upload
-plan. It does not open real transport streams, send bytes, reset hardware, or
+The upload planner consumes a firmware package and derives an ordered upload
+plan. The upload executor then validates the package, plan, artifacts, hashes,
+and transport readiness up to the point where bytes would be written, then
+stops. It does not open real transport streams, send bytes, reset hardware, or
 call `esptool`.
 
 Current CLI surface:
@@ -17,30 +19,31 @@ Current CLI surface:
 arduino-cli acl workflow upload <firmware-package>
 ```
 
-The command is positional and dry-run only.
+The command is positional and prepare-only.
 
 - `--dry-run` is not part of the contract
 - `--package` is not part of the contract
-- the command validates the package and reports the plan instead of executing it
+- the command validates the package and reports the execution-ready plan
+  instead of executing it
 
 ## Report Shape
 
-The upload report should expose one canonical view for the GUI:
+The upload execution report should expose one canonical view for the GUI:
 
 - firmware package metadata
 - flash-plan metadata
 - validation and diagnostics metadata
-- planned upload result summary
+- prepare-only execution result summary
 - progress events
 - beginner summary
 - professional details without duplicate copies of the same information
 
-The workflow layer may still wrap the upload report for orchestration, but the
-canonical upload details should live in the upload report itself.
+The workflow layer may still wrap the upload execution report for orchestration,
+but the canonical upload details should live in the execution report itself.
 
 ## Validation Boundary
 
-Dry-run validation proves:
+Prepare-only validation proves:
 
 - the package exists
 - the manifest is readable
@@ -48,7 +51,7 @@ Dry-run validation proves:
 - required artifacts exist
 - an ordered upload plan can be derived
 
-Dry-run validation does not prove:
+Prepare-only validation does not prove:
 
 - transport availability
 - byte-stream support
@@ -58,7 +61,7 @@ Dry-run validation does not prove:
 
 ## Design Intent
 
-The upload engine is intentionally small and reusable so future work can add:
+The upload stack is intentionally small and reusable so future work can add:
 
 - real transport execution
 - transport selection

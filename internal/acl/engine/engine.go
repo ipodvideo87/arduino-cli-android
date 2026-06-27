@@ -94,19 +94,20 @@ func (b *EventBus) Publish(event Event) error {
 }
 
 type WorkflowContext struct {
-	Root           string
-	RuntimeRoot    string
-	TargetPath     string
-	BuildPath      string
-	OutputDir      string
-	SketchName     string
-	FQBN           string
-	CompileRequest CompileRequest
-	CompileRunner  CompileRunner
-	UploadRequest  upload.UploadRequest
-	Events         *EventBus
-	Metadata       map[string]string
-	Data           map[string]any
+	Root                   string
+	RuntimeRoot            string
+	TargetPath             string
+	BuildPath              string
+	OutputDir              string
+	SketchName             string
+	FQBN                   string
+	CompileRequest         CompileRequest
+	CompileRunner          CompileRunner
+	UploadRequest          upload.UploadRequest
+	UploadExecutionRequest upload.UploadExecutionRequest
+	Events                 *EventBus
+	Metadata               map[string]string
+	Data                   map[string]any
 }
 
 func NewContext() *WorkflowContext {

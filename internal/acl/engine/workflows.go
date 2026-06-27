@@ -17,8 +17,8 @@ import (
 	aclverifier "github.com/arduino/arduino-cli/internal/acl/verifier"
 )
 
-var newUploadEngine = func() upload.UploadEngine {
-	return upload.NewEngine()
+var newUploadExecutor = func() upload.UploadExecutor {
+	return upload.NewExecutor()
 }
 
 type BootstrapWorkflowReport struct {
@@ -96,7 +96,7 @@ func UploadWorkflow() Workflow {
 			{
 				Name: "upload",
 				Steps: []Step{
-					{Name: "package validation", Critical: true, Execute: runUploadPlan},
+					{Name: "prepare execution", Critical: true, Execute: runUploadPrepare},
 					{Name: "workflow report", Critical: true, Execute: runUploadReport},
 				},
 			},
@@ -414,50 +414,52 @@ func runCompileReport(_ context.Context, wctx *WorkflowContext) (StepResult, err
 	return StepResult{Status: compileWorkflowStatus(report), Message: report.Beginner, Beginner: report.Beginner, Professional: report.Professional, Data: report}, nil
 }
 
-func runUploadPlan(ctx context.Context, wctx *WorkflowContext) (StepResult, error) {
-	engine := newUploadEngine()
-	if engine == nil {
-		return StepResult{Status: StepStatusFailed, Message: "upload engine is not configured", Beginner: "upload engine is not configured", Critical: true}, fmt.Errorf("upload engine is not configured")
+func runUploadPrepare(ctx context.Context, wctx *WorkflowContext) (StepResult, error) {
+	executor := newUploadExecutor()
+	if executor == nil {
+		return StepResult{Status: StepStatusFailed, Message: "upload executor is not configured", Beginner: "upload executor is not configured", Critical: true}, fmt.Errorf("upload executor is not configured")
 	}
-	report, err := engine.DryRun(ctx, wctx.UploadRequest)
+	report, err := executor.PrepareOnly(ctx, uploadExecutionRequestForWorkflow(wctx))
 	if report.SchemaVersion == "" {
 		report.SchemaVersion = "1"
 	}
-	wctx.Set("upload_report", report)
+	wctx.Set("upload_execution_report", report)
 	message := report.BeginnerSummary()
 	if strings.TrimSpace(message) == "" {
-		message = "upload dry-run completed"
+		message = "upload execution prepared"
 	}
 	status := StepStatusPassed
-	if report.Status == acldiagnostics.StatusWarning {
+	switch report.Status {
+	case acldiagnostics.StatusWarning:
 		status = StepStatusWarning
-	}
-	if report.Status == acldiagnostics.StatusFailed {
+	case acldiagnostics.StatusFailed:
 		status = StepStatusFailed
 	}
 	return StepResult{
-		Status:   status,
-		Message:  message,
-		Beginner: message,
-		Data:     report,
-		Critical: report.Status == acldiagnostics.StatusFailed,
+		Status:       status,
+		Message:      message,
+		Beginner:     message,
+		Professional: report.ProfessionalDetails(),
+		Data:         report,
+		Critical:     report.Status == acldiagnostics.StatusFailed,
 	}, err
 }
 
 func runUploadReport(_ context.Context, wctx *WorkflowContext) (StepResult, error) {
-	value, ok := wctx.Get("upload_report")
+	value, ok := wctx.Get("upload_execution_report")
 	if !ok {
-		return StepResult{Status: StepStatusFailed, Message: "upload report is not available", Beginner: "upload report is not available", Critical: true}, fmt.Errorf("upload report is not available")
+		return StepResult{Status: StepStatusFailed, Message: "upload execution report is not available", Beginner: "upload execution report is not available", Critical: true}, fmt.Errorf("upload execution report is not available")
 	}
-	report, ok := value.(upload.UploadReport)
+	report, ok := value.(upload.UploadExecutionReport)
 	if !ok {
-		return StepResult{Status: StepStatusFailed, Message: "upload report has an unsupported type", Beginner: "upload report is invalid", Critical: true}, fmt.Errorf("upload report has an unsupported type")
+		return StepResult{Status: StepStatusFailed, Message: "upload execution report has an unsupported type", Beginner: "upload execution report is invalid", Critical: true}, fmt.Errorf("upload execution report has an unsupported type")
 	}
 	return StepResult{
-		Status:   uploadStatus(report),
-		Message:  report.BeginnerSummary(),
-		Beginner: report.BeginnerSummary(),
-		Data:     report,
+		Status:       uploadExecutionStatus(report),
+		Message:      report.BeginnerSummary(),
+		Beginner:     report.BeginnerSummary(),
+		Professional: report.ProfessionalDetails(),
+		Data:         report,
 	}, nil
 }
 
@@ -755,7 +757,7 @@ func compileWorkflowStatus(report CompileWorkflowReport) StepStatus {
 	return StepStatusPassed
 }
 
-func uploadStatus(report upload.UploadReport) StepStatus {
+func uploadExecutionStatus(report upload.UploadExecutionReport) StepStatus {
 	switch report.Status {
 	case acldiagnostics.StatusFailed:
 		return StepStatusFailed
@@ -766,6 +768,40 @@ func uploadStatus(report upload.UploadReport) StepStatus {
 	default:
 		return StepStatusWarning
 	}
+}
+
+func uploadExecutionRequestForWorkflow(wctx *WorkflowContext) upload.UploadExecutionRequest {
+	req := wctx.UploadExecutionRequest
+	if strings.TrimSpace(req.PackageDir) == "" {
+		req.PackageDir = wctx.UploadRequest.PackageDir
+	}
+	if len(req.Metadata) == 0 && len(wctx.UploadRequest.Metadata) > 0 {
+		req.Metadata = cloneStringMap(wctx.UploadRequest.Metadata)
+	}
+	if isZeroUploadTarget(req.Target) {
+		req.Target = wctx.UploadRequest.Target
+	}
+	req.PrepareOnly = true
+	return req
+}
+
+func isZeroUploadTarget(target upload.UploadTarget) bool {
+	return strings.TrimSpace(target.Provider) == "" &&
+		strings.TrimSpace(target.Kind) == "" &&
+		strings.TrimSpace(target.Name) == "" &&
+		strings.TrimSpace(target.Identifier) == "" &&
+		strings.TrimSpace(target.TransportFamily) == "" &&
+		target.Endpoint.Kind == "" &&
+		strings.TrimSpace(target.Endpoint.Path) == "" &&
+		strings.TrimSpace(target.Endpoint.URL) == "" &&
+		target.Endpoint.FileDescriptor == 0 &&
+		strings.TrimSpace(target.Endpoint.StreamName) == "" &&
+		!target.Endpoint.Supported &&
+		strings.TrimSpace(target.Endpoint.Reason) == "" &&
+		strings.TrimSpace(target.Endpoint.UserMessage) == "" &&
+		len(target.Endpoint.Professional) == 0 &&
+		len(target.Endpoint.Metadata) == 0 &&
+		len(target.Metadata) == 0
 }
 
 func buildFirmwarePackageFromSnapshot(exec CompileExecution, req CompileRequest) (firmware.FirmwarePackage, error) {

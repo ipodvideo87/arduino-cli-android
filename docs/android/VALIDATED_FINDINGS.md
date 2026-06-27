@@ -4,6 +4,12 @@ This file is a logbook of tested findings from the project history.
 
 ## 2026-06-27
 
+- Environment: repository unit-test environment
+- Command/evidence: `go test ./internal/acl/upload/... ./internal/acl/... ./internal/cli/... ./commands/...` and `go build -o arduino-cli .`
+- Result: the upload workflow now uses a prepare-only executor, the positional `acl workflow upload <firmware-package>` contract remains intact, and the executor report compiles and round-trips through unit tests
+- Confidence: high
+- Notes: this validates the code path and report shape only; it does not validate real upload, flashing, or transport execution
+
 - Environment: native Termux on Samsung A17 / Android 16
 - Command/evidence: `./arduino-cli acl workflow upload --help`
 - Result: the upload workflow is positional and dry-run only; the help text

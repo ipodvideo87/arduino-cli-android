@@ -271,22 +271,23 @@ func TestDiagnosticsWorkflowWithFakes(t *testing.T) {
 	require.NotEmpty(t, report.ProfessionalDetails())
 }
 
-func TestUploadWorkflowUsesDryRunPlanner(t *testing.T) {
+func TestUploadWorkflowUsesPrepareOnlyExecutor(t *testing.T) {
 	packageDir := t.TempDir()
 
-	oldEngine := newUploadEngine
-	newUploadEngine = func() upload.UploadEngine {
-		return uploadEngineFunc(func(ctx context.Context, req upload.UploadRequest) (upload.UploadReport, error) {
+	oldExecutor := newUploadExecutor
+	newUploadExecutor = func() upload.UploadExecutor {
+		return uploadExecutorFunc(func(ctx context.Context, req upload.UploadExecutionRequest) (upload.UploadExecutionReport, error) {
 			require.Equal(t, packageDir, req.PackageDir)
-			return upload.UploadReport{
+			return upload.UploadExecutionReport{
 				SchemaVersion: "1",
 				Status:        acldiagnostics.StatusPassed,
 				DryRun:        true,
-				Beginner:      "upload dry-run ready",
-				Professional:  []string{"dry-run: true"},
-				Plan: upload.UploadPlan{
+				PrepareOnly:   true,
+				Beginner:      "upload execution prepared",
+				Professional:  []string{"prepare-only: true"},
+				Plan: upload.UploadExecutionPlan{
 					PackageDir: packageDir,
-					Steps: []upload.UploadStep{{
+					Operations: []upload.UploadOperation{{
 						Name:     "application",
 						Artifact: firmware.ArtifactApplicationBinary,
 						Offset:   0x10000,
@@ -295,7 +296,7 @@ func TestUploadWorkflowUsesDryRunPlanner(t *testing.T) {
 			}, nil
 		})
 	}
-	t.Cleanup(func() { newUploadEngine = oldEngine })
+	t.Cleanup(func() { newUploadExecutor = oldExecutor })
 
 	ctx := NewContext()
 	ctx.UploadRequest = upload.UploadRequest{PackageDir: packageDir}
@@ -305,21 +306,22 @@ func TestUploadWorkflowUsesDryRunPlanner(t *testing.T) {
 	require.Equal(t, "upload", report.Name)
 	require.NotEmpty(t, report.Jobs)
 	require.NotNil(t, report.Result)
-	result, ok := report.Result.(upload.UploadReport)
+	result, ok := report.Result.(upload.UploadExecutionReport)
 	require.True(t, ok)
 	require.True(t, result.DryRun)
+	require.True(t, result.PrepareOnly)
 	require.Equal(t, packageDir, result.Plan.PackageDir)
-	require.Len(t, result.Plan.Steps, 1)
+	require.Len(t, result.Plan.Operations, 1)
 }
 
-type uploadEngineFunc func(context.Context, upload.UploadRequest) (upload.UploadReport, error)
+type uploadExecutorFunc func(context.Context, upload.UploadExecutionRequest) (upload.UploadExecutionReport, error)
 
-func (f uploadEngineFunc) Plan(context.Context, upload.UploadRequest) (upload.UploadPlan, error) {
-	report, err := f(context.Background(), upload.UploadRequest{})
+func (f uploadExecutorFunc) Prepare(context.Context, upload.UploadExecutionRequest) (upload.UploadExecutionPlan, error) {
+	report, err := f(context.Background(), upload.UploadExecutionRequest{})
 	return report.Plan, err
 }
 
-func (f uploadEngineFunc) DryRun(ctx context.Context, req upload.UploadRequest) (upload.UploadReport, error) {
+func (f uploadExecutorFunc) PrepareOnly(ctx context.Context, req upload.UploadExecutionRequest) (upload.UploadExecutionReport, error) {
 	return f(ctx, req)
 }
 

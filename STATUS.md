@@ -108,9 +108,9 @@ Repository cleanup:
   diagnostic alias for the same stream state report.
 - The ACL firmware package foundation now exists, including the build manifest, flash plan, firmware package wrapper, and binary validator.
 - The firmware package now also emits `analysis.json` and `README_FLASHING.txt`, and the ACL compile path uses metadata-first bootloader detection with an app-only fallback warning when the bootloader artifacts are incomplete.
-- The ACL upload engine foundation now exists as a transport-neutral dry-run planner that consumes firmware packages and flash plans without opening real transport streams or sending bytes.
-- The ACL workflow upload command is now documented and validated as a dry-run-only positional command (`acl workflow upload <firmware-package>`); `--dry-run` and `--package` are not part of the contract.
-- The upload dry-run report surface now keeps the canonical package, plan, diagnostics, result, and progress data in one place and de-duplicates repeated professional details.
+- The ACL upload engine foundation now exists as a transport-neutral prepare-only planner/executor stack that consumes firmware packages and flash plans without opening real transport streams or sending bytes.
+- The ACL workflow upload command is now documented and validated as a positional prepare-only command (`acl workflow upload <firmware-package>`); `--dry-run` and `--package` are not part of the contract.
+- The upload execution report surface now keeps the canonical package, plan, diagnostics, result, and progress data in one place and de-duplicates repeated professional details.
 - Native Termux dry-run validation currently reports three upload steps for the existing package metadata (`partitions`, `boot_app0`, `application`); the bootloader remains package-dependent and target-chip metadata is still a warning.
 - The ACL compatibility layer now exists as a rule-based decision layer for runtime, library, firmware, and transport compatibility.
 - The ACL diagnostics workflow now exists as a shared pending/running/passed/warning/failed/skipped status model.
@@ -140,7 +140,7 @@ Repository cleanup:
 - Design a reusable native Android USB transport framework inside the existing Termux ecosystem.
 - Define a generic Android upload and monitor bridge that stays board-agnostic, descriptor-driven, and provider-based.
 - Validate firmware upload and serial monitor behavior through the new transport implementation on real hardware.
-- Validate the ACL upload dry-run planner in native Termux before wiring real transport execution, and keep the report surface aligned with the GUI contract.
+- Validate the ACL upload prepare-only executor in native Termux before wiring real transport execution, and keep the report surface aligned with the GUI contract.
 - Implement the first real transport provider runtime after the contract layer is proven stable.
 - Validate the Termux USB transport provider on native Termux and confirm the exact discovery, permission, and file-descriptor handoff behavior on-device.
 - Probe `TERMUX_USB_FD` handoff and build the byte-stream bridge foundation for the Termux USB provider.
@@ -183,12 +183,13 @@ Repository cleanup:
   observation, and inspection.
 - The transport stream foundation exists in code and unit tests, but native
   Termux byte-stream read/write validation is still pending.
-- The upload engine foundation exists in code and unit tests as a dry-run
-  planner only; real upload execution is still pending native transport proof.
+- The upload engine foundation exists in code and unit tests as a prepare-only
+  planner/executor stack; real upload execution is still pending native
+  transport proof.
 - Successful proot execution does not prove Android-native compatibility.
 - Firmware upload on real hardware has not yet been demonstrated.
 - The Android USB transport bridge is not yet implemented, so end-to-end upload remains unproven.
 
 ## Next Engineering Milestone
 
-Finish the generic native Android USB transport bridge, validate upload and monitor flow on real hardware, and move Android post-install repair into a shared automatic pipeline. In parallel, validate the transport stream foundation and upload dry-run planning on native Termux, then refine the ACL CLI diagnostic surfaces for future UI consumption.
+Finish the generic native Android USB transport bridge, validate upload and monitor flow on real hardware, and move Android post-install repair into a shared automatic pipeline. In parallel, validate the transport stream foundation and upload prepare-only planning on native Termux, then refine the ACL CLI diagnostic surfaces for future UI consumption.

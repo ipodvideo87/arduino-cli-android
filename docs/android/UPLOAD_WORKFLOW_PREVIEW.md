@@ -18,12 +18,15 @@ What transport is available, what can it do, and how do we use it safely?
 
 Current implementation note:
 
-- the ACL upload engine foundation now exists as a dry-run planner
-- it consumes firmware packages and flash plans
-- it is exposed as `acl workflow upload <firmware-package>` and is dry-run only
+- the ACL upload engine foundation now exists as a planner plus a prepare-only
+  executor
+- it consumes firmware packages, flash plans, and validation metadata
+- it is exposed as `acl workflow upload <firmware-package>` and remains
+  positional only
 - `--dry-run` and `--package` are not part of the workflow contract
-- the canonical upload report keeps one professional-details array and one
-  result summary instead of duplicating the same details in nested layers
+- the canonical executor report keeps one package section, one plan section,
+  one diagnostics section, one result section, and one progress array instead
+  of duplicating the same details in nested layers
 - it does not open real transport streams or send bytes yet
 
 ## Intended Flow
