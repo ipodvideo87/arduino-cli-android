@@ -5,6 +5,24 @@ Termux USB provider.
 
 It is a validation checklist, not an upload or flashing milestone.
 
+Validated on:
+
+- Samsung A17
+- Android 16
+- native Termux
+
+Validated behaviors:
+
+- discovery
+- permission acquisition
+
+Not validated by this milestone:
+
+- upload
+- flashing
+- serial monitor
+- usable byte-stream endpoint
+
 ## Scope
 
 Validate only:
@@ -148,6 +166,37 @@ Example interpretation:
   export
 - upload and monitor remain unimplemented
 
+## Native-Termux Validation Result
+
+Observed on the Samsung A17 / Android 16 / native Termux environment:
+
+- `./arduino-cli acl transport list`
+  - Status: warning
+  - Devices: 1
+- `./arduino-cli acl transport diagnose --details`
+  - device: `/dev/bus/usb/001/002`
+  - provider: `termuxusb`
+  - selected kind: `android-usb-fd`
+  - `termux-usb -l` discovered the same path
+  - the warning correctly explains that `TERMUX_USB_FD` is unavailable outside
+    `termux-usb -e`
+- `termux-usb -l`
+  - returned `/dev/bus/usb/001/002`
+- `./arduino-cli acl transport acquire --device /dev/bus/usb/001/002`
+  - USB permission granted
+  - Status: passed
+
+Validated conclusion:
+
+- discovery is native-Termux validated
+- permission acquisition is native-Termux validated
+- file-descriptor handoff remains unvalidated
+- upload, flashing, and serial monitor remain unvalidated
+
+Next recommended milestone:
+
+- `TERMUX_USB_FD` handoff probe / byte-stream bridge foundation
+
 ## What Success Means
 
 Success for this milestone means the provider can:
@@ -178,4 +227,3 @@ Store the results in:
 
 - `docs/android/VALIDATED_FINDINGS.md`
 - `STATUS.md`
-

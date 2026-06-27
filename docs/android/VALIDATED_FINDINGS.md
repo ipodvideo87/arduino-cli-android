@@ -60,6 +60,18 @@ This file is a logbook of tested findings from the project history.
 - Confidence: high
 - Notes: documentation only; no new device result is claimed by this entry
 
+- Environment: native Termux on Samsung A17 / Android 16
+- Command/evidence: `./arduino-cli acl transport list`,
+  `./arduino-cli acl transport diagnose --details`,
+  `termux-usb -l`, and `./arduino-cli acl transport acquire --device
+  /dev/bus/usb/001/002`
+- Result: Termux USB discovery and permission acquisition are validated on the
+  target device; `acquire` reports permission granted and diagnostics report the
+  expected `TERMUX_USB_FD` limitation outside `termux-usb -e`
+- Confidence: high
+- Notes: this does not prove upload, flashing, serial monitor, or usable
+  byte-stream endpoint behavior
+
 - Environment: ESP32-S3 / Arduino-ESP32 flash recipe metadata
 - Command/evidence: external flashing history and Arduino-ESP32 recipe conventions
 - Result: external flashing previously used bootloader, partitions, boot_app0, and

@@ -37,6 +37,7 @@ Current validation posture:
 - Unit tests and CLI/build verification are useful, but not sufficient for Android claims.
 - Emulated ARM64 smoke tests are useful preflight checks only and do not prove Android success.
 - The Termux USB provider now has a native-Termux validation checklist documenting expected outputs for discovery, permission, stale-path handling, and fd handoff evidence.
+- Discovery and permission acquisition for the Termux USB provider are now native-Termux validated on Samsung A17 / Android 16; byte-stream and upload behavior remain unvalidated.
 - USB flashing is still unimplemented and must not be claimed as complete.
 
 Repository cleanup:
@@ -116,6 +117,7 @@ Repository cleanup:
 - Validate firmware upload and serial monitor behavior through the new transport implementation on real hardware.
 - Implement the first real transport provider runtime after the contract layer is proven stable.
 - Validate the Termux USB transport provider on native Termux and confirm the exact discovery, permission, and file-descriptor handoff behavior on-device.
+- Probe `TERMUX_USB_FD` handoff and build the byte-stream bridge foundation for the Termux USB provider.
 - Finish the Android preflight and dry-run reporting surfaces so they can be consumed by future UI workspaces.
 - Keep the development workflow aligned with the two-environment model: native Termux as the source of truth, Ubuntu/proot as a tooling environment.
 - Polish the ACL CLI diagnostic surfaces and wire them into future workspace UI layers.
@@ -139,6 +141,7 @@ Repository cleanup:
   `cc1plus` startup crash.
 - Native Android upload/flash architecture is not yet implemented end-to-end; it still needs a reusable USB host and serial bridge before upload is marked complete.
 - The cause of the intermittent `termux-usb` acquisition/opening failures remains unknown.
+- Termux USB discovery and permission acquisition are now validated on Samsung A17 / Android 16, but `TERMUX_USB_FD` handoff remains unproven.
 - Successful proot execution does not prove Android-native compatibility.
 - Firmware upload on real hardware has not yet been demonstrated.
 - The Android USB transport bridge is not yet implemented, so end-to-end upload remains unproven.

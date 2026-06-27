@@ -196,6 +196,12 @@ rm -rf ~/.arduino15/packages/esp32 ~/.arduino15/staging ~/.cache/arduino ~/.ardu
   - Evidence: repository implementation in `internal/acl/transport/termuxusb`
     and the `arduino-cli acl transport list|diagnose|acquire` command group.
   - Validation checklist: `docs/android/MILESTONE_TERMUX_USB_PROVIDER.md`
+- Native Termux validation now confirms discovery and permission acquisition on
+  Samsung A17 / Android 16, while file-descriptor handoff remains unvalidated.
+  - Evidence: `termux-usb -l` returns `/dev/bus/usb/001/002`, `acl transport
+    list` reports one device, `acl transport diagnose --details` reports the
+    same path and the `TERMUX_USB_FD` limitation, and `acl transport acquire`
+    reports permission granted.
 - Android USB host access remains app-scoped and permission-gated.
   - Evidence: `UsbManager.requestPermission(...)` and `UsbDeviceConnection`
     documentation.
