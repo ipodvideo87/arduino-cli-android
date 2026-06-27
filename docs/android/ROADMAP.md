@@ -29,6 +29,8 @@
 - Upload Engine foundation and prepare-only executor
 - Governance framework batch 1: Codex operating model, engineering principles,
   decision framework, and documentation architecture
+- Governance framework batch 1.5: repository governance, engineering
+  methodology, architecture review, technical debt, and interface stability
 
 ## Next Milestones
 
@@ -66,3 +68,5 @@
 - Governance and documentation framework work should stay ahead of further
   upload-execution expansion so later batches build on stable decision and
   ownership rules.
+- Repository governance and interface-stability guidance should be treated as
+  part of the foundation before more architecture or schema changes are added.

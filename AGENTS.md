@@ -20,6 +20,11 @@ Native Termux validation always takes priority over container or desktop validat
   - [docs/android/ENGINEERING_PRINCIPLES.md](docs/android/ENGINEERING_PRINCIPLES.md)
   - [docs/android/DECISION_FRAMEWORK.md](docs/android/DECISION_FRAMEWORK.md)
   - [docs/android/DOCUMENTATION_ARCHITECTURE.md](docs/android/DOCUMENTATION_ARCHITECTURE.md)
+  - [docs/android/ENGINEERING_METHODOLOGY.md](docs/android/ENGINEERING_METHODOLOGY.md)
+  - [docs/android/REPOSITORY_GOVERNANCE.md](docs/android/REPOSITORY_GOVERNANCE.md)
+  - [docs/android/ARCHITECTURE_REVIEW_PROCESS.md](docs/android/ARCHITECTURE_REVIEW_PROCESS.md)
+  - [docs/android/TECHNICAL_DEBT_POLICY.md](docs/android/TECHNICAL_DEBT_POLICY.md)
+  - [docs/android/INTERFACE_STABILITY_POLICY.md](docs/android/INTERFACE_STABILITY_POLICY.md)
 - Before making Android-specific changes or any architecture-level change, read:
   - [docs/android/PROJECT_NORTH_STAR.md](docs/android/PROJECT_NORTH_STAR.md)
   - [docs/android/LIVING_INSTITUTIONAL_MEMORY.md](docs/android/LIVING_INSTITUTIONAL_MEMORY.md)
@@ -182,6 +187,13 @@ Do not claim a milestone is complete until it has been verified through real-wor
   `docs/android/DECISION_FRAMEWORK.md`, and
   `docs/android/DOCUMENTATION_ARCHITECTURE.md`; read them before making
   architecture-level or documentation-governance changes.
+- Repository evolution guidance also lives in
+  `docs/android/ENGINEERING_METHODOLOGY.md`,
+  `docs/android/REPOSITORY_GOVERNANCE.md`,
+  `docs/android/ARCHITECTURE_REVIEW_PROCESS.md`,
+  `docs/android/TECHNICAL_DEBT_POLICY.md`, and
+  `docs/android/INTERFACE_STABILITY_POLICY.md`; read them before making
+  long-lived architecture, interface, schema, or debt decisions.
 
 ## Repository Hygiene
 

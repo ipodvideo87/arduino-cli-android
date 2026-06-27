@@ -17,6 +17,8 @@ to recover context quickly and accurately.
 - What validation provider was used and what confidence boundary it proves.
 - How future contributors should reason, decide, document, and report in this
   repository.
+- How the repository should evolve over time without accumulating avoidable
+  architectural drift.
 
 ## Operating Rules
 
@@ -32,3 +34,5 @@ to recover context quickly and accurately.
 - Preserve governance frameworks and documentation-ownership rules in versioned
   docs so later work can build on the same decision model instead of recreating
   it.
+- Preserve repository-governance, debt, and interface-stability guidance in
+  versioned docs so future evolution remains deliberate rather than accidental.

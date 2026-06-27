@@ -140,6 +140,14 @@ Repository cleanup:
   - `docs/android/DECISION_FRAMEWORK.md`
   - `docs/android/DOCUMENTATION_ARCHITECTURE.md`
   - updated cross-references in `AGENTS.md`, `ROADMAP.md`, and the validation docs
+- Governance framework batch 1.5 is now in place:
+  - `docs/android/ENGINEERING_METHODOLOGY.md`
+  - `docs/android/REPOSITORY_GOVERNANCE.md`
+  - `docs/android/ARCHITECTURE_REVIEW_PROCESS.md`
+  - `docs/android/TECHNICAL_DEBT_POLICY.md`
+  - `docs/android/INTERFACE_STABILITY_POLICY.md`
+  - updated cross-references in `AGENTS.md`, `STATUS.md`, `ROADMAP.md`, and
+    `LIVING_INSTITUTIONAL_MEMORY.md`
 
 ## Work In Progress
 
@@ -167,6 +175,8 @@ Repository cleanup:
 - Extend the ACL engine with flash hooks once the lower-level hooks are ready to use end-to-end.
 - Apply the governance framework batch 1 guidance to later documentation and
   architecture batches without turning this milestone into a full doc cleanup.
+- Apply the repository governance and evolution framework to later interface,
+  schema, and architecture work without rewriting the whole docs set at once.
 
 ## Known Blockers
 
