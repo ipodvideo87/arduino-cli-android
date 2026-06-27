@@ -41,9 +41,11 @@ Current validation posture:
 - The Termux USB provider now also exposes a bounded `acl transport probe-fd`
   / `probe-fd-helper` stream-diagnostics path that records `TERMUX_USB_FD`
   evidence without claiming a usable byte stream.
-- The probe now defaults to `termux-usb -r -E` and the helper accepts both
-  environment and positional-argument fd sources, which resolves the earlier
-  TERMUX_USB_FD mismatch.
+- The probe now uses `termux-usb -r -E -e <helper> <device>` and the helper
+  accepts both environment and positional-argument fd sources, which resolves
+  the earlier TERMUX_USB_FD mismatch.
+- Native Termux has now confirmed the working probe shape:
+  `termux-usb -r -E -e "./arduino-cli acl transport probe-fd-helper --json" /dev/bus/usb/001/002`.
 - USB flashing is still unimplemented and must not be claimed as complete.
 
 Repository cleanup:
@@ -128,6 +130,8 @@ Repository cleanup:
   consider byte-stream bridge work.
 - Re-run native Termux validation for both `-E` and argv fd handoff modes, then
   record the observed `fd_source` in `docs/android/VALIDATED_FINDINGS.md`.
+- Keep the `probe-fd` diagnostics aligned with the native `-E -e` handoff shape
+  so helper JSON is only parsed after the helper has actually launched.
 - Finish the Android preflight and dry-run reporting surfaces so they can be consumed by future UI workspaces.
 - Keep the development workflow aligned with the two-environment model: native Termux as the source of truth, Ubuntu/proot as a tooling environment.
 - Polish the ACL CLI diagnostic surfaces and wire them into future workspace UI layers.

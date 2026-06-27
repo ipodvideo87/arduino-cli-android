@@ -70,6 +70,14 @@ This file is a logbook of tested findings from the project history.
   the probe is still pending
 
 - Environment: native Termux on Samsung A17 / Android 16
+- Command/evidence: `termux-usb -r -E -e "./arduino-cli acl transport probe-fd-helper --json" /dev/bus/usb/001/002`
+- Result: helper JSON observes `TERMUX_USB_FD` via environment and reports
+  `fd_source=environment`, `handoff_mode=env`, and `status=warning`
+- Confidence: high
+- Notes: this is the confirmed working fd-handoff shape; it does not prove
+  upload, flashing, or serial monitor behavior
+
+- Environment: native Termux on Samsung A17 / Android 16
 - Command/evidence: `./arduino-cli acl transport list`,
   `./arduino-cli acl transport diagnose --details`,
   `termux-usb -l`, and `./arduino-cli acl transport acquire --device

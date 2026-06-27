@@ -59,6 +59,9 @@ Native Termux validation always takes priority over container or desktop validat
 - Treat `probe-fd-helper` as an internal helper that may receive a positional fd
   from `termux-usb -e` or `TERMUX_USB_FD` from `termux-usb -E`; preserve both
   sources in diagnostics and findings.
+- When working on `probe-fd`, keep the native handoff shape aligned with
+  `termux-usb -r -E -e "<helper>" <device>` so `termux-usb` launch failures are
+  not misclassified as helper JSON parsing failures.
 - The Android post-install pipeline should be shared and automatic: extract, patch or repair, validate, register, and self-test. Platform and tool installers should call it; library installs should opt in only when they contain executable payloads.
 - Treat compatibility as a first-class layer. Prefer compatible library selection over source patching, record compatibility decisions in build and install reports, and surface beginner-friendly and professional detail separately.
 - Successful compiles should emit a first-class firmware package and install flows should pass through the shared Android patch pipeline, but USB flashing remains a separate milestone until proven on-device.

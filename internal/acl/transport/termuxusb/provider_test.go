@@ -236,7 +236,7 @@ func TestProviderProbeParsesHelperReport(t *testing.T) {
 
 	provider := NewProviderWithRunner(&scriptedRunner{
 		results: map[string]CommandResult{
-			defaultCommandName + " -r -E helper /dev/bus/usb/001/002": {
+			defaultCommandName + " -r -E -e helper /dev/bus/usb/001/002": {
 				Stdout:   `{"schema_version":"1","status":"warning","provider":"termuxusb","provider_kind":"android-usb-fd","fd_env_present":true,"fd_observed":true,"fd_valid":true,"fd_inspectable":true,"fd_source":"environment","handoff_mode":"env","helper_args":[],"stream_supported":false,"stream_proven":false,"read_state":"unsupported","write_state":"unsupported","close_state":"unsupported","eof_state":"unsupported","disconnect_state":"unsupported","beginner_summary":"TERMUX_USB_FD observed via environment; stream support remains experimental","professional_details":["fd handoff observed"],"next_step":"add a bounded byte-stream bridge or transport stream adapter"}`,
 				ExitCode: 0,
 			},
@@ -255,13 +255,13 @@ func TestProviderProbeParsesHelperReport(t *testing.T) {
 	require.True(t, report.FDInspectable)
 	require.Equal(t, "environment", report.FDSource)
 	require.Equal(t, "env", report.HandoffMode)
-	require.Contains(t, report.TermuxUSBCommand, "-E")
+	require.Equal(t, "termux-usb -r -E -e helper /dev/bus/usb/001/002", report.TermuxUSBCommand)
 	require.Equal(t, transport.StreamObservationUnsupported, report.ReadState)
 	require.Contains(t, report.BeginnerSummary(), "TERMUX_USB_FD observed")
 	require.Contains(t, report.ProfessionalDetails(), "fd handoff observed")
 }
 
-func TestProviderProbeSupportsArgumentHandoff(t *testing.T) {
+func TestHelperSupportsArgumentHandoff(t *testing.T) {
 	oldFD := os.Getenv("TERMUX_USB_FD")
 	t.Cleanup(func() {
 		_ = os.Setenv("TERMUX_USB_FD", oldFD)
@@ -273,26 +273,9 @@ func TestProviderProbeSupportsArgumentHandoff(t *testing.T) {
 	t.Cleanup(func() { _ = fdFile.Close() })
 	fdArg := strconv.FormatUint(uint64(fdFile.Fd()), 10)
 
-	provider := NewProviderWithRunner(&scriptedRunner{
-		results: map[string]CommandResult{
-			defaultCommandName + " -r -e helper /dev/bus/usb/001/002": {
-				Stdout:   `{"schema_version":"1","status":"warning","provider":"termuxusb","provider_kind":"android-usb-fd","fd_observed":true,"fd_valid":true,"fd_inspectable":true,"fd_source":"argument","handoff_mode":"argv","helper_args":["` + fdArg + `"],"stream_supported":false,"stream_proven":false,"read_state":"unsupported","write_state":"unsupported","close_state":"unsupported","eof_state":"unsupported","disconnect_state":"unsupported","beginner_summary":"file descriptor observed via command-line argument; stream support remains experimental","professional_details":["fd argument observed"],"next_step":"add a bounded byte-stream bridge or transport stream adapter"}`,
-				ExitCode: 0,
-			},
-		},
-	})
-
-	report, err := provider.Probe(context.Background(), transport.StreamProbeRequest{
-		Device: transport.DiscoveredDevice{
-			StableID: "/dev/bus/usb/001/002",
-		},
-		HandoffMode:   "argv",
-		HelperCommand: "helper",
-	})
-	require.NoError(t, err)
+	report := HelperStreamProbeReportFromInvocation([]string{fdArg})
 	require.Equal(t, "argument", report.FDSource)
 	require.Equal(t, "argv", report.HandoffMode)
-	require.Contains(t, report.TermuxUSBCommand, "-e")
 	require.Contains(t, report.BeginnerSummary(), "command-line argument")
 }
 
@@ -305,7 +288,7 @@ func TestProviderProbeHandlesMalformedHelperOutput(t *testing.T) {
 
 	provider := NewProviderWithRunner(&scriptedRunner{
 		results: map[string]CommandResult{
-			defaultCommandName + " -r -E helper /dev/bus/usb/001/002": {
+			defaultCommandName + " -r -E -e helper /dev/bus/usb/001/002": {
 				Stdout:   "not-json",
 				ExitCode: 0,
 			},
@@ -321,6 +304,7 @@ func TestProviderProbeHandlesMalformedHelperOutput(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, diagnostics.StatusFailed, report.Status)
 	require.Contains(t, report.BeginnerSummary(), "could not be parsed")
+	require.Contains(t, strings.Join(report.ProfessionalDetails(), " "), "helper stdout: not-json")
 }
 
 func TestProviderProbeHandlesHelperFailure(t *testing.T) {
@@ -332,8 +316,9 @@ func TestProviderProbeHandlesHelperFailure(t *testing.T) {
 
 	provider := NewProviderWithRunner(&scriptedRunner{
 		results: map[string]CommandResult{
-			defaultCommandName + " -r -E helper /dev/bus/usb/001/002": {
+			defaultCommandName + " -r -E -e helper /dev/bus/usb/001/002": {
 				Stderr:   "permission denied",
+				Stdout:   "No such device",
 				ExitCode: 1,
 				Err:      errors.New("exit status 1"),
 			},
@@ -349,4 +334,28 @@ func TestProviderProbeHandlesHelperFailure(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, report.Warnings, "exit status 1")
 	require.Contains(t, strings.Join(report.ProfessionalDetails(), " "), "permission denied")
+	require.Contains(t, report.BeginnerSummary(), "handoff failed")
+}
+
+func TestProviderProbeUsesExpectedCommandShape(t *testing.T) {
+	runner := &scriptedRunner{
+		results: map[string]CommandResult{
+			defaultCommandName + " -r -E -e helper /dev/bus/usb/001/002": {
+				Stdout:   `{"schema_version":"1","status":"warning","provider":"termuxusb","provider_kind":"android-usb-fd","fd_env_present":true,"fd_observed":true,"fd_valid":true,"fd_inspectable":true,"fd_source":"environment","handoff_mode":"env","helper_args":[],"stream_supported":false,"stream_proven":false,"read_state":"unsupported","write_state":"unsupported","close_state":"unsupported","eof_state":"unsupported","disconnect_state":"unsupported","beginner_summary":"TERMUX_USB_FD observed via environment; stream support remains experimental","professional_details":["fd handoff observed"],"next_step":"add a bounded byte-stream bridge or transport stream adapter"}`,
+				ExitCode: 0,
+			},
+		},
+	}
+	provider := NewProviderWithRunner(runner)
+
+	report, err := provider.Probe(context.Background(), transport.StreamProbeRequest{
+		Device: transport.DiscoveredDevice{
+			StableID: "/dev/bus/usb/001/002",
+		},
+		HelperCommand: "helper",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "termux-usb -r -E -e helper /dev/bus/usb/001/002", report.TermuxUSBCommand)
+	require.NotEmpty(t, runner.calls)
+	require.Equal(t, defaultCommandName+" -r -E -e helper /dev/bus/usb/001/002", runner.calls[0])
 }

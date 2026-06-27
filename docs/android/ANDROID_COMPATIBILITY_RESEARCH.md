@@ -283,7 +283,7 @@ The next experiments to run on device are:
 
 1. `termux-usb -l`
 2. `termux-usb -r <device>`
-3. `termux-usb -e <probe> <device>`
+3. `termux-usb -r -E -e <probe> <device>`
 4. `ls -l /dev/bus/usb/*/*` before and after disconnect/reconnect
 5. dump raw USB descriptors from the opened fd
 6. identify the CDC or vendor-specific serial interface from those descriptors

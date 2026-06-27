@@ -243,14 +243,8 @@ func (p *Provider) Probe(ctx context.Context, req transport.StreamProbeRequest) 
 		return report, nil
 	}
 
-	args := []string{"-r"}
-	if handoffMode == "argv" {
-		args = append(args, "-e")
-	} else {
-		handoffMode = "env"
-		args = append(args, "-E")
-	}
-	args = append(args, helperCommand, devicePath)
+	args := []string{"-r", "-E", "-e", helperCommand, devicePath}
+	handoffMode = "env"
 	report.TermuxUSBCommand = formatCommand(p.commandName(), args)
 	if report.Metadata == nil {
 		report.Metadata = map[string]string{}
@@ -272,8 +266,7 @@ func (p *Provider) Probe(ctx context.Context, req transport.StreamProbeRequest) 
 
 	parsed, parseErr := parseStreamProbeReport(result.Stdout)
 	if parseErr != nil {
-		report.Status = diagnostics.StatusFailed
-		report.Beginner = "fd probe helper output could not be parsed"
+		report.Traces = []transport.CommandTrace{trace}
 		report.Warnings = append(report.Warnings, parseErr.Error())
 		if result.Err != nil {
 			report.Warnings = append(report.Warnings, result.Err.Error())
@@ -281,9 +274,20 @@ func (p *Provider) Probe(ctx context.Context, req transport.StreamProbeRequest) 
 		if trimmed := strings.TrimSpace(result.Stderr); trimmed != "" {
 			report.Professional = append(report.Professional, "helper stderr: "+trimmed)
 		}
+		if trimmed := strings.TrimSpace(result.Stdout); trimmed != "" {
+			report.Professional = append(report.Professional, "helper stdout: "+trimmed)
+		}
+		if result.Err != nil || result.ExitCode != 0 {
+			report.Status = diagnostics.StatusFailed
+			report.Beginner = "termux-usb handoff failed before helper JSON was produced"
+			report.Limitations = append(report.Limitations, "termux-usb did not hand off execution to the helper")
+			report.NextStep = "fix the termux-usb handoff path before probing the helper JSON"
+			return report, nil
+		}
+		report.Status = diagnostics.StatusFailed
+		report.Beginner = "fd probe helper output could not be parsed"
 		report.Limitations = append(report.Limitations, "helper JSON output was malformed")
 		report.NextStep = "fix the helper output parser before attempting a byte-stream bridge"
-		report.Traces = []transport.CommandTrace{trace}
 		return report, nil
 	}
 

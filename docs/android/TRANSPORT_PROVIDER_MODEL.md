@@ -43,8 +43,9 @@ Current implementation note:
 - the Termux USB provider also exposes a bounded `probe-fd` / `probe-fd-helper`
   path that records `TERMUX_USB_FD` evidence without claiming a usable byte
   stream
-- the probe now prefers `-E` handoff and the helper accepts both env and argv
-  fd sources so diagnostics can distinguish `termux-usb -E` from `termux-usb -e`
+- the probe now uses `termux-usb -r -E -e <helper> <device>` and the helper
+  accepts both env and argv fd sources so diagnostics can distinguish
+  `termux-usb -E` from `termux-usb -e`
 - byte-stream access, upload, and monitor behavior remain future work
 
 ## Provider Categories

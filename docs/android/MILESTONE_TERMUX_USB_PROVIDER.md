@@ -179,6 +179,12 @@ The provider now also exposes a safe fd-handoff probe surface:
 ./arduino-cli acl transport probe-fd-helper <fd> --json
 ```
 
+The native working handoff command is:
+
+```sh
+termux-usb -r -E -e "./arduino-cli acl transport probe-fd-helper --json" /dev/bus/usb/001/002
+```
+
 Expected behavior:
 
 - the probe reports whether `TERMUX_USB_FD` is present
@@ -199,14 +205,16 @@ Expected interpretation:
 - `stream_supported=false` means no usable byte-stream bridge is claimed yet
 - `read_state`, `write_state`, `close_state`, `eof_state`, and
   `disconnect_state` remain bounded diagnostics until a real bridge exists
+- if `termux-usb` returns `No such device` before helper JSON appears, the
+  failure is a handoff/acquisition failure, not a helper parse failure
 
 Root cause and fix:
 
 - the first implementation only looked at `TERMUX_USB_FD`
-- native Termux evidence showed `termux-usb -e` passes the fd as a positional
-  argument, while `termux-usb -E` passes it in `TERMUX_USB_FD`
-- the probe now defaults to `-E` and the helper accepts both env and argv fd
-  sources so diagnostics can record either handoff mode clearly
+- native Termux evidence showed `termux-usb -r -E -e <helper> <device>` is the
+  working handoff shape on the Samsung A17 / Android 16 device
+- the helper now accepts both env and argv fd sources so diagnostics can record
+  either handoff mode clearly
 
 ## Native-Termux Validation Result
 
@@ -227,6 +235,20 @@ Observed on the Samsung A17 / Android 16 / native Termux environment:
 - `./arduino-cli acl transport acquire --device /dev/bus/usb/001/002`
   - USB permission granted
   - Status: passed
+- `termux-usb -r -E -e "./arduino-cli acl transport probe-fd-helper --json" /dev/bus/usb/001/002`
+  - `fd_env_present: true`
+  - `fd_env_value: "7"`
+  - `fd_observed: true`
+  - `fd_valid: true`
+  - `fd_inspectable: true`
+  - `fd_source: "environment"`
+  - `handoff_mode: "env"`
+  - `status: "warning"`
+  - `beginner_summary: "TERMUX_USB_FD observed via environment; stream support remains experimental"`
+- `./arduino-cli acl transport probe-fd --device /dev/bus/usb/001/002`
+  - now constructs `termux-usb -r -E -e "./arduino-cli acl transport probe-fd-helper --json" /dev/bus/usb/001/002`
+  - if `termux-usb` returns `No such device` before helper JSON appears, that is
+    a handoff/acquisition failure
 
 Validated conclusion:
 

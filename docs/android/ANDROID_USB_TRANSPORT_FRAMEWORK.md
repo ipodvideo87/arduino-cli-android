@@ -26,8 +26,9 @@ It is still a contract and diagnostics layer only: no real Android USB API
 calls, no USB flashing, and no upload or serial-monitor implementation yet.
 The fd probe is intentionally bounded and only records `TERMUX_USB_FD`
 handoff evidence.
-The current probe defaults to `termux-usb -r -E` and also accepts the
-positional fd handoff used by `termux-usb -e`.
+The current probe uses the working `termux-usb -r -E -e <helper> <device>`
+shape and the helper also accepts the positional fd handoff used by
+`termux-usb -e`.
 
 The framework exists so Arduino CLI and future tool integrations can keep
 talking to a serial-like endpoint while ACL owns Android-specific USB

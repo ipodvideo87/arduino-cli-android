@@ -460,7 +460,7 @@ func TestACLTransportProbeFDCommandJSON(t *testing.T) {
 				CloseState:       transport.StreamObservationUnsupported,
 				EOFState:         transport.StreamObservationUnsupported,
 				DisconnectState:  transport.StreamObservationUnsupported,
-				TermuxUSBCommand: "termux-usb -r -E helper /dev/bus/usb/001/002",
+				TermuxUSBCommand: "termux-usb -r -E -e helper /dev/bus/usb/001/002",
 				Beginner:         "TERMUX_USB_FD observed; stream support remains experimental",
 				Professional:     []string{"fd handoff observed", "byte-stream bridge not yet implemented"},
 				NextStep:         "add a bounded byte-stream bridge or transport stream adapter",
@@ -485,7 +485,7 @@ func TestACLTransportProbeFDCommandJSON(t *testing.T) {
 	require.Equal(t, acldiagnostics.StatusWarning, report.Status)
 	require.Equal(t, "env", report.HandoffMode)
 	require.Equal(t, "environment", report.FDSource)
-	require.Contains(t, report.TermuxUSBCommand, "-E")
+	require.Equal(t, "termux-usb -r -E -e helper /dev/bus/usb/001/002", report.TermuxUSBCommand)
 	require.Contains(t, report.BeginnerSummary(), "TERMUX_USB_FD")
 }
 
