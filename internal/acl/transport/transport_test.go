@@ -70,6 +70,29 @@ func TestTransportManagerHonorsPreferredKinds(t *testing.T) {
 	require.Equal(t, KindPTY, selected.Descriptor.Kind)
 }
 
+func TestTransportManagerSkipsUnavailableProvidersDuringSelection(t *testing.T) {
+	mgr := NewTransportManager(
+		fakeProvider{desc: TransportDescriptor{
+			Kind:         KindAndroidUSBFD,
+			Name:         "unavailable",
+			Available:    false,
+			Priority:     200,
+			Capabilities: []Capability{CapabilitySerialIO},
+		}},
+		fakeProvider{desc: TransportDescriptor{
+			Kind:         KindNativeSerial,
+			Name:         "available",
+			Available:    true,
+			Priority:     100,
+			Capabilities: []Capability{CapabilitySerialIO},
+		}},
+	)
+
+	selected, err := mgr.Select(SelectionRequest{RequiredCapabilities: []Capability{CapabilitySerialIO}})
+	require.NoError(t, err)
+	require.Equal(t, "available", selected.Descriptor.Name)
+}
+
 func TestTransportManagerSelectsFutureTransportWhenRequested(t *testing.T) {
 	mgr := NewTransportManager(
 		fakeProvider{desc: TransportDescriptor{

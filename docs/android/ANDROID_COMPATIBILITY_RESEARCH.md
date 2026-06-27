@@ -190,6 +190,11 @@ rm -rf ~/.arduino15/packages/esp32 ~/.arduino15/staging ~/.cache/arduino ~/.ardu
   evidence.
   - Evidence: Termux API source uses `TERMUX_USB_FD` and `termux-callback`, and
     release notes document USB fd and Android 14 USB fixes.
+- The ACL transport boundary now has a diagnostic-first Termux USB provider and
+  safe CLI surfaces, but native Termux validation is still required before any
+  Android USB success claim is made.
+  - Evidence: repository implementation in `internal/acl/transport/termuxusb`
+    and the `arduino-cli acl transport list|diagnose|acquire` command group.
 - Android USB host access remains app-scoped and permission-gated.
   - Evidence: `UsbManager.requestPermission(...)` and `UsbDeviceConnection`
     documentation.

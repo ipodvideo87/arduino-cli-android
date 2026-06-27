@@ -81,6 +81,7 @@ Repository cleanup:
 - Android USB host access has been demonstrated on the same ESP32-S3 hardware by third-party apps, so the remaining work is transport integration rather than basic hardware discovery.
 - Termux USB enumeration and permission flow are functional, but acquisition timing still needs root-cause analysis.
 - The ACL transport manager now exists as a capability-based selector for native serial, Android USB fd, PTY, RFC2217, and future transports.
+- The Termux USB transport provider now exists as a diagnostic-only implementation with discovery, permission, session, and endpoint-export contracts, plus `arduino-cli acl transport list|diagnose|acquire` CLI surfaces.
 - The ACL firmware package foundation now exists, including the build manifest, flash plan, firmware package wrapper, and binary validator.
 - The firmware package now also emits `analysis.json` and `README_FLASHING.txt`, and the ACL compile path uses metadata-first bootloader detection with an app-only fallback warning when the bootloader artifacts are incomplete.
 - The ACL compatibility layer now exists as a rule-based decision layer for runtime, library, firmware, and transport compatibility.
@@ -112,6 +113,7 @@ Repository cleanup:
 - Define a generic Android upload and monitor bridge that stays board-agnostic, descriptor-driven, and provider-based.
 - Validate firmware upload and serial monitor behavior through the new transport implementation on real hardware.
 - Implement the first real transport provider runtime after the contract layer is proven stable.
+- Validate the Termux USB transport provider on native Termux and confirm the exact discovery, permission, and file-descriptor handoff behavior on-device.
 - Finish the Android preflight and dry-run reporting surfaces so they can be consumed by future UI workspaces.
 - Keep the development workflow aligned with the two-environment model: native Termux as the source of truth, Ubuntu/proot as a tooling environment.
 - Polish the ACL CLI diagnostic surfaces and wire them into future workspace UI layers.

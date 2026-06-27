@@ -27,11 +27,20 @@ compile-safe provider boundary:
 - `TransportSelection`
 - provider/session/permission/endpoint/diagnostics contracts
 - fake-provider tests
+- Termux USB diagnostics and acquisition scaffolding in
+  `internal/acl/transport/termuxusb`
 
 That is the first layer of the provider model.
 
 The remaining transport lifecycle behavior should be layered above it, not
 forced into the selector.
+
+Current implementation note:
+
+- the Termux USB provider is diagnostic-first and reports discovery, permission
+  acquisition traces, and file-descriptor availability through the transport
+  report model
+- byte-stream access, upload, and monitor behavior remain future work
 
 ## Provider Categories
 

@@ -121,6 +121,9 @@ func (m *TransportManager) Select(req SelectionRequest) (TransportSelection, err
 	matches := make([]scoredTransport, 0, len(entries))
 	for _, entry := range entries {
 		desc := entry.descriptor
+		if !desc.Available {
+			continue
+		}
 		if !desc.Satisfies(req.RequiredCapabilities) {
 			continue
 		}
@@ -450,6 +453,9 @@ func mergeDiagnostics(base, overlay TransportDiagnosticsReport) TransportDiagnos
 		if len(base.Interfaces) == 0 {
 			base.Interfaces = append([]InterfaceSummary(nil), overlay.Device.Interfaces...)
 		}
+	}
+	if len(overlay.Devices) > 0 {
+		base.Devices = append([]DiscoveredDevice(nil), overlay.Devices...)
 	}
 	if overlay.DiscoveryStatus != "" {
 		base.DiscoveryStatus = overlay.DiscoveryStatus

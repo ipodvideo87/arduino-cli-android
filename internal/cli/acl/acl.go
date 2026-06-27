@@ -43,6 +43,7 @@ func NewCommand(srv rpc.ArduinoCoreServiceServer) *cobra.Command {
 	cmd.AddCommand(newVerifyCommand())
 	cmd.AddCommand(newPatchPreviewCommand())
 	cmd.AddCommand(newBootstrapCommand())
+	cmd.AddCommand(newTransportCommand())
 	cmd.AddCommand(newWorkflowCommand(srv))
 	return cmd
 }

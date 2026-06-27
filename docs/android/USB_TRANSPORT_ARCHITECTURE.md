@@ -70,6 +70,10 @@ Current repository state:
   contracts.
 - Fake providers and tests exercise the boundary without real Android USB
   access.
+- `internal/acl/transport/termuxusb` now provides the first real provider
+  implementation boundary, including command-trace diagnostics and safe
+  `acl transport` CLI entry points, but it remains diagnostic-only until native
+  Termux USB validation proves the acquisition and fd-handoff path.
 
 ### 3. Discovery
 
@@ -228,6 +232,18 @@ Capability examples:
 - line coding
 - modem control
 - protocol translation
+
+## Current CLI Surface
+
+The ACL CLI exposes the transport boundary through safe, non-flashing
+diagnostic commands:
+
+- `arduino-cli acl transport list`
+- `arduino-cli acl transport diagnose`
+- `arduino-cli acl transport acquire --device <path>`
+
+These commands are intended to surface discovery, permission, and endpoint
+metadata, not to perform upload or monitor operations.
 
 ## Stable Design Conclusion
 

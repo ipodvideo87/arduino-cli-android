@@ -264,6 +264,16 @@ type EndpointExport struct {
 	Stream         any                `json:"-"`
 }
 
+type CommandTrace struct {
+	Command        string   `json:"command,omitempty"`
+	Args           []string `json:"args,omitempty"`
+	Stdout         string   `json:"stdout,omitempty"`
+	Stderr         string   `json:"stderr,omitempty"`
+	ExitCode       int      `json:"exit_code,omitempty"`
+	Err            string   `json:"error,omitempty"`
+	Interpretation string   `json:"interpretation,omitempty"`
+}
+
 func (e EndpointExport) BeginnerSummary() string {
 	if strings.TrimSpace(e.UserMessage) != "" {
 		return e.UserMessage
@@ -421,6 +431,7 @@ type TransportDiagnosticsReport struct {
 	Selected         TransportDescriptor   `json:"selected,omitempty"`
 	Alternatives     []TransportDescriptor `json:"alternatives,omitempty"`
 	Device           DiscoveredDevice      `json:"device,omitempty"`
+	Devices          []DiscoveredDevice    `json:"devices,omitempty"`
 	DiscoveryStatus  diagnostics.Status    `json:"discovery_status,omitempty"`
 	PermissionStatus diagnostics.Status    `json:"permission_status,omitempty"`
 	ConnectionStatus diagnostics.Status    `json:"connection_status,omitempty"`
@@ -429,6 +440,7 @@ type TransportDiagnosticsReport struct {
 	Endpoints        []EndpointSummary     `json:"endpoints,omitempty"`
 	Warnings         []string              `json:"warnings,omitempty"`
 	Limitations      []string              `json:"limitations,omitempty"`
+	Traces           []CommandTrace        `json:"traces,omitempty"`
 	Beginner         string                `json:"beginner_summary,omitempty"`
 	Professional     []string              `json:"professional_details,omitempty"`
 	Fields           map[string]string     `json:"fields,omitempty"`

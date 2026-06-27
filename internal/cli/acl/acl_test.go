@@ -12,6 +12,7 @@ import (
 	aclengine "github.com/arduino/arduino-cli/internal/acl/engine"
 	aclinstall "github.com/arduino/arduino-cli/internal/acl/install"
 	aclscanner "github.com/arduino/arduino-cli/internal/acl/scanner"
+	"github.com/arduino/arduino-cli/internal/acl/transport"
 	aclverifier "github.com/arduino/arduino-cli/internal/acl/verifier"
 	rpc "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/commands/v1"
 	"github.com/spf13/cobra"
@@ -308,6 +309,155 @@ func TestACLWorkflowCompileCommandSeparatesBuildAndOutputDirs(t *testing.T) {
 	root.SetArgs([]string{"acl", "workflow", "compile", "--fqbn", "esp32:esp32:esp32s3", "--build-path", buildDir, "--output-dir", outputDir, sketchDir})
 
 	require.NoError(t, root.Execute())
+}
+
+func TestACLTransportListCommandJSON(t *testing.T) {
+	oldFactory := newTransportProvider
+	newTransportProvider = func() transportProvider {
+		return fakeCLITransportProvider{
+			desc: transport.TransportDescriptor{
+				Kind:      transport.KindAndroidUSBFD,
+				Name:      "termux-usb",
+				Provider:  "termuxusb",
+				Available: true,
+			},
+			report: transport.TransportDiagnosticsReport{
+				SchemaVersion: "1",
+				Status:        acldiagnostics.StatusPassed,
+				Beginner:      "1 USB device discovered",
+				Professional:  []string{"device list ready"},
+				Devices: []transport.DiscoveredDevice{{
+					Provider:        "termuxusb",
+					StableID:        "/dev/bus/usb/001/002",
+					DisplayName:     "/dev/bus/usb/001/002",
+					TransportFamily: transport.TransportFamilyUSBSerial,
+				}},
+			},
+		}
+	}
+	t.Cleanup(func() { newTransportProvider = oldFactory })
+
+	root := newTestRoot()
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"acl", "transport", "list", "--json"})
+
+	require.NoError(t, root.Execute())
+
+	var report transportListReport
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &report))
+	require.Len(t, report.Devices, 1)
+	require.Equal(t, acldiagnostics.StatusPassed, report.Status)
+}
+
+func TestACLTransportDiagnoseCommandTextAndDetails(t *testing.T) {
+	oldFactory := newTransportProvider
+	newTransportProvider = func() transportProvider {
+		return fakeCLITransportProvider{
+			desc: transport.TransportDescriptor{
+				Kind:      transport.KindAndroidUSBFD,
+				Name:      "termux-usb",
+				Provider:  "termuxusb",
+				Available: true,
+			},
+			report: transport.TransportDiagnosticsReport{
+				SchemaVersion: "1",
+				Status:        acldiagnostics.StatusWarning,
+				Beginner:      "Termux USB diagnostics completed with limitations",
+				Professional:  []string{"device list ready", "endpoint export is diagnostic-only"},
+				Traces: []transport.CommandTrace{{
+					Command:        "termux-usb",
+					Args:           []string{"-l"},
+					Stdout:         "[\"/dev/bus/usb/001/002\"]",
+					ExitCode:       0,
+					Interpretation: "termux-usb discovery",
+				}},
+			},
+		}
+	}
+	t.Cleanup(func() { newTransportProvider = oldFactory })
+
+	root := newTestRoot()
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"acl", "transport", "diagnose", "--details", "--device", "/dev/bus/usb/001/002"})
+
+	require.NoError(t, root.Execute())
+	output := buf.String()
+	require.Contains(t, output, "ACL Transport Diagnose")
+	require.Contains(t, output, "Termux USB diagnostics completed")
+	require.Contains(t, output, "termux-usb -l")
+}
+
+func TestACLTransportAcquireCommandJSON(t *testing.T) {
+	oldFactory := newTransportProvider
+	newTransportProvider = func() transportProvider {
+		return fakeCLITransportProvider{
+			desc: transport.TransportDescriptor{
+				Kind:      transport.KindAndroidUSBFD,
+				Name:      "termux-usb",
+				Provider:  "termuxusb",
+				Available: true,
+			},
+			permission: transport.PermissionResult{
+				State:       transport.PermissionStateGranted,
+				Method:      "termux-usb -r",
+				UserMessage: "USB permission granted",
+				Professional: []string{
+					"command: termux-usb -r /dev/bus/usb/001/002",
+				},
+			},
+			report: transport.TransportDiagnosticsReport{
+				SchemaVersion: "1",
+				Status:        acldiagnostics.StatusPassed,
+				Beginner:      "Termux USB diagnostics completed",
+			},
+		}
+	}
+	t.Cleanup(func() { newTransportProvider = oldFactory })
+
+	root := newTestRoot()
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"acl", "transport", "acquire", "--json", "--device", "/dev/bus/usb/001/002"})
+
+	require.NoError(t, root.Execute())
+
+	var report transportAcquireReport
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &report))
+	require.Equal(t, transport.PermissionStateGranted, report.Permission.State)
+	require.Equal(t, "/dev/bus/usb/001/002", report.DevicePath)
+}
+
+type fakeCLITransportProvider struct {
+	desc       transport.TransportDescriptor
+	report     transport.TransportDiagnosticsReport
+	permission transport.PermissionResult
+	devices    []transport.DiscoveredDevice
+}
+
+func (f fakeCLITransportProvider) Descriptor() transport.TransportDescriptor { return f.desc }
+
+func (f fakeCLITransportProvider) Discover(context.Context, transport.DiscoveryRequest) ([]transport.DiscoveredDevice, error) {
+	return append([]transport.DiscoveredDevice(nil), f.devices...), nil
+}
+
+func (f fakeCLITransportProvider) RequestPermission(context.Context, transport.PermissionRequest) (transport.PermissionResult, error) {
+	if f.permission.State == "" {
+		return transport.PermissionResult{State: transport.PermissionStateUnavailable}, nil
+	}
+	return f.permission, nil
+}
+
+func (f fakeCLITransportProvider) Open(context.Context, transport.OpenRequest) (transport.TransportSession, error) {
+	return nil, nil
+}
+
+func (f fakeCLITransportProvider) Diagnostics(context.Context, transport.DiagnosticsRequest) (transport.TransportDiagnosticsReport, error) {
+	return f.report, nil
 }
 
 type testBootstrapExecutor struct {

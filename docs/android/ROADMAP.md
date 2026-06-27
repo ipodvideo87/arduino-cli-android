@@ -22,12 +22,14 @@
 - USB transport research and architecture docs
 - USB transport provider model and upload/monitor previews
 - Transport provider skeleton, diagnostics models, and fake-provider tests
+- Termux USB transport provider, command traces, and safe CLI diagnostics
 
 ## Next Milestones
 
 - Finish full-flash bootloader package validation on native Termux
 - Add emulated ARM64 / Termux-like smoke tests
 - Build a generic Android USB transport bridge
+- Validate the Termux USB provider and file-descriptor handoff path on native Termux
 - Implement the upload workflow
 - Implement the serial monitor workflow
 - Add GUI/workspaces

@@ -14,8 +14,15 @@ interface numbers, reset sequences, or baud rates.
 
 The compile-safe transport provider skeleton now exists in
 `internal/acl/transport`, along with fake-provider tests and manager helpers.
-It is still a contract layer only: no real Android USB API calls, no USB
-flashing, and no upload or serial-monitor implementation yet.
+The Termux USB provider now exists in `internal/acl/transport/termuxusb`,
+along with safe diagnostic CLI surfaces:
+
+- `arduino-cli acl transport list`
+- `arduino-cli acl transport diagnose`
+- `arduino-cli acl transport acquire --device <path>`
+
+It is still a contract and diagnostics layer only: no real Android USB API
+calls, no USB flashing, and no upload or serial-monitor implementation yet.
 
 The framework exists so Arduino CLI and future tool integrations can keep
 talking to a serial-like endpoint while ACL owns Android-specific USB
@@ -30,6 +37,9 @@ discovery, permission, and bridge logic.
 - transport selection is capability-based rather than board-based
 - provider contracts are compile-safe and fake-provider tested before any real
   Android USB integration is attempted
+- Termux USB discovery, permission acquisition, and file-descriptor reporting
+  are isolated behind the transport provider contract and remain diagnostic-only
+  until native Termux validation proves the on-device behavior
 
 ## Related Docs
 

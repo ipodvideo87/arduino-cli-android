@@ -44,6 +44,14 @@ This file is a logbook of tested findings from the project history.
 - Confidence: medium
 - Notes: package content should be rechecked as firmware-package semantics evolve
 
+- Environment: repository unit-test environment
+- Command/evidence: `go test ./internal/acl/transport/... ./internal/cli/acl/...`
+- Result: the transport provider contracts, Termux USB provider, and transport CLI
+  surfaces compile and pass unit tests
+- Confidence: high
+- Notes: this validates the code boundary only; native Termux USB hardware behavior
+  still needs on-device validation
+
 - Environment: ESP32-S3 / Arduino-ESP32 flash recipe metadata
 - Command/evidence: external flashing history and Arduino-ESP32 recipe conventions
 - Result: external flashing previously used bootloader, partitions, boot_app0, and
