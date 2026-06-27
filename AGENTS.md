@@ -148,6 +148,9 @@ Do not claim a milestone is complete until it has been verified through real-wor
 - Every change should leave the documentation in a more accurate state than before.
 - Push after completed validated change sets unless instructed otherwise.
 - When unsure, document assumptions and open questions explicitly.
+- Follow [docs/android/DIAGNOSTIC_VALIDATION_STANDARD.md](docs/android/DIAGNOSTIC_VALIDATION_STANDARD.md) for all engineering completion reports, validation summaries, and milestone claims.
+- Avoid vague completion language such as `passed`, `works`, or `complete` unless the statement is immediately qualified by diagnostic evidence and validation scope.
+- Completion summaries must include the environment, highest validation level achieved, evidence collected, claims supported, claims not yet supported, and the next recommended validation step.
 
 ## Repository Status
 - `STATUS.md` is the canonical snapshot of current project progress.

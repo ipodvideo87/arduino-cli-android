@@ -4,13 +4,16 @@ This project uses evidence levels to avoid overclaiming.
 
 ## Levels
 
-- Level 0: builds locally
-- Level 1: unit tests pass
-- Level 2: CLI command exists and basic help works
-- Level 3: native Termux compile or workflow validation passes
-- Level 4: real firmware package validates on device
-- Level 5: real hardware upload or flash succeeds
-- Level 6: flashed firmware boots and runtime behavior is verified
+The validation hierarchy is also defined in [DIAGNOSTIC_VALIDATION_STANDARD.md](DIAGNOSTIC_VALIDATION_STANDARD.md). That document defines how evidence should be reported; this document defines the validation scope for each level.
+
+- Level 0: static analysis
+- Level 1: unit / integration
+- Level 2: host validation
+- Level 3: ARM64 smoke validation
+- Level 4: native Termux validation
+- Level 5: real hardware validation
+
+The repository's higher-level milestone claims should always refer to the highest validation level actually demonstrated.
 
 ## Validation Providers
 
@@ -51,6 +54,10 @@ Every provider should emit:
 - Real hardware is required for upload, flash, and runtime claims.
 - Default bootstrap mode should not modify the host. Installation must be
   explicit.
+- Passing Go tests alone does not validate Android behavior.
+- Passing smoke tests does not validate native Termux behavior.
+- Passing native Termux validation does not validate real hardware behavior.
+- Every completion report should explicitly identify the validation level it achieved and the evidence that supports that claim.
 
 ## Claiming Success
 
@@ -58,3 +65,4 @@ Every provider should emit:
 - Keep compile, packaging, validation, upload, flash, and runtime claims separate.
 - Do not collapse a lower evidence level into a higher one.
 - Label emulated validation as preflight only.
+- Avoid vague success language such as `passed`, `works`, or `complete` unless it is immediately qualified with evidence, scope, and validation level.
