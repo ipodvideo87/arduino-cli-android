@@ -26,6 +26,7 @@ does not replace native Android validation.
 - USB Transport Research: [docs/android/USB_TRANSPORT_RESEARCH.md](docs/android/USB_TRANSPORT_RESEARCH.md)
 - USB Transport Architecture: [docs/android/USB_TRANSPORT_ARCHITECTURE.md](docs/android/USB_TRANSPORT_ARCHITECTURE.md)
 - Transport Provider Model: [docs/android/TRANSPORT_PROVIDER_MODEL.md](docs/android/TRANSPORT_PROVIDER_MODEL.md)
+- Termux USB Provider Validation Checklist: [docs/android/MILESTONE_TERMUX_USB_PROVIDER.md](docs/android/MILESTONE_TERMUX_USB_PROVIDER.md)
 - Upload Workflow Preview: [docs/android/UPLOAD_WORKFLOW_PREVIEW.md](docs/android/UPLOAD_WORKFLOW_PREVIEW.md)
 - Serial Monitor Preview: [docs/android/SERIAL_MONITOR_PREVIEW.md](docs/android/SERIAL_MONITOR_PREVIEW.md)
 - Firmware Package Spec: [docs/specifications/FIRMWARE_PACKAGE_SPEC.md](docs/specifications/FIRMWARE_PACKAGE_SPEC.md)
@@ -35,6 +36,7 @@ Current validation posture:
 - Native Termux remains the source of truth for Android behavior.
 - Unit tests and CLI/build verification are useful, but not sufficient for Android claims.
 - Emulated ARM64 smoke tests are useful preflight checks only and do not prove Android success.
+- The Termux USB provider now has a native-Termux validation checklist documenting expected outputs for discovery, permission, stale-path handling, and fd handoff evidence.
 - USB flashing is still unimplemented and must not be claimed as complete.
 
 Repository cleanup:

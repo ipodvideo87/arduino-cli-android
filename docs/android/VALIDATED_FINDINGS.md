@@ -52,6 +52,14 @@ This file is a logbook of tested findings from the project history.
 - Notes: this validates the code boundary only; native Termux USB hardware behavior
   still needs on-device validation
 
+- Environment: native Termux validation planning
+- Command/evidence: `docs/android/MILESTONE_TERMUX_USB_PROVIDER.md`
+- Result: a native-Termux checklist now exists for `acl transport list`,
+  `acl transport diagnose --details`, and `acl transport acquire --device`
+  validation flows
+- Confidence: high
+- Notes: documentation only; no new device result is claimed by this entry
+
 - Environment: ESP32-S3 / Arduino-ESP32 flash recipe metadata
 - Command/evidence: external flashing history and Arduino-ESP32 recipe conventions
 - Result: external flashing previously used bootloader, partitions, boot_app0, and

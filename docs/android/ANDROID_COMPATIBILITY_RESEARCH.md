@@ -195,6 +195,7 @@ rm -rf ~/.arduino15/packages/esp32 ~/.arduino15/staging ~/.cache/arduino ~/.ardu
   Android USB success claim is made.
   - Evidence: repository implementation in `internal/acl/transport/termuxusb`
     and the `arduino-cli acl transport list|diagnose|acquire` command group.
+  - Validation checklist: `docs/android/MILESTONE_TERMUX_USB_PROVIDER.md`
 - Android USB host access remains app-scoped and permission-gated.
   - Evidence: `UsbManager.requestPermission(...)` and `UsbDeviceConnection`
     documentation.

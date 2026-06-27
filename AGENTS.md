@@ -35,6 +35,7 @@ Native Termux validation always takes priority over container or desktop validat
   and [docs/android/TRANSPORT_PROVIDER_MODEL.md](docs/android/TRANSPORT_PROVIDER_MODEL.md)
   and [docs/android/UPLOAD_WORKFLOW_PREVIEW.md](docs/android/UPLOAD_WORKFLOW_PREVIEW.md)
   and [docs/android/SERIAL_MONITOR_PREVIEW.md](docs/android/SERIAL_MONITOR_PREVIEW.md)
+  and [docs/android/MILESTONE_TERMUX_USB_PROVIDER.md](docs/android/MILESTONE_TERMUX_USB_PROVIDER.md)
   and the current milestone document under `docs/android/`.
 - If the behavior is not already documented there, research it before guessing.
 - Add new confirmed Android/Termux findings to that file as part of the same work.
