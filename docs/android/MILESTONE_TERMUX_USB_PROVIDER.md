@@ -176,12 +176,15 @@ The provider now also exposes a safe fd-handoff probe surface:
 ./arduino-cli acl transport probe-fd --device <device-path>
 ./arduino-cli acl transport probe-fd --json --device <device-path>
 ./arduino-cli acl transport probe-fd-helper --json
+./arduino-cli acl transport probe-fd-helper <fd> --json
 ```
 
 Expected behavior:
 
 - the probe reports whether `TERMUX_USB_FD` is present
 - the helper records whether the fd value is valid and inspectable
+- the helper records whether the fd came from `TERMUX_USB_FD` or a positional
+  command-line argument
 - the report stays diagnostic-only
 - the report does not prove read/write stream support
 - the report does not prove upload, flashing, or serial monitor behavior
@@ -191,9 +194,19 @@ Expected interpretation:
 - `fd_observed=true` means the helper saw a Termux fd handoff
 - `fd_valid=true` means the environment variable parsed as an integer fd
 - `fd_inspectable=true` means the helper could inspect the file descriptor
+- `fd_source=environment` means the helper used `TERMUX_USB_FD`
+- `fd_source=argument` means the helper used the positional fd argument
 - `stream_supported=false` means no usable byte-stream bridge is claimed yet
 - `read_state`, `write_state`, `close_state`, `eof_state`, and
   `disconnect_state` remain bounded diagnostics until a real bridge exists
+
+Root cause and fix:
+
+- the first implementation only looked at `TERMUX_USB_FD`
+- native Termux evidence showed `termux-usb -e` passes the fd as a positional
+  argument, while `termux-usb -E` passes it in `TERMUX_USB_FD`
+- the probe now defaults to `-E` and the helper accepts both env and argv fd
+  sources so diagnostics can record either handoff mode clearly
 
 ## Native-Termux Validation Result
 
@@ -207,8 +220,8 @@ Observed on the Samsung A17 / Android 16 / native Termux environment:
   - provider: `termuxusb`
   - selected kind: `android-usb-fd`
   - `termux-usb -l` discovered the same path
-  - the warning correctly explains that `TERMUX_USB_FD` is unavailable outside
-    `termux-usb -e`
+  - the warning correctly explains that `TERMUX_USB_FD` is unavailable without
+    the fd handoff path
 - `termux-usb -l`
   - returned `/dev/bus/usb/001/002`
 - `./arduino-cli acl transport acquire --device /dev/bus/usb/001/002`
@@ -226,6 +239,8 @@ Next recommended milestone:
 
 - `TERMUX_USB_FD` handoff probe / byte-stream bridge foundation
 - native-Termux validation of `acl transport probe-fd`
+- validate both `-E` and argv handoff paths on native Termux and record the
+  observed `fd_source` in the findings log
 
 ## What Success Means
 

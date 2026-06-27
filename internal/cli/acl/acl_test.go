@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	acldiagnostics "github.com/arduino/arduino-cli/internal/acl/diagnostics"
@@ -444,24 +445,27 @@ func TestACLTransportProbeFDCommandJSON(t *testing.T) {
 				Available: true,
 			},
 			probe: transport.TransportStreamDiagnosticsReport{
-				SchemaVersion:   "1",
-				Status:          acldiagnostics.StatusWarning,
-				Provider:        "termuxusb",
-				ProviderKind:    transport.KindAndroidUSBFD,
-				FDEnvPresent:    true,
-				FDObserved:      true,
-				FDValid:         true,
-				FDInspectable:   true,
-				StreamSupported: false,
-				StreamProven:    false,
-				ReadState:       transport.StreamObservationUnsupported,
-				WriteState:      transport.StreamObservationUnsupported,
-				CloseState:      transport.StreamObservationUnsupported,
-				EOFState:        transport.StreamObservationUnsupported,
-				DisconnectState: transport.StreamObservationUnsupported,
-				Beginner:        "TERMUX_USB_FD observed; stream support remains experimental",
-				Professional:    []string{"fd handoff observed", "byte-stream bridge not yet implemented"},
-				NextStep:        "add a bounded byte-stream bridge or transport stream adapter",
+				SchemaVersion:    "1",
+				Status:           acldiagnostics.StatusWarning,
+				Provider:         "termuxusb",
+				ProviderKind:     transport.KindAndroidUSBFD,
+				FDEnvPresent:     true,
+				FDObserved:       true,
+				FDValid:          true,
+				FDInspectable:    true,
+				StreamSupported:  false,
+				StreamProven:     false,
+				ReadState:        transport.StreamObservationUnsupported,
+				WriteState:       transport.StreamObservationUnsupported,
+				CloseState:       transport.StreamObservationUnsupported,
+				EOFState:         transport.StreamObservationUnsupported,
+				DisconnectState:  transport.StreamObservationUnsupported,
+				TermuxUSBCommand: "termux-usb -r -E helper /dev/bus/usb/001/002",
+				Beginner:         "TERMUX_USB_FD observed; stream support remains experimental",
+				Professional:     []string{"fd handoff observed", "byte-stream bridge not yet implemented"},
+				NextStep:         "add a bounded byte-stream bridge or transport stream adapter",
+				HandoffMode:      "env",
+				FDSource:         "environment",
 			},
 		}
 	}
@@ -479,6 +483,9 @@ func TestACLTransportProbeFDCommandJSON(t *testing.T) {
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &report))
 	require.True(t, report.FDObserved)
 	require.Equal(t, acldiagnostics.StatusWarning, report.Status)
+	require.Equal(t, "env", report.HandoffMode)
+	require.Equal(t, "environment", report.FDSource)
+	require.Contains(t, report.TermuxUSBCommand, "-E")
 	require.Contains(t, report.BeginnerSummary(), "TERMUX_USB_FD")
 }
 
@@ -501,7 +508,32 @@ func TestACLTransportProbeFDHelperCommandJSON(t *testing.T) {
 	require.True(t, report.FDObserved)
 	require.True(t, report.FDValid)
 	require.True(t, report.FDInspectable)
+	require.Equal(t, "environment", report.FDSource)
+	require.Equal(t, "env", report.HandoffMode)
 	require.Equal(t, acldiagnostics.StatusWarning, report.Status)
+}
+
+func TestACLTransportProbeFDHelperCommandArgumentJSON(t *testing.T) {
+	file, err := os.CreateTemp(t.TempDir(), "termux-usb-fd-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = file.Close() })
+	t.Setenv("TERMUX_USB_FD", "")
+
+	root := newTestRoot()
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"acl", "transport", "probe-fd-helper", strconv.FormatUint(uint64(file.Fd()), 10), "--json"})
+
+	require.NoError(t, root.Execute())
+
+	var report transport.TransportStreamDiagnosticsReport
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &report))
+	require.True(t, report.FDObserved)
+	require.True(t, report.FDValid)
+	require.True(t, report.FDInspectable)
+	require.Equal(t, "argument", report.FDSource)
+	require.Equal(t, "argv", report.HandoffMode)
 }
 
 type fakeCLITransportProvider struct {

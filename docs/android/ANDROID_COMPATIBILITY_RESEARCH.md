@@ -209,6 +209,13 @@ rm -rf ~/.arduino15/packages/esp32 ~/.arduino15/staging ~/.cache/arduino ~/.ardu
   - Evidence: `internal/acl/transport/termuxusb` and the CLI/tests in
     `internal/cli/acl`
   - Status: implemented and unit-tested; native Termux validation pending
+- The root cause of the earlier missing-fd report was a handoff-mode mismatch:
+  the probe only inspected `TERMUX_USB_FD`, while native Termux evidence showed
+  that `termux-usb -E` uses the environment variable and `termux-usb -e` uses a
+  positional argument.
+  - Evidence: native Termux `termux-usb -help` output and the provider/helper
+    implementation now supporting both sources
+  - Status: fixed in code; native validation of the fixed path is the next step
 - Android USB host access remains app-scoped and permission-gated.
   - Evidence: `UsbManager.requestPermission(...)` and `UsbDeviceConnection`
     documentation.

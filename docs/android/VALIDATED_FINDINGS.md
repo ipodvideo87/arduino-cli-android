@@ -63,7 +63,8 @@ This file is a logbook of tested findings from the project history.
 - Environment: repository unit-test environment
 - Command/evidence: `go test ./internal/acl/transport/... ./internal/cli/acl/...`
 - Result: the Termux USB provider now includes a bounded fd-handoff probe and
-  the helper/CLI surface passes unit tests
+  the helper/CLI surface passes unit tests, including env and argv fd-source
+  handling
 - Confidence: high
 - Notes: this validates the contract boundary only; native Termux validation of
   the probe is still pending

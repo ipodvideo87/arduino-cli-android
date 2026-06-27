@@ -177,8 +177,10 @@ func newTransportProbeFDCommand() *cobra.Command {
 					DisplayName:     devicePath,
 					TransportFamily: transport.TransportFamilyUSBSerial,
 				},
+				HandoffMode: "env",
 				Metadata: map[string]string{
-					"device_path": devicePath,
+					"device_path":  devicePath,
+					"handoff_mode": "env",
 				},
 			})
 			if err != nil && strings.TrimSpace(report.Beginner) == "" {
@@ -201,8 +203,9 @@ func newTransportProbeFDHelperCommand() *cobra.Command {
 		Use:    "probe-fd-helper",
 		Hidden: true,
 		Short:  "Internal helper for TERMUX_USB_FD diagnostics",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return writeJSON(cmd, termuxusb.HelperStreamProbeReportFromEnv())
+		Args:   cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return writeJSON(cmd, termuxusb.HelperStreamProbeReportFromInvocation(args))
 		},
 	}
 	return cmd

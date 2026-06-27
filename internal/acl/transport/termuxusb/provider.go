@@ -230,6 +230,11 @@ func (p *Provider) Probe(ctx context.Context, req transport.StreamProbeRequest) 
 	if helperCommand == "" {
 		helperCommand = defaultProbeHelperCommand()
 	}
+	handoffMode := strings.TrimSpace(req.HandoffMode)
+	if handoffMode == "" {
+		handoffMode = "env"
+	}
+	report.HandoffMode = handoffMode
 
 	if !p.available() {
 		report.Beginner = "termux-usb is unavailable on this host"
@@ -238,7 +243,20 @@ func (p *Provider) Probe(ctx context.Context, req transport.StreamProbeRequest) 
 		return report, nil
 	}
 
-	args := []string{"-r", "-e", helperCommand, devicePath}
+	args := []string{"-r"}
+	if handoffMode == "argv" {
+		args = append(args, "-e")
+	} else {
+		handoffMode = "env"
+		args = append(args, "-E")
+	}
+	args = append(args, helperCommand, devicePath)
+	report.TermuxUSBCommand = formatCommand(p.commandName(), args)
+	if report.Metadata == nil {
+		report.Metadata = map[string]string{}
+	}
+	report.Metadata["handoff_mode"] = handoffMode
+	report.Metadata["termux_usb_command"] = report.TermuxUSBCommand
 	result := p.runner.Run(ctx, p.commandName(), args...)
 	trace := transport.CommandTrace{
 		Command:        p.commandName(),
@@ -281,6 +299,10 @@ func (p *Provider) Probe(ctx context.Context, req transport.StreamProbeRequest) 
 	}
 	report.Metadata["device_path"] = devicePath
 	report.Metadata["helper_command"] = helperCommand
+	report.Metadata["handoff_mode"] = handoffMode
+	report.HandoffMode = handoffMode
+	report.TermuxUSBCommand = formatCommand(p.commandName(), args)
+	report.Metadata["termux_usb_command"] = report.TermuxUSBCommand
 	report.Traces = append([]transport.CommandTrace{trace}, report.Traces...)
 	if result.Err != nil {
 		report.Warnings = append(report.Warnings, result.Err.Error())
@@ -550,6 +572,10 @@ func defaultProbeHelperCommand() string {
 	return fmt.Sprintf("%s acl transport probe-fd-helper --json", os.Args[0])
 }
 
+func formatCommand(name string, args []string) string {
+	return strings.TrimSpace(strings.Join(append([]string{name}, args...), " "))
+}
+
 func parseStreamProbeReport(raw string) (transport.TransportStreamDiagnosticsReport, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -563,14 +589,20 @@ func parseStreamProbeReport(raw string) (transport.TransportStreamDiagnosticsRep
 }
 
 func HelperStreamProbeReportFromEnv() transport.TransportStreamDiagnosticsReport {
-	raw := strings.TrimSpace(os.Getenv("TERMUX_USB_FD"))
+	return HelperStreamProbeReportFromInvocation(nil)
+}
+
+func HelperStreamProbeReportFromInvocation(args []string) transport.TransportStreamDiagnosticsReport {
+	rawEnv := strings.TrimSpace(os.Getenv("TERMUX_USB_FD"))
+	rawArg, argPresent, argMalformed := probeFDFromArgs(args)
 	report := transport.TransportStreamDiagnosticsReport{
 		SchemaVersion:   "1",
 		Status:          diagnostics.StatusWarning,
 		Provider:        defaultProviderID,
 		ProviderKind:    transport.KindAndroidUSBFD,
-		FDEnvPresent:    raw != "",
-		FDEnvValue:      raw,
+		FDEnvPresent:    rawEnv != "",
+		FDEnvValue:      rawEnv,
+		HelperArgs:      append([]string(nil), args...),
 		StreamSupported: false,
 		StreamProven:    false,
 		ReadState:       transport.StreamObservationUnsupported,
@@ -581,64 +613,159 @@ func HelperStreamProbeReportFromEnv() transport.TransportStreamDiagnosticsReport
 		Metadata:        map[string]string{},
 		NextStep:        "run a bounded read/write bridge before claiming byte-stream support",
 	}
-	if raw == "" {
+	report.Metadata["helper_args"] = strings.Join(args, " ")
+	switch {
+	case rawEnv != "":
+		report.FDObserved = true
+		report.FDSource = "environment"
+		report.HandoffMode = "env"
+		report.Metadata["fd_source"] = report.FDSource
+		report.Metadata["handoff_mode"] = report.HandoffMode
+		fd, err := strconv.Atoi(rawEnv)
+		if err != nil {
+			report.Status = diagnostics.StatusFailed
+			report.Beginner = "TERMUX_USB_FD is invalid"
+			report.Warnings = []string{"TERMUX_USB_FD could not be parsed"}
+			report.Limitations = []string{"fd value is not a valid integer"}
+			report.Professional = []string{
+				"TERMUX_USB_FD could not be parsed",
+				"raw value: " + rawEnv,
+			}
+			report.NextStep = "fix the helper invocation before probing the stream"
+			return report
+		}
+		report.FDValid = true
+		file := os.NewFile(uintptr(fd), "TERMUX_USB_FD")
+		if file == nil {
+			report.Status = diagnostics.StatusFailed
+			report.Beginner = "TERMUX_USB_FD could not be wrapped as a file"
+			report.Warnings = []string{"os.NewFile returned nil"}
+			report.Limitations = []string{"fd wrapping failed"}
+			report.NextStep = "debug the Termux fd handoff path"
+			return report
+		}
+		defer file.Close()
+		if _, err := file.Stat(); err != nil {
+			report.Status = diagnostics.StatusFailed
+			report.Beginner = "TERMUX_USB_FD is not inspectable"
+			report.Warnings = []string{err.Error()}
+			report.Limitations = []string{"fd metadata could not be inspected"}
+			report.Professional = []string{
+				"TERMUX_USB_FD was present but stat failed",
+				"fd: " + rawEnv,
+			}
+			report.NextStep = "verify the fd handoff path before attempting byte-stream work"
+			return report
+		}
+		report.FDInspectable = true
+		report.Beginner = "TERMUX_USB_FD observed via environment; stream support remains experimental"
+		report.Professional = []string{
+			"TERMUX_USB_FD was observed and inspected successfully",
+			"byte-stream read/write behavior is still unproven",
+		}
+		report.Limitations = []string{
+			"no bounded read/write bridge has been implemented",
+			"the helper does not attempt destructive device I/O",
+		}
+		report.NextStep = "add a bounded byte-stream bridge or transport stream adapter"
+		return report
+	case argPresent && !argMalformed:
+		report.FDObserved = true
+		report.FDSource = "argument"
+		report.HandoffMode = "argv"
+		report.Metadata["fd_source"] = report.FDSource
+		report.Metadata["handoff_mode"] = report.HandoffMode
+		fd, err := strconv.Atoi(rawArg)
+		if err != nil {
+			report.Status = diagnostics.StatusFailed
+			report.Beginner = "fd argument is invalid"
+			report.Warnings = []string{"file descriptor argument could not be parsed"}
+			report.Limitations = []string{"fd argument is not a valid integer"}
+			report.Professional = []string{
+				"fd argument could not be parsed",
+				"raw argument: " + rawArg,
+			}
+			report.NextStep = "fix the helper invocation before probing the stream"
+			return report
+		}
+		report.FDValid = true
+		file := os.NewFile(uintptr(fd), "TERMUX_USB_FD")
+		if file == nil {
+			report.Status = diagnostics.StatusFailed
+			report.Beginner = "fd argument could not be wrapped as a file"
+			report.Warnings = []string{"os.NewFile returned nil"}
+			report.Limitations = []string{"fd wrapping failed"}
+			report.NextStep = "debug the Termux fd handoff path"
+			return report
+		}
+		defer file.Close()
+		if _, err := file.Stat(); err != nil {
+			report.Status = diagnostics.StatusFailed
+			report.Beginner = "fd argument is not inspectable"
+			report.Warnings = []string{err.Error()}
+			report.Limitations = []string{"fd metadata could not be inspected"}
+			report.Professional = []string{
+				"fd argument was present but stat failed",
+				"fd: " + rawArg,
+			}
+			report.NextStep = "verify the fd handoff path before attempting byte-stream work"
+			return report
+		}
+		report.FDInspectable = true
+		report.Beginner = "file descriptor observed via command-line argument; stream support remains experimental"
+		report.Professional = []string{
+			"fd argument was observed and inspected successfully",
+			"byte-stream read/write behavior is still unproven",
+		}
+		report.Limitations = []string{
+			"no bounded read/write bridge has been implemented",
+			"the helper does not attempt destructive device I/O",
+		}
+		report.NextStep = "add a bounded byte-stream bridge or transport stream adapter"
+		return report
+	case argPresent && argMalformed:
+		report.FDObserved = true
+		report.FDSource = "argument"
+		report.HandoffMode = "argv"
+		report.Metadata["fd_source"] = report.FDSource
+		report.Metadata["handoff_mode"] = report.HandoffMode
+		report.Status = diagnostics.StatusFailed
+		report.Beginner = "fd argument is invalid"
+		report.Warnings = []string{"file descriptor argument could not be parsed"}
+		report.Limitations = []string{"fd argument is not a valid integer"}
+		report.Professional = []string{
+			"fd argument could not be parsed",
+			"raw argument: " + rawArg,
+		}
+		report.NextStep = "fix the helper invocation before probing the stream"
+		return report
+	default:
 		report.Beginner = "TERMUX_USB_FD is not set"
 		report.Limitations = []string{"fd handoff is unavailable outside termux-usb -e"}
 		report.Professional = []string{
 			"the helper did not observe an fd handoff",
-			"run the helper via termux-usb -r -e to inspect TERMUX_USB_FD",
+			"run the helper via termux-usb -r -E to inspect TERMUX_USB_FD, or pass an fd argument when using -e",
 		}
+		report.FDSource = "none"
+		report.HandoffMode = "env"
+		report.Metadata["fd_source"] = report.FDSource
+		report.Metadata["handoff_mode"] = report.HandoffMode
 		return report
 	}
-	report.FDObserved = true
-	fd, err := strconv.Atoi(raw)
-	if err != nil {
-		report.Status = diagnostics.StatusFailed
-		report.Beginner = "TERMUX_USB_FD is invalid"
-		report.Warnings = []string{"TERMUX_USB_FD could not be parsed"}
-		report.Limitations = []string{"fd value is not a valid integer"}
-		report.Professional = []string{
-			"TERMUX_USB_FD could not be parsed",
-			"raw value: " + raw,
+}
+
+func probeFDFromArgs(args []string) (string, bool, bool) {
+	for _, arg := range args {
+		trimmed := strings.TrimSpace(arg)
+		if trimmed == "" || strings.HasPrefix(trimmed, "-") {
+			continue
 		}
-		report.NextStep = "fix the helper invocation before probing the stream"
-		return report
-	}
-	report.FDValid = true
-	file := os.NewFile(uintptr(fd), "TERMUX_USB_FD")
-	if file == nil {
-		report.Status = diagnostics.StatusFailed
-		report.Beginner = "TERMUX_USB_FD could not be wrapped as a file"
-		report.Warnings = []string{"os.NewFile returned nil"}
-		report.Limitations = []string{"fd wrapping failed"}
-		report.NextStep = "debug the Termux fd handoff path"
-		return report
-	}
-	defer file.Close()
-	if _, err := file.Stat(); err != nil {
-		report.Status = diagnostics.StatusFailed
-		report.Beginner = "TERMUX_USB_FD is not inspectable"
-		report.Warnings = []string{err.Error()}
-		report.Limitations = []string{"fd metadata could not be inspected"}
-		report.Professional = []string{
-			"TERMUX_USB_FD was present but stat failed",
-			"fd: " + raw,
+		if _, err := strconv.Atoi(trimmed); err == nil {
+			return trimmed, true, false
 		}
-		report.NextStep = "verify the fd handoff path before attempting byte-stream work"
-		return report
+		return trimmed, true, true
 	}
-	report.FDInspectable = true
-	report.Beginner = "TERMUX_USB_FD observed; stream support remains experimental"
-	report.Professional = []string{
-		"TERMUX_USB_FD was observed and inspected successfully",
-		"byte-stream read/write behavior is still unproven",
-	}
-	report.Limitations = []string{
-		"no bounded read/write bridge has been implemented",
-		"the helper does not attempt destructive device I/O",
-	}
-	report.NextStep = "add a bounded byte-stream bridge or transport stream adapter"
-	return report
+	return "", false, false
 }
 
 func buildSessionStreamProbeReport(device transport.DiscoveredDevice, endpoint transport.EndpointExport, permission diagnostics.Status) transport.TransportStreamDiagnosticsReport {
@@ -658,6 +785,7 @@ func buildSessionStreamProbeReport(device transport.DiscoveredDevice, endpoint t
 	report.EOFState = transport.StreamObservationUnsupported
 	report.DisconnectState = transport.StreamObservationUnsupported
 	report.Metadata["permission_state"] = string(permission)
+	report.Metadata["fd_source"] = report.FDSource
 	if endpoint.Kind == transport.EndpointExportFileDescriptor {
 		report.Metadata["endpoint"] = "file-descriptor"
 		if report.NextStep == "" {

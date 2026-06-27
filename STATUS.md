@@ -41,6 +41,9 @@ Current validation posture:
 - The Termux USB provider now also exposes a bounded `acl transport probe-fd`
   / `probe-fd-helper` stream-diagnostics path that records `TERMUX_USB_FD`
   evidence without claiming a usable byte stream.
+- The probe now defaults to `termux-usb -r -E` and the helper accepts both
+  environment and positional-argument fd sources, which resolves the earlier
+  TERMUX_USB_FD mismatch.
 - USB flashing is still unimplemented and must not be claimed as complete.
 
 Repository cleanup:
@@ -123,6 +126,8 @@ Repository cleanup:
 - Probe `TERMUX_USB_FD` handoff and build the byte-stream bridge foundation for the Termux USB provider.
 - Validate the `acl transport probe-fd` surface on native Termux and only then
   consider byte-stream bridge work.
+- Re-run native Termux validation for both `-E` and argv fd handoff modes, then
+  record the observed `fd_source` in `docs/android/VALIDATED_FINDINGS.md`.
 - Finish the Android preflight and dry-run reporting surfaces so they can be consumed by future UI workspaces.
 - Keep the development workflow aligned with the two-environment model: native Termux as the source of truth, Ubuntu/proot as a tooling environment.
 - Polish the ACL CLI diagnostic surfaces and wire them into future workspace UI layers.
@@ -148,7 +153,7 @@ Repository cleanup:
 - The cause of the intermittent `termux-usb` acquisition/opening failures remains unknown.
 - Termux USB discovery and permission acquisition are now validated on Samsung A17 / Android 16, but `TERMUX_USB_FD` handoff remains unproven.
 - The bounded TERMUX_USB_FD probe exists in code and tests, but native Termux
-  validation of the probe itself is still pending.
+  validation of the fixed env/argv fd-source handling is still pending.
 - Successful proot execution does not prove Android-native compatibility.
 - Firmware upload on real hardware has not yet been demonstrated.
 - The Android USB transport bridge is not yet implemented, so end-to-end upload remains unproven.

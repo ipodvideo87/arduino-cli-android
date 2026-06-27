@@ -455,35 +455,40 @@ type StreamProbeRequest struct {
 	Device               DiscoveredDevice  `json:"device,omitempty"`
 	Permission           PermissionResult  `json:"permission,omitempty"`
 	HelperCommand        string            `json:"helper_command,omitempty"`
+	HandoffMode          string            `json:"handoff_mode,omitempty"`
 	ExpectedCapabilities []Capability      `json:"expected_capabilities,omitempty"`
 	Metadata             map[string]string `json:"metadata,omitempty"`
 }
 
 type TransportStreamDiagnosticsReport struct {
-	SchemaVersion   string                 `json:"schema_version,omitempty"`
-	Status          diagnostics.Status     `json:"status,omitempty"`
-	Provider        string                 `json:"provider,omitempty"`
-	ProviderKind    Kind                   `json:"provider_kind,omitempty"`
-	Device          DiscoveredDevice       `json:"device,omitempty"`
-	FDEnvPresent    bool                   `json:"fd_env_present,omitempty"`
-	FDEnvValue      string                 `json:"fd_env_value,omitempty"`
-	FDObserved      bool                   `json:"fd_observed,omitempty"`
-	FDValid         bool                   `json:"fd_valid,omitempty"`
-	FDInspectable   bool                   `json:"fd_inspectable,omitempty"`
-	StreamSupported bool                   `json:"stream_supported,omitempty"`
-	StreamProven    bool                   `json:"stream_proven,omitempty"`
-	ReadState       StreamObservationState `json:"read_state,omitempty"`
-	WriteState      StreamObservationState `json:"write_state,omitempty"`
-	CloseState      StreamObservationState `json:"close_state,omitempty"`
-	EOFState        StreamObservationState `json:"eof_state,omitempty"`
-	DisconnectState StreamObservationState `json:"disconnect_state,omitempty"`
-	Warnings        []string               `json:"warnings,omitempty"`
-	Limitations     []string               `json:"limitations,omitempty"`
-	Traces          []CommandTrace         `json:"traces,omitempty"`
-	Beginner        string                 `json:"beginner_summary,omitempty"`
-	Professional    []string               `json:"professional_details,omitempty"`
-	NextStep        string                 `json:"next_step,omitempty"`
-	Metadata        map[string]string      `json:"metadata,omitempty"`
+	SchemaVersion    string                 `json:"schema_version,omitempty"`
+	Status           diagnostics.Status     `json:"status,omitempty"`
+	Provider         string                 `json:"provider,omitempty"`
+	ProviderKind     Kind                   `json:"provider_kind,omitempty"`
+	Device           DiscoveredDevice       `json:"device,omitempty"`
+	FDEnvPresent     bool                   `json:"fd_env_present,omitempty"`
+	FDEnvValue       string                 `json:"fd_env_value,omitempty"`
+	FDObserved       bool                   `json:"fd_observed,omitempty"`
+	FDValid          bool                   `json:"fd_valid,omitempty"`
+	FDInspectable    bool                   `json:"fd_inspectable,omitempty"`
+	FDSource         string                 `json:"fd_source,omitempty"`
+	HandoffMode      string                 `json:"handoff_mode,omitempty"`
+	HelperArgs       []string               `json:"helper_args,omitempty"`
+	TermuxUSBCommand string                 `json:"termux_usb_command,omitempty"`
+	StreamSupported  bool                   `json:"stream_supported,omitempty"`
+	StreamProven     bool                   `json:"stream_proven,omitempty"`
+	ReadState        StreamObservationState `json:"read_state,omitempty"`
+	WriteState       StreamObservationState `json:"write_state,omitempty"`
+	CloseState       StreamObservationState `json:"close_state,omitempty"`
+	EOFState         StreamObservationState `json:"eof_state,omitempty"`
+	DisconnectState  StreamObservationState `json:"disconnect_state,omitempty"`
+	Warnings         []string               `json:"warnings,omitempty"`
+	Limitations      []string               `json:"limitations,omitempty"`
+	Traces           []CommandTrace         `json:"traces,omitempty"`
+	Beginner         string                 `json:"beginner_summary,omitempty"`
+	Professional     []string               `json:"professional_details,omitempty"`
+	NextStep         string                 `json:"next_step,omitempty"`
+	Metadata         map[string]string      `json:"metadata,omitempty"`
 }
 
 func (r TransportStreamDiagnosticsReport) BeginnerSummary() string {
@@ -523,6 +528,18 @@ func (r TransportStreamDiagnosticsReport) ProfessionalDetails() []string {
 	}
 	if r.FDInspectable {
 		details = append(details, "TERMUX_USB_FD inspectable")
+	}
+	if r.FDSource != "" {
+		details = append(details, "fd source: "+r.FDSource)
+	}
+	if r.HandoffMode != "" {
+		details = append(details, "handoff mode: "+r.HandoffMode)
+	}
+	if len(r.HelperArgs) > 0 {
+		details = append(details, "helper args: "+strings.Join(r.HelperArgs, " "))
+	}
+	if r.TermuxUSBCommand != "" {
+		details = append(details, "termux-usb command: "+r.TermuxUSBCommand)
 	}
 	if len(r.Warnings) > 0 {
 		details = append(details, "warnings: "+strings.Join(r.Warnings, "; "))
