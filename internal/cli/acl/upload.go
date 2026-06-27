@@ -20,9 +20,17 @@ func newWorkflowUploadCommand() *cobra.Command {
 	opts := transportCommandOptions{}
 	var packageDir string
 	cmd := &cobra.Command{
-		Use:   "upload [firmware-package]",
+		Use:   "upload <firmware-package>",
 		Short: "Run the ACL upload dry-run workflow",
-		Args:  cobra.ExactArgs(1),
+		Long: strings.TrimSpace(`
+Run the ACL upload dry-run workflow against a firmware package.
+
+This command is dry-run only by design. It validates the package, derives the
+ordered upload plan, and reports diagnostics without opening a transport
+stream or writing to hardware.
+`),
+		Example: "arduino-cli acl workflow upload ~/Development/Sketches/build/esp32.esp32.esp32s3/firmware-package",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			packageDir = args[0]
 			report, err := workflowUploadRun(cmd.Context(), workflowUploadRequest{PackageDir: packageDir})
@@ -59,11 +67,12 @@ func writeUploadWorkflowReport(cmd *cobra.Command, report engine.WorkflowReport,
 	fmt.Fprintf(cmd.OutOrStdout(), "Status: %s\n", report.Status)
 	fmt.Fprintln(cmd.OutOrStdout(), report.BeginnerSummary())
 	if details {
-		for _, detail := range report.ProfessionalDetails() {
-			fmt.Fprintln(cmd.OutOrStdout(), detail)
-		}
 		if result, ok := report.Result.(upload.UploadReport); ok {
 			for _, detail := range result.ProfessionalDetails() {
+				fmt.Fprintln(cmd.OutOrStdout(), detail)
+			}
+		} else {
+			for _, detail := range report.ProfessionalDetails() {
 				fmt.Fprintln(cmd.OutOrStdout(), detail)
 			}
 		}

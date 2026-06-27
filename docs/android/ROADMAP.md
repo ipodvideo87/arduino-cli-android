@@ -36,7 +36,7 @@
 - Validate the Termux USB provider and file-descriptor handoff path on native Termux
 - Validate the TERMUX_USB_FD probe surface on native Termux
 - Validate the transport stream foundation on native Termux
-- Validate upload dry-run planning on native Termux
+- Validate upload dry-run planning on native Termux and keep the CLI/report contract explicit
 - Implement the upload workflow
 - Implement the serial monitor workflow
 - Validate the transport API stabilization boundary before upload depends on it

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/arduino/arduino-cli/internal/acl/diagnostics"
@@ -95,6 +96,21 @@ func TestEngineDryRunDoesNotTouchTransportStream(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, diagnostics.StatusPassed, report.Status)
+}
+
+func TestEngineDryRunProducesCanonicalProfessionalDetails(t *testing.T) {
+	packageDir := createPackageDir(t, "full-flash", true)
+	report, err := NewEngine().DryRun(context.Background(), UploadRequest{PackageDir: packageDir})
+	require.NoError(t, err)
+	require.Empty(t, report.Result.Professional)
+
+	details := report.ProfessionalDetails()
+	joined := strings.Join(details, "\n")
+	require.Equal(t, 1, strings.Count(joined, "package dir: "))
+	require.Equal(t, 1, strings.Count(joined, "dry-run: true"))
+	require.Equal(t, 1, strings.Count(joined, "planned bytes: "))
+	require.Contains(t, joined, "upload steps: 4")
+	require.Contains(t, joined, "result status: passed")
 }
 
 func TestUploadReportJSONRoundTrip(t *testing.T) {

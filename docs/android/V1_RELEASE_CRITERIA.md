@@ -31,7 +31,7 @@ Status values:
 | Android Transport | Native Validated | Discovery, permission, diagnostics, and fd-handoff evidence are validated on native Termux. |
 | Transport Stream Foundation | Implemented | Bounded stream contracts and diagnostics exist; native byte-stream validation is still pending. |
 | Transport API | Stabilizing | Provider, manager, session, and stream contracts are acceptable for upload-engine foundation work; breaking changes are not expected. |
-| Upload Engine | In Progress | Dry-run planning exists and must remain transport-neutral until real upload execution is proven. |
+| Upload Engine | In Progress | Dry-run planning exists, the positional CLI contract is validated, and real upload execution must remain transport-neutral until transport proof exists. |
 | Flash Engine | Planned | Must remain transport-based and device-agnostic. |
 | Serial Monitor | Planned | Must consume the same transport stream contract. |
 | Device Manager | Planned | Should present transport and hardware state through reusable ACL data. |
@@ -54,6 +54,8 @@ Before claiming V1 release readiness:
    breaking change necessary.
 7. The upload engine foundation must remain dry-run only until real transport
    execution is validated on native Termux and real hardware.
+8. The upload CLI contract must stay explicit about positional package usage
+   unless the architecture and validation docs are intentionally updated.
 
 ## Current Non-Goals
 

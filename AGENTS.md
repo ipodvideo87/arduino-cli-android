@@ -26,12 +26,14 @@ Native Termux validation always takes priority over container or desktop validat
   - [docs/android/EMULATED_ARM64_SMOKE_TEST_WORKFLOW.md](docs/android/EMULATED_ARM64_SMOKE_TEST_WORKFLOW.md)
   - [docs/android/TRANSPORT_STREAM_FOUNDATION.md](docs/android/TRANSPORT_STREAM_FOUNDATION.md)
   - [docs/android/TRANSPORT_API_STABILIZATION.md](docs/android/TRANSPORT_API_STABILIZATION.md)
+  - [docs/android/UPLOAD_ENGINE_ARCHITECTURE.md](docs/android/UPLOAD_ENGINE_ARCHITECTURE.md)
   - [docs/android/V1_RELEASE_CRITERIA.md](docs/android/V1_RELEASE_CRITERIA.md)
   - [docs/specifications/FIRMWARE_PACKAGE_SPEC.md](docs/specifications/FIRMWARE_PACKAGE_SPEC.md)
   - [docs/android/VALIDATED_FINDINGS.md](docs/android/VALIDATED_FINDINGS.md)
 - Before making Android-specific changes, also read [docs/android/ANDROID_COMPATIBILITY_RESEARCH.md](docs/android/ANDROID_COMPATIBILITY_RESEARCH.md).
 - Before designing Android upload or flashing behavior, also read
   [docs/android/ANDROID_UPLOAD_ARCHITECTURE.md](docs/android/ANDROID_UPLOAD_ARCHITECTURE.md)
+  and [docs/android/UPLOAD_ENGINE_ARCHITECTURE.md](docs/android/UPLOAD_ENGINE_ARCHITECTURE.md)
   and [docs/android/ANDROID_USB_TRANSPORT_FRAMEWORK.md](docs/android/ANDROID_USB_TRANSPORT_FRAMEWORK.md)
   and [docs/android/USB_TRANSPORT_RESEARCH.md](docs/android/USB_TRANSPORT_RESEARCH.md)
   and [docs/android/USB_TRANSPORT_ARCHITECTURE.md](docs/android/USB_TRANSPORT_ARCHITECTURE.md)
@@ -70,6 +72,7 @@ Native Termux validation always takes priority over container or desktop validat
 - Successful compiles should emit a first-class firmware package and install flows should pass through the shared Android patch pipeline, but USB flashing remains a separate milestone until proven on-device.
 - Treat the transport stream foundation as reusable infrastructure. Keep byte-stream claims experimental until native Termux validation proves them, and preserve stream diagnostics even when live byte-stream support is unavailable.
 - Treat the upload engine foundation as transport-neutral dry-run planning. It may validate firmware packages and derive ordered upload steps, but it must not open real transport streams or send bytes until the transport execution milestone is explicitly validated.
+- Treat `arduino-cli acl workflow upload <firmware-package>` as a dry-run-only positional workflow unless the CLI contract is explicitly changed. Do not add `--dry-run` or `--package` flags without updating the architecture docs and validation findings.
 - Read [docs/android/TRANSPORT_API_STABILIZATION.md](docs/android/TRANSPORT_API_STABILIZATION.md) before changing transport contracts. Prefer additive changes; breaking changes should be exceptional and clearly justified.
 - Keep docs and `STATUS.md` updated when architecture, assumptions, or validation evidence changes.
 - Do not claim success beyond the validation level actually achieved.

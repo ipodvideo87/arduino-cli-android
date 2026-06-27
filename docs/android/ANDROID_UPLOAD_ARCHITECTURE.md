@@ -9,6 +9,7 @@ design center.
 The preview-level workflow details now live in:
 
 - [Upload Workflow Preview](UPLOAD_WORKFLOW_PREVIEW.md)
+- [Upload Engine Architecture](UPLOAD_ENGINE_ARCHITECTURE.md)
 - [Serial Monitor Preview](SERIAL_MONITOR_PREVIEW.md)
 
 ## Scope
@@ -163,7 +164,9 @@ does not yet prove end-to-end Android USB flashing.
 
 The ACL upload engine foundation now exists as a transport-neutral dry-run
 planner. It consumes firmware packages and flash plans, emits structured
-diagnostics, and does not yet open real transport streams or send bytes.
+diagnostics, and does not yet open real transport streams or send bytes. The
+CLI entrypoint is positional and dry-run only: `acl workflow upload
+<firmware-package>`.
 
 The transport architecture itself is still a design milestone, not runtime
 behavior.

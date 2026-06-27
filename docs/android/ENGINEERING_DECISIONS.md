@@ -173,3 +173,18 @@ These decisions use an ADR-style format.
   real flashing remains a later transport-specific milestone.
 - Validation/evidence if available: upload engine package tests and ACL workflow
   upload-dry-run integration tests.
+
+## ACL workflow upload is positional and dry-run only
+
+- Status: accepted
+- Context: Native Termux validation showed the upload workflow is useful as a
+  dry-run planner, but GUI and CLI consumers need the contract to be explicit.
+- Decision: expose the workflow as `acl workflow upload <firmware-package>` and
+  keep it dry-run only; do not add `--dry-run` or `--package` flags unless the
+  architecture and validation docs are updated together.
+- Alternatives considered: adding explicit dry-run/package flags; leaving the
+  workflow contract implicit.
+- Consequences: the command stays simple and predictable, and GUI layers can
+  depend on the positional package contract without guessing about hidden flags.
+- Validation/evidence if available: native Termux help output and dry-run
+  validation from the current milestone.

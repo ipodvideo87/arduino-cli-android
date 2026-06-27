@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	acldiagnostics "github.com/arduino/arduino-cli/internal/acl/diagnostics"
@@ -353,6 +354,22 @@ func TestACLWorkflowUploadCommandJSON(t *testing.T) {
 	require.NotNil(t, report.Result)
 }
 
+func TestACLWorkflowUploadCommandHelpIsDryRunOnly(t *testing.T) {
+	root := newTestRoot()
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"acl", "workflow", "upload", "--help"})
+
+	require.NoError(t, root.Execute())
+
+	output := buf.String()
+	require.Contains(t, output, "upload <firmware-package>")
+	require.Contains(t, output, "dry-run only by design")
+	require.NotContains(t, output, "--dry-run")
+	require.NotContains(t, output, "--package")
+}
+
 func TestACLWorkflowUploadCommandTextAndDetails(t *testing.T) {
 	packageDir := t.TempDir()
 
@@ -389,6 +406,7 @@ func TestACLWorkflowUploadCommandTextAndDetails(t *testing.T) {
 	require.Contains(t, output, "ACL Workflow Upload")
 	require.Contains(t, output, "upload dry-run completed with warnings")
 	require.Contains(t, output, "dry-run: true")
+	require.Equal(t, 1, strings.Count(output, "dry-run: true"))
 }
 
 func TestACLTransportListCommandJSON(t *testing.T) {

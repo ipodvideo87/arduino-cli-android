@@ -20,6 +20,10 @@ Current implementation note:
 
 - the ACL upload engine foundation now exists as a dry-run planner
 - it consumes firmware packages and flash plans
+- it is exposed as `acl workflow upload <firmware-package>` and is dry-run only
+- `--dry-run` and `--package` are not part of the workflow contract
+- the canonical upload report keeps one professional-details array and one
+  result summary instead of duplicating the same details in nested layers
 - it does not open real transport streams or send bytes yet
 
 ## Intended Flow

@@ -197,7 +197,7 @@ func (r UploadDiagnostics) ProfessionalDetails() []string {
 	if len(r.Limitations) > 0 {
 		details = append(details, "limitations: "+strings.Join(r.Limitations, "; "))
 	}
-	return details
+	return dedupeStrings(details)
 }
 
 type UploadResult struct {
@@ -247,11 +247,33 @@ func (r UploadReport) ProfessionalDetails() []string {
 	if strings.TrimSpace(r.Plan.PackageDir) != "" {
 		details = append(details, "package dir: "+r.Plan.PackageDir)
 	}
+	if r.Diagnostics.PackageExists {
+		details = append(details, "package exists: true")
+	}
+	if r.Diagnostics.ManifestExists {
+		details = append(details, "manifest exists: true")
+	}
+	if r.Diagnostics.FlashPlanExists {
+		details = append(details, "flash plan exists: true")
+	}
+	if r.Diagnostics.ValidationExists {
+		details = append(details, "validation report exists: true")
+	}
 	if strings.TrimSpace(r.Plan.PackageMode) != "" {
 		details = append(details, "package mode: "+r.Plan.PackageMode)
 	}
 	if strings.TrimSpace(r.Plan.TargetChip) != "" {
 		details = append(details, "target chip: "+r.Plan.TargetChip)
+	}
+	if r.Plan.Ordered {
+		details = append(details, "flash plan ordered: true")
+	} else {
+		details = append(details, "flash plan ordered: false")
+	}
+	if r.Plan.Complete {
+		details = append(details, "flash plan complete: true")
+	} else {
+		details = append(details, "flash plan complete: false")
 	}
 	if len(r.Plan.Steps) > 0 {
 		details = append(details, fmt.Sprintf("upload steps: %d", len(r.Plan.Steps)))
@@ -262,14 +284,44 @@ func (r UploadReport) ProfessionalDetails() []string {
 	if r.Plan.TotalBytes > 0 {
 		details = append(details, fmt.Sprintf("estimated bytes: %d", r.Plan.TotalBytes))
 	}
-	details = append(details, r.Diagnostics.ProfessionalDetails()...)
+	if r.Diagnostics.Status != "" {
+		details = append(details, "diagnostics status: "+string(r.Diagnostics.Status))
+	}
+	for _, check := range r.Diagnostics.Checks {
+		details = append(details, fmt.Sprintf("check %s: %s", check.Name, check.Message))
+	}
+	for _, warning := range r.Diagnostics.Warnings {
+		details = append(details, "warning: "+warning)
+	}
+	for _, limitation := range r.Diagnostics.Limitations {
+		details = append(details, "limitation: "+limitation)
+	}
 	for _, warning := range r.Warnings {
 		details = append(details, "warning: "+warning)
 	}
 	for _, limitation := range r.Limitations {
 		details = append(details, "limitation: "+limitation)
 	}
-	return details
+	if r.Result.DryRun {
+		details = append(details, "dry-run: true")
+	} else if r.Result.Status != "" {
+		details = append(details, "dry-run: false")
+	}
+	if r.Result.Status != "" {
+		details = append(details, "result status: "+string(r.Result.Status))
+	}
+	if r.Result.Ready {
+		details = append(details, "ready: true")
+	} else if r.Result.DryRun {
+		details = append(details, "ready: false")
+	}
+	if r.Result.PlannedBytes > 0 {
+		details = append(details, fmt.Sprintf("planned bytes: %d", r.Result.PlannedBytes))
+	}
+	if r.Result.StepCount > 0 {
+		details = append(details, fmt.Sprintf("step count: %d", r.Result.StepCount))
+	}
+	return dedupeStrings(details)
 }
 
 func (r UploadResult) BeginnerSummary() string {
@@ -288,7 +340,7 @@ func (r UploadResult) ProfessionalDetails() []string {
 	details = append(details, fmt.Sprintf("ready: %t", r.Ready))
 	details = append(details, fmt.Sprintf("planned bytes: %d", r.PlannedBytes))
 	details = append(details, fmt.Sprintf("step count: %d", r.StepCount))
-	return details
+	return dedupeStrings(details)
 }
 
 type UploadSession interface {
@@ -311,10 +363,9 @@ func (e *Engine) DryRun(ctx context.Context, req UploadRequest) (UploadReport, e
 		StepCount:    len(report.Plan.Steps),
 		Status:       report.Status,
 		Beginner:     report.BeginnerSummary(),
-		Professional: report.ProfessionalDetails(),
 	}
 	report.Beginner = report.Result.BeginnerSummary()
-	report.Professional = report.Result.ProfessionalDetails()
+	report.Professional = report.ProfessionalDetails()
 	if err != nil && report.Status == "" {
 		report.Status = diagnostics.StatusFailed
 	}
@@ -772,4 +823,24 @@ func fileExists(path string) bool {
 	}
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func dedupeStrings(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
 }

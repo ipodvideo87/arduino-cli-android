@@ -436,12 +436,11 @@ func runUploadPlan(ctx context.Context, wctx *WorkflowContext) (StepResult, erro
 		status = StepStatusFailed
 	}
 	return StepResult{
-		Status:       status,
-		Message:      message,
-		Beginner:     message,
-		Professional: report.ProfessionalDetails(),
-		Data:         report,
-		Critical:     report.Status == acldiagnostics.StatusFailed,
+		Status:   status,
+		Message:  message,
+		Beginner: message,
+		Data:     report,
+		Critical: report.Status == acldiagnostics.StatusFailed,
 	}, err
 }
 
@@ -455,11 +454,10 @@ func runUploadReport(_ context.Context, wctx *WorkflowContext) (StepResult, erro
 		return StepResult{Status: StepStatusFailed, Message: "upload report has an unsupported type", Beginner: "upload report is invalid", Critical: true}, fmt.Errorf("upload report has an unsupported type")
 	}
 	return StepResult{
-		Status:       uploadStatus(report),
-		Message:      report.BeginnerSummary(),
-		Beginner:     report.BeginnerSummary(),
-		Professional: report.ProfessionalDetails(),
-		Data:         report,
+		Status:   uploadStatus(report),
+		Message:  report.BeginnerSummary(),
+		Beginner: report.BeginnerSummary(),
+		Data:     report,
 	}, nil
 }
 

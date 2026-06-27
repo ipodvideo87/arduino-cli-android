@@ -2,6 +2,35 @@
 
 This file is a logbook of tested findings from the project history.
 
+## 2026-06-27
+
+- Environment: native Termux on Samsung A17 / Android 16
+- Command/evidence: `./arduino-cli acl workflow upload --help`
+- Result: the upload workflow is positional and dry-run only; the help text
+  advertises `acl workflow upload <firmware-package>` and does not expose
+  `--dry-run` or `--package`
+- Confidence: high
+- Notes: the command contract is now explicit for GUI and documentation use
+
+- Environment: native Termux on Samsung A17 / Android 16
+- Command/evidence: `./arduino-cli --json acl workflow upload ~/Development/Sketches/build/esp32.esp32.esp32s3/firmware-package`
+- Result: upload dry-run planning works from the positional package path, with
+  `dry_run=true`, `ready=true`, ordered steps, and a warning about missing
+  target-chip metadata
+- Confidence: high
+- Notes: this validates dry-run planning only; it does not validate real upload,
+  flashing, or transport execution. The observed plan currently has three
+  entries: partitions, boot_app0, and application; the bootloader is still
+  package-dependent
+
+- Environment: repository unit-test environment
+- Command/evidence: upload report unit tests and workflow tests
+- Result: the upload dry-run report now keeps a canonical package/plan/
+  diagnostics/result/progress surface and de-duplicates repeated professional
+  details
+- Confidence: high
+- Notes: this is a report-shaping validation, not hardware behavior
+
 ## 2026-06-26
 
 - Environment: native Termux on Samsung A17 / Android 16
