@@ -15,6 +15,8 @@ to recover context quickly and accurately.
 - What is still unknown.
 - What future agents should not accidentally undo.
 - What validation provider was used and what confidence boundary it proves.
+- How future contributors should reason, decide, document, and report in this
+  repository.
 
 ## Operating Rules
 
@@ -27,3 +29,6 @@ to recover context quickly and accurately.
 - Keep validation provider reports, scripts, and the research log in versioned
   docs so future contributors do not have to reconstruct the evidence chain from
   chat history.
+- Preserve governance frameworks and documentation-ownership rules in versioned
+  docs so later work can build on the same decision model instead of recreating
+  it.

@@ -2,6 +2,12 @@
 
 This document defines the repository standard for validation reporting.
 
+This is the canonical home for diagnostic validation reporting requirements. Other documents may include brief reporting reminders for readability, but they should reference this standard rather than duplicating it.
+
+For guidance on how Codex should apply this standard in practice, see
+[CODEX_OPERATING_MODEL.md](CODEX_OPERATING_MODEL.md) and
+[DECISION_FRAMEWORK.md](DECISION_FRAMEWORK.md).
+
 ## Principle
 
 Evidence is more important than conclusions.
@@ -260,6 +266,7 @@ The three modes should add depth and specificity, not just length.
 - Record what was observed, not only what was intended.
 - Capture the next validation step when the evidence is incomplete.
 - Use precise wording for limitations and unknowns.
+- Keep local context brief and readable when it helps the current document, but do not create competing definitions for validation reporting.
 
 ## Recommended Completion Report Template
 

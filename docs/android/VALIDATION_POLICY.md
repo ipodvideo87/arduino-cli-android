@@ -2,6 +2,12 @@
 
 This project uses evidence levels to avoid overclaiming.
 
+This document is the canonical home for validation scope and provider-level policy. Other documents may summarize validation expectations for readability, but they should reference this document instead of duplicating the rules.
+
+For task execution and report-writing behavior, see
+[CODEX_OPERATING_MODEL.md](CODEX_OPERATING_MODEL.md) and
+[DIAGNOSTIC_VALIDATION_STANDARD.md](DIAGNOSTIC_VALIDATION_STANDARD.md).
+
 ## Levels
 
 The validation hierarchy is also defined in [DIAGNOSTIC_VALIDATION_STANDARD.md](DIAGNOSTIC_VALIDATION_STANDARD.md). That document defines how evidence should be reported; this document defines the validation scope for each level.

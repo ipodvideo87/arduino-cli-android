@@ -14,6 +14,12 @@ There are intentionally two Linux environments in this project:
 Native Termux validation always takes priority over container or desktop validation.
 
 ## Android Research Policy
+- Before starting any task that may change architecture, validation, reporting,
+  or long-lived documentation, also read:
+  - [docs/android/CODEX_OPERATING_MODEL.md](docs/android/CODEX_OPERATING_MODEL.md)
+  - [docs/android/ENGINEERING_PRINCIPLES.md](docs/android/ENGINEERING_PRINCIPLES.md)
+  - [docs/android/DECISION_FRAMEWORK.md](docs/android/DECISION_FRAMEWORK.md)
+  - [docs/android/DOCUMENTATION_ARCHITECTURE.md](docs/android/DOCUMENTATION_ARCHITECTURE.md)
 - Before making Android-specific changes or any architecture-level change, read:
   - [docs/android/PROJECT_NORTH_STAR.md](docs/android/PROJECT_NORTH_STAR.md)
   - [docs/android/LIVING_INSTITUTIONAL_MEMORY.md](docs/android/LIVING_INSTITUTIONAL_MEMORY.md)
@@ -149,8 +155,16 @@ Do not claim a milestone is complete until it has been verified through real-wor
 - Push after completed validated change sets unless instructed otherwise.
 - When unsure, document assumptions and open questions explicitly.
 - Follow [docs/android/DIAGNOSTIC_VALIDATION_STANDARD.md](docs/android/DIAGNOSTIC_VALIDATION_STANDARD.md) for all engineering completion reports, validation summaries, and milestone claims.
+- Use [docs/android/DECISION_FRAMEWORK.md](docs/android/DECISION_FRAMEWORK.md)
+  when multiple approaches are viable, when tradeoffs matter, or when the
+  requested solution might not be the best-supported one.
 - Avoid vague completion language such as `passed`, `works`, or `complete` unless the statement is immediately qualified by diagnostic evidence and validation scope.
 - Completion summaries must include the environment, highest validation level achieved, evidence collected, claims supported, claims not yet supported, and the next recommended validation step.
+- Canonical definitions, policies, standards, procedures, validation levels, architecture contracts, interfaces, and long-lived technical decisions should have exactly one canonical home.
+- Other documents may summarize those topics for readability, but they should reference the canonical section rather than maintaining independent copies.
+- Small local context is encouraged when it improves readability, but it must not redefine policy or become a second source of truth.
+- Avoid documentation mazes where every page only says `see another document`; each page should remain understandable on its own while deferring detailed definitions to the canonical source.
+- Each document should have a clear responsibility, and the repository status, roadmap, validation policy, diagnostic standard, architecture documents, and mission document should keep their ownership boundaries explicit.
 
 ## Repository Status
 - `STATUS.md` is the canonical snapshot of current project progress.
@@ -162,6 +176,12 @@ Do not claim a milestone is complete until it has been verified through real-wor
 - `STATUS.md` should always identify the next engineering milestone.
 - Update `STATUS.md` whenever a milestone meaningfully changes.
 - Treat the docs listed above as living institutional memory and keep them current.
+- Governance, decision-making, and documentation-ownership guidance live in
+  `docs/android/CODEX_OPERATING_MODEL.md`,
+  `docs/android/ENGINEERING_PRINCIPLES.md`,
+  `docs/android/DECISION_FRAMEWORK.md`, and
+  `docs/android/DOCUMENTATION_ARCHITECTURE.md`; read them before making
+  architecture-level or documentation-governance changes.
 
 ## Repository Hygiene
 

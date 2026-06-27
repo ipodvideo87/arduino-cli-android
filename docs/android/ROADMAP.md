@@ -27,6 +27,8 @@
 - Transport Stream Foundation
 - Transport API Stabilization
 - Upload Engine foundation and prepare-only executor
+- Governance framework batch 1: Codex operating model, engineering principles,
+  decision framework, and documentation architecture
 
 ## Next Milestones
 
@@ -61,3 +63,6 @@
 - ESP32-S3 remains the first validation target.
 - The architecture should stay board-agnostic so other platforms can be added
   without rewriting the workflow model.
+- Governance and documentation framework work should stay ahead of further
+  upload-execution expansion so later batches build on stable decision and
+  ownership rules.

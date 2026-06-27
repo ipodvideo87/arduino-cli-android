@@ -134,6 +134,12 @@ Repository cleanup:
 - The `arduino-cli acl` command group now exposes scanner, verifier, patch-preview, and bootstrap entry points for CLI-facing diagnostics.
 - The `arduino-cli acl workflow` experimental subcommands now expose the ACL engine for bootstrap and diagnostics workflows.
 - Bootstrap reporting now reuses the Android install patch pipeline in read-only form and carries the known `.acl/runtime/ld-linux-aarch64.so.1` permission-denied evidence path in validation details.
+- Governance framework batch 1 is now in place:
+  - `docs/android/CODEX_OPERATING_MODEL.md`
+  - `docs/android/ENGINEERING_PRINCIPLES.md`
+  - `docs/android/DECISION_FRAMEWORK.md`
+  - `docs/android/DOCUMENTATION_ARCHITECTURE.md`
+  - updated cross-references in `AGENTS.md`, `ROADMAP.md`, and the validation docs
 
 ## Work In Progress
 
@@ -159,6 +165,8 @@ Repository cleanup:
 - Polish the ACL CLI diagnostic surfaces and wire them into future workspace UI layers.
 - Validate the experimental ACL compile workflow end-to-end on real sketches and tighten the report surface before promoting it further.
 - Extend the ACL engine with flash hooks once the lower-level hooks are ready to use end-to-end.
+- Apply the governance framework batch 1 guidance to later documentation and
+  architecture batches without turning this milestone into a full doc cleanup.
 
 ## Known Blockers
 
