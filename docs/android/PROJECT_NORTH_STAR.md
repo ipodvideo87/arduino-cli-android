@@ -20,8 +20,8 @@ order to compile, inspect, package, validate, or eventually flash firmware.
   machine-readable report so the ACL Engine and future GUIs can compare results
   without re-discovering context.
 - The transport system should follow the same philosophy: discovery,
-  permission, connection, protocol, upload, monitor, and diagnostics should be
-  separate reusable layers.
+  permission, connection, stream, protocol, upload, monitor, and diagnostics
+  should be separate reusable layers.
 - Future GUI/workspaces should talk to transport providers and workflows, not
   directly to Android USB APIs.
 - ESP32-S3 is the first validation target, not the architecture.

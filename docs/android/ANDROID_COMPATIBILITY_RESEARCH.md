@@ -211,6 +211,12 @@ rm -rf ~/.arduino15/packages/esp32 ~/.arduino15/staging ~/.cache/arduino ~/.ardu
   - Evidence: `internal/acl/transport/termuxusb` and the CLI/tests in
     `internal/cli/acl`
   - Status: implemented and unit-tested; native Termux validation pending
+- The transport stream foundation now exists as a reusable bounded stream
+  wrapper, lifecycle state model, and diagnostics report surface.
+  - Evidence: `internal/acl/transport/stream.go`, `internal/acl/transport`
+    tests, and the `acl transport stream-status` diagnostic alias
+  - Status: implemented and unit-tested; native Termux byte-stream read/write
+    validation is still pending
 - The root cause of the earlier missing-fd report was a handoff-mode mismatch:
   the probe only inspected `TERMUX_USB_FD`, while native Termux evidence showed
   that `termux-usb -E` uses the environment variable and `termux-usb -e` uses a

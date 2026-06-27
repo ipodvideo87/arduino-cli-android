@@ -11,6 +11,16 @@ This file is a logbook of tested findings from the project history.
 - Confidence: high
 - Notes: this is the current native Android compile baseline
 
+- Environment: repository unit-test environment
+- Command/evidence: `go test ./internal/acl/transport/...`
+- Result: the transport stream foundation is implemented and unit-tested, with
+  bounded stream wrappers, lifecycle states, timeout configuration, EOF and
+  disconnect reporting, and the Termux USB provider/session stream boundary
+  covered by tests
+- Confidence: high
+- Notes: this validates the contract and wrapper behavior only; native Termux
+  byte-stream read/write behavior still needs device proof
+
 ## Unknown / from project history
 
 - Environment: native Termux on the target Android device

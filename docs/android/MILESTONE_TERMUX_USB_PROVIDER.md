@@ -53,6 +53,8 @@ Run these on the Android device in native Termux:
 ./arduino-cli acl transport list
 ./arduino-cli acl transport diagnose --details
 ./arduino-cli acl transport acquire --device <device-path>
+./arduino-cli acl transport probe-fd --device <device-path> --details
+./arduino-cli acl transport stream-status --device <device-path> --details
 ```
 
 Optional JSON forms, if you want machine-readable output:
@@ -194,6 +196,9 @@ Expected behavior:
 - the helper records whether the fd value is valid and inspectable
 - the helper records whether the fd came from `TERMUX_USB_FD` or a positional
   command-line argument
+- the helper and session reports now carry an explicit stream `state`, which is
+  `experimental` when the fd handoff has been observed but byte-stream support
+  is still provisional
 - the report stays diagnostic-only
 - the report does not prove read/write stream support
 - the report does not prove upload, flashing, or serial monitor behavior
@@ -205,6 +210,8 @@ Expected interpretation:
 - `fd_inspectable=true` means the helper could inspect the file descriptor
 - `fd_source=environment` means the helper used `TERMUX_USB_FD`
 - `fd_source=argument` means the helper used the positional fd argument
+- `state=experimental` means the fd handoff was observed and the stream
+  foundation is present, but byte-stream behavior is not yet validated
 - `stream_supported=false` means no usable byte-stream bridge is claimed yet
 - `read_state`, `write_state`, `close_state`, `eof_state`, and
   `disconnect_state` remain bounded diagnostics until a real bridge exists
@@ -254,6 +261,8 @@ Observed on the Samsung A17 / Android 16 / native Termux environment:
     a handoff/acquisition failure
 - `./arduino-cli --json acl transport probe-fd --device /dev/bus/usb/001/002`
   - JSON output is validated
+- `./arduino-cli acl transport stream-status --device /dev/bus/usb/001/002 --details`
+  - generic alias for the same stream-state report
 
 Validated conclusion:
 
@@ -262,13 +271,15 @@ Validated conclusion:
 - TERMUX_USB_FD handoff is native-Termux validated
 - fd observation is native-Termux validated
 - fd inspection is native-Termux validated
+- stream-state reporting is now modeled in code, but native byte-stream
+  behavior remains unvalidated
 - upload, flashing, and serial monitor remain unvalidated
 
 Next recommended milestone:
 
 - bounded byte-stream bridge foundation
-- validate `read_state` and `write_state` without claiming upload or serial
-  bridge success
+- native validation of bounded `read_state` and `write_state` behavior without
+  claiming upload or serial bridge success
 
 ## What Success Means
 

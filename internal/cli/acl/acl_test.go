@@ -449,6 +449,7 @@ func TestACLTransportProbeFDCommandJSON(t *testing.T) {
 				Status:           acldiagnostics.StatusWarning,
 				Provider:         "termuxusb",
 				ProviderKind:     transport.KindAndroidUSBFD,
+				State:            transport.TransportStreamStateExperimental,
 				FDEnvPresent:     true,
 				FDObserved:       true,
 				FDValid:          true,
@@ -486,7 +487,61 @@ func TestACLTransportProbeFDCommandJSON(t *testing.T) {
 	require.Equal(t, "env", report.HandoffMode)
 	require.Equal(t, "environment", report.FDSource)
 	require.Equal(t, "termux-usb -r -E -e helper /dev/bus/usb/001/002", report.TermuxUSBCommand)
+	require.Equal(t, transport.TransportStreamStateExperimental, report.State)
 	require.Contains(t, report.BeginnerSummary(), "TERMUX_USB_FD")
+}
+
+func TestACLTransportStreamStatusCommandJSON(t *testing.T) {
+	oldFactory := newTransportProvider
+	newTransportProvider = func() transportProvider {
+		return fakeCLITransportProvider{
+			desc: transport.TransportDescriptor{
+				Kind:      transport.KindAndroidUSBFD,
+				Name:      "termux-usb",
+				Provider:  "termuxusb",
+				Available: true,
+			},
+			probe: transport.TransportStreamDiagnosticsReport{
+				SchemaVersion:    "1",
+				Status:           acldiagnostics.StatusWarning,
+				Provider:         "termuxusb",
+				ProviderKind:     transport.KindAndroidUSBFD,
+				State:            transport.TransportStreamStateExperimental,
+				FDEnvPresent:     true,
+				FDObserved:       true,
+				FDValid:          true,
+				FDInspectable:    true,
+				StreamSupported:  false,
+				StreamProven:     false,
+				ReadState:        transport.StreamObservationExperimental,
+				WriteState:       transport.StreamObservationExperimental,
+				CloseState:       transport.StreamObservationExperimental,
+				EOFState:         transport.StreamObservationExperimental,
+				DisconnectState:  transport.StreamObservationExperimental,
+				TermuxUSBCommand: "termux-usb -r -E -e helper /dev/bus/usb/001/002",
+				Beginner:         "TERMUX_USB_FD observed; stream support remains experimental",
+				Professional:     []string{"fd handoff observed", "bounded stream foundation in progress"},
+				NextStep:         "add a bounded byte-stream bridge or transport stream adapter",
+				HandoffMode:      "env",
+				FDSource:         "environment",
+			},
+		}
+	}
+	t.Cleanup(func() { newTransportProvider = oldFactory })
+
+	root := newTestRoot()
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"acl", "transport", "stream-status", "--json", "--device", "/dev/bus/usb/001/002"})
+
+	require.NoError(t, root.Execute())
+
+	var report transport.TransportStreamDiagnosticsReport
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &report))
+	require.Equal(t, transport.TransportStreamStateExperimental, report.State)
+	require.Equal(t, transport.StreamObservationExperimental, report.ReadState)
+	require.Equal(t, "termux-usb -r -E -e helper /dev/bus/usb/001/002", report.TermuxUSBCommand)
 }
 
 func TestACLTransportProbeFDHelperCommandJSON(t *testing.T) {

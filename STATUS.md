@@ -26,7 +26,9 @@ does not replace native Android validation.
 - USB Transport Research: [docs/android/USB_TRANSPORT_RESEARCH.md](docs/android/USB_TRANSPORT_RESEARCH.md)
 - USB Transport Architecture: [docs/android/USB_TRANSPORT_ARCHITECTURE.md](docs/android/USB_TRANSPORT_ARCHITECTURE.md)
 - Transport Provider Model: [docs/android/TRANSPORT_PROVIDER_MODEL.md](docs/android/TRANSPORT_PROVIDER_MODEL.md)
+- Transport Stream Foundation: [docs/android/TRANSPORT_STREAM_FOUNDATION.md](docs/android/TRANSPORT_STREAM_FOUNDATION.md)
 - Termux USB Provider Validation Checklist: [docs/android/MILESTONE_TERMUX_USB_PROVIDER.md](docs/android/MILESTONE_TERMUX_USB_PROVIDER.md)
+- V1 Release Criteria: [docs/android/V1_RELEASE_CRITERIA.md](docs/android/V1_RELEASE_CRITERIA.md)
 - Upload Workflow Preview: [docs/android/UPLOAD_WORKFLOW_PREVIEW.md](docs/android/UPLOAD_WORKFLOW_PREVIEW.md)
 - Serial Monitor Preview: [docs/android/SERIAL_MONITOR_PREVIEW.md](docs/android/SERIAL_MONITOR_PREVIEW.md)
 - Firmware Package Spec: [docs/specifications/FIRMWARE_PACKAGE_SPEC.md](docs/specifications/FIRMWARE_PACKAGE_SPEC.md)
@@ -41,6 +43,9 @@ Current validation posture:
 - The Termux USB provider now also exposes a bounded `acl transport probe-fd`
   / `probe-fd-helper` stream-diagnostics path that records `TERMUX_USB_FD`
   evidence without claiming a usable byte stream.
+- The transport stream foundation now exists as a reusable bounded stream
+  wrapper and report model; the stream state is still experimental until native
+  Termux byte-stream validation proves read/write behavior.
 - The probe now uses `termux-usb -r -E -e <helper> <device>` and the helper
   accepts both environment and positional-argument fd sources, which resolves
   the earlier TERMUX_USB_FD mismatch.
@@ -94,7 +99,9 @@ Repository cleanup:
 - Android USB host access has been demonstrated on the same ESP32-S3 hardware by third-party apps, so the remaining work is transport integration rather than basic hardware discovery.
 - Termux USB enumeration and permission flow are functional, but acquisition timing still needs root-cause analysis.
 - The ACL transport manager now exists as a capability-based selector for native serial, Android USB fd, PTY, RFC2217, and future transports.
-- The Termux USB transport provider now exists as a diagnostic-only implementation with discovery, permission, session, endpoint-export, and bounded fd-probe contracts, plus `arduino-cli acl transport list|diagnose|acquire|probe-fd` CLI surfaces.
+- The Termux USB transport provider now exists as a diagnostic-only implementation with discovery, permission, session, endpoint-export, and bounded fd-probe contracts, plus `arduino-cli acl transport list|diagnose|acquire|probe-fd|stream-status` CLI surfaces.
+- The Termux USB transport provider now also exposes `stream-status` as a
+  diagnostic alias for the same stream state report.
 - The ACL firmware package foundation now exists, including the build manifest, flash plan, firmware package wrapper, and binary validator.
 - The firmware package now also emits `analysis.json` and `README_FLASHING.txt`, and the ACL compile path uses metadata-first bootloader detection with an app-only fallback warning when the bootloader artifacts are incomplete.
 - The ACL compatibility layer now exists as a rule-based decision layer for runtime, library, firmware, and transport compatibility.
@@ -128,6 +135,8 @@ Repository cleanup:
 - Implement the first real transport provider runtime after the contract layer is proven stable.
 - Validate the Termux USB transport provider on native Termux and confirm the exact discovery, permission, and file-descriptor handoff behavior on-device.
 - Probe `TERMUX_USB_FD` handoff and build the byte-stream bridge foundation for the Termux USB provider.
+- Validate the transport stream foundation on native Termux before claiming any
+  byte-stream support.
 - Validate the `acl transport probe-fd` surface on native Termux and only then
   consider byte-stream bridge work.
 - Re-run native Termux validation for both `-E` and argv fd handoff modes, then
@@ -163,10 +172,12 @@ Repository cleanup:
 - The bounded TERMUX_USB_FD probe exists in code and tests, and native Termux
   validation of the official `probe-fd` command now confirms fd handoff,
   observation, and inspection.
+- The transport stream foundation exists in code and unit tests, but native
+  Termux byte-stream read/write validation is still pending.
 - Successful proot execution does not prove Android-native compatibility.
 - Firmware upload on real hardware has not yet been demonstrated.
 - The Android USB transport bridge is not yet implemented, so end-to-end upload remains unproven.
 
 ## Next Engineering Milestone
 
-Finish the generic native Android USB transport bridge, validate upload and monitor flow on real hardware, and move Android post-install repair into a shared automatic pipeline. In parallel, refine the ACL CLI diagnostic surfaces for future UI consumption.
+Finish the generic native Android USB transport bridge, validate upload and monitor flow on real hardware, and move Android post-install repair into a shared automatic pipeline. In parallel, validate the transport stream foundation on native Termux and refine the ACL CLI diagnostic surfaces for future UI consumption.

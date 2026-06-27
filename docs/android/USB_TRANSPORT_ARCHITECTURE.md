@@ -74,6 +74,9 @@ Current repository state:
   implementation boundary, including command-trace diagnostics and safe
   `acl transport` CLI entry points, but it remains diagnostic-only until native
   Termux USB validation proves the acquisition and fd-handoff path.
+- The transport package now also defines the reusable `TransportStream`
+  boundary, stream lifecycle states, timeout configuration, and bounded stream
+  diagnostics. That layer is still transport-neutral and experimental.
 
 ### 3. Discovery
 
@@ -126,7 +129,21 @@ Examples:
 
 This layer is distinct from discovery and from endpoint export.
 
-### 7. Endpoint Export
+### 7. Transport Stream Foundation
+
+The stream layer sits between the session and any upload or monitor consumer.
+
+Responsibilities:
+
+- present bounded byte-oriented IO
+- preserve diagnostics when the stream is experimental or unavailable
+- track state, timeouts, EOF, disconnect, and close reasons
+- keep transport-specific fd or socket mechanics hidden behind a neutral
+  interface
+
+This layer is not protocol adaptation and not upload logic.
+
+### 8. Endpoint Export
 
 The tool-facing contract should be serial-shaped when possible.
 
@@ -137,7 +154,7 @@ Preferred exports:
 - RFC2217-compatible socket
 - future device-specific adapters when a serial endpoint is not enough
 
-### 8. Diagnostics
+### 9. Diagnostics
 
 Diagnostics must be first-class and machine-readable.
 

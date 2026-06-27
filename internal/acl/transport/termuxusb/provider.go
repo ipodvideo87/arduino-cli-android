@@ -44,6 +44,7 @@ type Session struct {
 	report     transport.TransportDiagnosticsReport
 	endpoint   transport.EndpointExport
 	caps       transport.TransportCapabilities
+	stream     transport.TransportStream
 }
 
 func NewProvider() *Provider {
@@ -211,6 +212,7 @@ func (p *Provider) Probe(ctx context.Context, req transport.StreamProbeRequest) 
 		Provider:      defaultProviderID,
 		ProviderKind:  transport.KindAndroidUSBFD,
 		Device:        req.Device,
+		State:         transport.TransportStreamStateExperimental,
 		Beginner:      "stream probe has not been proven yet",
 		Professional: []string{
 			"stream probing is diagnostics-only until a bounded byte-stream bridge is implemented",
@@ -238,6 +240,7 @@ func (p *Provider) Probe(ctx context.Context, req transport.StreamProbeRequest) 
 
 	if !p.available() {
 		report.Beginner = "termux-usb is unavailable on this host"
+		report.State = transport.TransportStreamStateUnavailable
 		report.Limitations = append(report.Limitations, "termux-usb is not present")
 		report.NextStep = "install termux-usb and retry the fd probe on native Termux"
 		return report, nil
@@ -280,12 +283,14 @@ func (p *Provider) Probe(ctx context.Context, req transport.StreamProbeRequest) 
 		if result.Err != nil || result.ExitCode != 0 {
 			report.Status = diagnostics.StatusFailed
 			report.Beginner = "termux-usb handoff failed before helper JSON was produced"
+			report.State = transport.TransportStreamStateFailed
 			report.Limitations = append(report.Limitations, "termux-usb did not hand off execution to the helper")
 			report.NextStep = "fix the termux-usb handoff path before probing the helper JSON"
 			return report, nil
 		}
 		report.Status = diagnostics.StatusFailed
 		report.Beginner = "fd probe helper output could not be parsed"
+		report.State = transport.TransportStreamStateFailed
 		report.Limitations = append(report.Limitations, "helper JSON output was malformed")
 		report.NextStep = "fix the helper output parser before attempting a byte-stream bridge"
 		return report, nil
@@ -313,6 +318,16 @@ func (p *Provider) Probe(ctx context.Context, req transport.StreamProbeRequest) 
 	}
 	if result.ExitCode != 0 && report.Status == "" {
 		report.Status = diagnostics.StatusFailed
+	}
+	if report.FDObserved && report.FDInspectable {
+		report.State = transport.TransportStreamStateExperimental
+		report.ReadState = transport.StreamObservationExperimental
+		report.WriteState = transport.StreamObservationExperimental
+		report.CloseState = transport.StreamObservationExperimental
+		report.EOFState = transport.StreamObservationExperimental
+		report.DisconnectState = transport.StreamObservationExperimental
+	} else if report.State == "" {
+		report.State = transport.TransportStreamStateUnavailable
 	}
 	if report.NextStep == "" {
 		report.NextStep = "native byte-stream support remains experimental"
@@ -628,6 +643,7 @@ func HelperStreamProbeReportFromInvocation(args []string) transport.TransportStr
 		fd, err := strconv.Atoi(rawEnv)
 		if err != nil {
 			report.Status = diagnostics.StatusFailed
+			report.State = transport.TransportStreamStateFailed
 			report.Beginner = "TERMUX_USB_FD is invalid"
 			report.Warnings = []string{"TERMUX_USB_FD could not be parsed"}
 			report.Limitations = []string{"fd value is not a valid integer"}
@@ -642,6 +658,7 @@ func HelperStreamProbeReportFromInvocation(args []string) transport.TransportStr
 		file := os.NewFile(uintptr(fd), "TERMUX_USB_FD")
 		if file == nil {
 			report.Status = diagnostics.StatusFailed
+			report.State = transport.TransportStreamStateFailed
 			report.Beginner = "TERMUX_USB_FD could not be wrapped as a file"
 			report.Warnings = []string{"os.NewFile returned nil"}
 			report.Limitations = []string{"fd wrapping failed"}
@@ -651,6 +668,7 @@ func HelperStreamProbeReportFromInvocation(args []string) transport.TransportStr
 		defer file.Close()
 		if _, err := file.Stat(); err != nil {
 			report.Status = diagnostics.StatusFailed
+			report.State = transport.TransportStreamStateFailed
 			report.Beginner = "TERMUX_USB_FD is not inspectable"
 			report.Warnings = []string{err.Error()}
 			report.Limitations = []string{"fd metadata could not be inspected"}
@@ -662,6 +680,12 @@ func HelperStreamProbeReportFromInvocation(args []string) transport.TransportStr
 			return report
 		}
 		report.FDInspectable = true
+		report.State = transport.TransportStreamStateExperimental
+		report.ReadState = transport.StreamObservationExperimental
+		report.WriteState = transport.StreamObservationExperimental
+		report.CloseState = transport.StreamObservationExperimental
+		report.EOFState = transport.StreamObservationExperimental
+		report.DisconnectState = transport.StreamObservationExperimental
 		report.Beginner = "TERMUX_USB_FD observed via environment; stream support remains experimental"
 		report.Professional = []string{
 			"TERMUX_USB_FD was observed and inspected successfully",
@@ -682,6 +706,7 @@ func HelperStreamProbeReportFromInvocation(args []string) transport.TransportStr
 		fd, err := strconv.Atoi(rawArg)
 		if err != nil {
 			report.Status = diagnostics.StatusFailed
+			report.State = transport.TransportStreamStateFailed
 			report.Beginner = "fd argument is invalid"
 			report.Warnings = []string{"file descriptor argument could not be parsed"}
 			report.Limitations = []string{"fd argument is not a valid integer"}
@@ -696,6 +721,7 @@ func HelperStreamProbeReportFromInvocation(args []string) transport.TransportStr
 		file := os.NewFile(uintptr(fd), "TERMUX_USB_FD")
 		if file == nil {
 			report.Status = diagnostics.StatusFailed
+			report.State = transport.TransportStreamStateFailed
 			report.Beginner = "fd argument could not be wrapped as a file"
 			report.Warnings = []string{"os.NewFile returned nil"}
 			report.Limitations = []string{"fd wrapping failed"}
@@ -705,6 +731,7 @@ func HelperStreamProbeReportFromInvocation(args []string) transport.TransportStr
 		defer file.Close()
 		if _, err := file.Stat(); err != nil {
 			report.Status = diagnostics.StatusFailed
+			report.State = transport.TransportStreamStateFailed
 			report.Beginner = "fd argument is not inspectable"
 			report.Warnings = []string{err.Error()}
 			report.Limitations = []string{"fd metadata could not be inspected"}
@@ -716,6 +743,12 @@ func HelperStreamProbeReportFromInvocation(args []string) transport.TransportStr
 			return report
 		}
 		report.FDInspectable = true
+		report.State = transport.TransportStreamStateExperimental
+		report.ReadState = transport.StreamObservationExperimental
+		report.WriteState = transport.StreamObservationExperimental
+		report.CloseState = transport.StreamObservationExperimental
+		report.EOFState = transport.StreamObservationExperimental
+		report.DisconnectState = transport.StreamObservationExperimental
 		report.Beginner = "file descriptor observed via command-line argument; stream support remains experimental"
 		report.Professional = []string{
 			"fd argument was observed and inspected successfully",
@@ -752,6 +785,7 @@ func HelperStreamProbeReportFromInvocation(args []string) transport.TransportStr
 		}
 		report.FDSource = "none"
 		report.HandoffMode = "env"
+		report.State = transport.TransportStreamStateUnavailable
 		report.Metadata["fd_source"] = report.FDSource
 		report.Metadata["handoff_mode"] = report.HandoffMode
 		return report
@@ -783,15 +817,21 @@ func buildSessionStreamProbeReport(device transport.DiscoveredDevice, endpoint t
 	}
 	report.StreamSupported = false
 	report.StreamProven = false
-	report.ReadState = transport.StreamObservationUnsupported
-	report.WriteState = transport.StreamObservationUnsupported
-	report.CloseState = transport.StreamObservationUnsupported
-	report.EOFState = transport.StreamObservationUnsupported
-	report.DisconnectState = transport.StreamObservationUnsupported
+	if report.State == "" {
+		report.State = transport.TransportStreamStateUnavailable
+	}
 	report.Metadata["permission_state"] = string(permission)
 	report.Metadata["fd_source"] = report.FDSource
 	if endpoint.Kind == transport.EndpointExportFileDescriptor {
 		report.Metadata["endpoint"] = "file-descriptor"
+		if report.FDObserved && report.FDInspectable {
+			report.State = transport.TransportStreamStateExperimental
+			report.ReadState = transport.StreamObservationExperimental
+			report.WriteState = transport.StreamObservationExperimental
+			report.CloseState = transport.StreamObservationExperimental
+			report.EOFState = transport.StreamObservationExperimental
+			report.DisconnectState = transport.StreamObservationExperimental
+		}
 		if report.NextStep == "" {
 			report.NextStep = "probe-fd can inspect the fd handoff, but stream support remains experimental"
 		}
@@ -864,11 +904,56 @@ func newSession(device transport.DiscoveredDevice, permission transport.Permissi
 	}
 }
 
-func (s *Session) Close() error { return nil }
+func (s *Session) Close() error {
+	if s.stream != nil {
+		_ = s.stream.Close()
+		s.stream = nil
+	}
+	return nil
+}
 
 func (s *Session) Capabilities() transport.TransportCapabilities { return s.caps }
 
-func (s *Session) Diagnostics() transport.TransportDiagnosticsReport { return s.report }
+func (s *Session) Diagnostics() transport.TransportDiagnosticsReport {
+	report := s.report
+	if s.stream != nil {
+		report.StreamProbe = s.stream.Diagnostics()
+		report.StreamStatus = report.StreamProbe.Status
+		report.NextStep = report.StreamProbe.NextStep
+	}
+	return report
+}
+
+func (s *Session) Stream() (transport.TransportStream, error) {
+	if s.stream != nil {
+		return s.stream, nil
+	}
+	if s.endpoint.Kind != transport.EndpointExportFileDescriptor || s.endpoint.FileDescriptor <= 0 {
+		return nil, errors.New("byte-stream export is unavailable")
+	}
+	file := os.NewFile(uintptr(s.endpoint.FileDescriptor), "TERMUX_USB_FD")
+	if file == nil {
+		return nil, errors.New("TERMUX_USB_FD could not be wrapped as a stream")
+	}
+	report := s.report.StreamProbe
+	report.State = transport.TransportStreamStateExperimental
+	report.StreamSupported = false
+	report.StreamProven = false
+	report.ReadState = transport.StreamObservationExperimental
+	report.WriteState = transport.StreamObservationExperimental
+	report.CloseState = transport.StreamObservationExperimental
+	report.EOFState = transport.StreamObservationExperimental
+	report.DisconnectState = transport.StreamObservationExperimental
+	report.Beginner = "TERMUX_USB_FD stream is experimental"
+	report.Professional = append(report.Professional,
+		"the provider can wrap the handed-off fd, but read/write behavior is still experimental",
+	)
+	s.report.StreamProbe = report
+	s.report.StreamStatus = diagnostics.StatusWarning
+	s.report.NextStep = "validate bounded read/write behavior before claiming stream support"
+	s.stream = transport.NewExperimentalTransportStream(file, report)
+	return s.stream, nil
+}
 
 func (s *Session) ExportEndpoint() (transport.EndpointExport, error) { return s.endpoint, nil }
 

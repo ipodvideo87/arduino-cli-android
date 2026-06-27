@@ -49,6 +49,7 @@ func newTransportCommand() *cobra.Command {
 	cmd.AddCommand(newTransportDiagnoseCommand())
 	cmd.AddCommand(newTransportAcquireCommand())
 	cmd.AddCommand(newTransportProbeFDCommand())
+	cmd.AddCommand(newTransportStreamStatusCommand())
 	cmd.AddCommand(newTransportProbeFDHelperCommand())
 	return cmd
 }
@@ -164,11 +165,19 @@ func newTransportAcquireCommand() *cobra.Command {
 }
 
 func newTransportProbeFDCommand() *cobra.Command {
+	return newTransportStreamProbeCommand("probe-fd", "Probe TERMUX_USB_FD handoff for a Termux USB device")
+}
+
+func newTransportStreamStatusCommand() *cobra.Command {
+	return newTransportStreamProbeCommand("stream-status", "Report transport stream status for a Termux USB device")
+}
+
+func newTransportStreamProbeCommand(use, short string) *cobra.Command {
 	opts := transportCommandOptions{}
 	var devicePath string
 	cmd := &cobra.Command{
-		Use:   "probe-fd",
-		Short: "Probe TERMUX_USB_FD handoff for a Termux USB device",
+		Use:   use,
+		Short: short,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			provider := newTransportProvider()
 			report, err := provider.Probe(cmd.Context(), transport.StreamProbeRequest{
@@ -304,7 +313,11 @@ func writeTransportAcquireReport(cmd *cobra.Command, report transportAcquireRepo
 }
 
 func writeTransportStreamProbeReport(cmd *cobra.Command, report transport.TransportStreamDiagnosticsReport, details bool) error {
-	fmt.Fprintln(cmd.OutOrStdout(), "ACL Transport Probe FD")
+	title := "ACL Transport Probe FD"
+	if cmd != nil && cmd.Name() == "stream-status" {
+		title = "ACL Transport Stream Status"
+	}
+	fmt.Fprintln(cmd.OutOrStdout(), title)
 	fmt.Fprintln(cmd.OutOrStdout(), report.BeginnerSummary())
 	fmt.Fprintf(cmd.OutOrStdout(), "Status: %s\n", report.Status)
 	if details {

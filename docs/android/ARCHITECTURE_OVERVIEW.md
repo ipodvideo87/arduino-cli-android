@@ -23,6 +23,8 @@ Toolchains and hardware
   concerns.
 - `FirmwarePackage` is the boundary between the build system and the UI.
 - `TransportManager` and the future USB bridge sit below upload workflows.
+- `TransportStream` is the reusable byte-oriented boundary between transport
+  sessions and future upload / monitor consumers.
 - The compatibility layer, scanner, verifier, bootstrap, and patch preview are
   shared infrastructure used by multiple workflows.
 
@@ -40,6 +42,10 @@ Toolchains and hardware
   - package artifacts
   - validate outputs
   - classify compatibility and runtime readiness
+- Transport stream foundation:
+  - represent bounded read/write/cancel/close semantics
+  - preserve diagnostics even when a live stream is unavailable
+  - keep upload and monitor consumers transport-neutral
 - Arduino CLI backend:
   - perform actual Arduino compile and toolchain operations
 - Toolchains and hardware:
@@ -51,4 +57,3 @@ Toolchains and hardware
 - `analysis.json` should carry machine-readable analysis data for the GUI.
 - `firmware.elf` and `firmware.map` remain the authoritative raw build artifacts.
 - USB flashing must remain transport-based, not board-specific command glue.
-

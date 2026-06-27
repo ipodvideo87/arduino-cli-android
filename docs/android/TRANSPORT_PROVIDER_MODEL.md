@@ -25,7 +25,7 @@ compile-safe provider boundary:
 - `TransportDescriptor`
 - `SelectionRequest`
 - `TransportSelection`
-- provider/session/permission/endpoint/diagnostics contracts
+- provider/session/permission/endpoint/stream/diagnostics contracts
 - fake-provider tests
 - Termux USB diagnostics and acquisition scaffolding in
   `internal/acl/transport/termuxusb`
@@ -43,6 +43,8 @@ Current implementation note:
 - the Termux USB provider also exposes a bounded `probe-fd` / `probe-fd-helper`
   path that records `TERMUX_USB_FD` evidence without claiming a usable byte
   stream
+- the transport layer now models bounded stream lifecycle state, timeouts,
+  cancellation, EOF, disconnect, last-activity, and close-reason reporting
 - the probe now uses `termux-usb -r -E -e <helper> <device>` and the helper
   accepts both env and argv fd sources so diagnostics can distinguish
   `termux-usb -E` from `termux-usb -e`
@@ -74,6 +76,18 @@ Responsibilities:
 - hold the connection
 - close the connection
 - emit lifecycle events
+
+Sessions may optionally expose a `TransportStream` when a transport can provide
+bounded byte-oriented IO, but a session does not have to invent one.
+
+### Stream Provider
+
+Responsibilities:
+
+- expose bounded read/write/cancel/close behavior
+- surface stream diagnostics even when byte-stream support is experimental
+- keep transport-specific fd or socket details behind a transport-neutral
+  interface
 
 ### Protocol Adapter
 
@@ -151,6 +165,12 @@ Every provider should be able to report:
 - selected interface
 - selected endpoint(s)
 - permission source
+- stream state
+- stream timeout configuration
+- bytes read / written
+- last activity
+- close reason
+- disconnect reason
 - warnings
 - limitations
 - selection reason

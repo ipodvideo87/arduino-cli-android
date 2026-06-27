@@ -21,6 +21,7 @@ along with safe diagnostic CLI surfaces:
 - `arduino-cli acl transport diagnose`
 - `arduino-cli acl transport acquire --device <path>`
 - `arduino-cli acl transport probe-fd --device <path>`
+- `arduino-cli acl transport stream-status --device <path>`
 
 It is still a contract and diagnostics layer only: no real Android USB API
 calls, no USB flashing, and no upload or serial-monitor implementation yet.
@@ -29,6 +30,8 @@ handoff evidence.
 The current probe uses the working `termux-usb -r -E -e <helper> <device>`
 shape and the helper also accepts the positional fd handoff used by
 `termux-usb -e`.
+The reusable transport stream foundation now exists as a bounded stream model,
+but byte-stream support remains experimental until native Termux proves it.
 
 The framework exists so Arduino CLI and future tool integrations can keep
 talking to a serial-like endpoint while ACL owns Android-specific USB
@@ -48,6 +51,9 @@ discovery, permission, and bridge logic.
   until native Termux validation proves the on-device behavior
 - the fd-handoff probe exists as a transport-neutral diagnostic boundary, but a
   real byte-stream bridge remains unproven
+- stream status is tracked separately from endpoint export readiness so future
+  upload and monitor workflows can consume bounded stream diagnostics without
+  parsing Android USB internals
 
 ## Related Docs
 

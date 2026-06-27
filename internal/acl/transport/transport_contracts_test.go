@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/arduino/arduino-cli/internal/acl/diagnostics"
 	"github.com/stretchr/testify/require"
@@ -55,7 +56,7 @@ type fixtureSession struct {
 	report   TransportDiagnosticsReport
 	closeErr error
 	control  ControlLineState
-	stream   io.ReadWriteCloser
+	stream   TransportStream
 }
 
 func (s fixtureSession) Close() error { return s.closeErr }
@@ -64,7 +65,7 @@ func (s fixtureSession) Capabilities() TransportCapabilities { return s.caps }
 
 func (s fixtureSession) Diagnostics() TransportDiagnosticsReport { return s.report }
 
-func (s fixtureSession) Stream() (io.ReadWriteCloser, error) {
+func (s fixtureSession) Stream() (TransportStream, error) {
 	if s.stream == nil {
 		return nil, errors.New("stream unavailable")
 	}
@@ -83,14 +84,75 @@ func (s fixtureSession) ExportEndpoint() (EndpointExport, error) { return s.endp
 var (
 	_ TransportSession      = fixtureSession{}
 	_ ByteStreamSession     = fixtureSession{}
+	_ StreamSession         = fixtureSession{}
 	_ ControlLineSession    = fixtureSession{}
 	_ EndpointExportSession = fixtureSession{}
+	_ TransportStream       = fixtureTransportStream{}
 	_ TransportProvider     = transportProviderFixture{}
 	_ TransportDiscoverer   = transportProviderFixture{}
 	_ PermissionRequester   = transportProviderFixture{}
 	_ SessionOpener         = transportProviderFixture{}
 	_ DiagnosticsReporter   = transportProviderFixture{}
 )
+
+type fixtureTransportStream struct {
+	reader io.Reader
+	writer io.Writer
+	closer io.Closer
+	report TransportStreamDiagnosticsReport
+}
+
+func (s fixtureTransportStream) Read(p []byte) (int, error) {
+	if s.reader == nil {
+		return 0, io.EOF
+	}
+	return s.reader.Read(p)
+}
+
+func (s fixtureTransportStream) Write(p []byte) (int, error) {
+	if s.writer == nil {
+		return len(p), nil
+	}
+	return s.writer.Write(p)
+}
+
+func (s fixtureTransportStream) Close() error {
+	if s.closer == nil {
+		return nil
+	}
+	return s.closer.Close()
+}
+
+func (s fixtureTransportStream) Capabilities() TransportStreamCapabilities {
+	return TransportStreamCapabilities{
+		Read:         true,
+		Write:        true,
+		Close:        true,
+		Timeouts:     true,
+		Cancellation: true,
+		LastActivity: true,
+		CloseReason:  true,
+		EOF:          true,
+		Disconnect:   true,
+		Experimental: true,
+	}
+}
+
+func (s fixtureTransportStream) Diagnostics() TransportStreamDiagnosticsReport {
+	if s.report.SchemaVersion == "" {
+		s.report.SchemaVersion = "1"
+	}
+	if s.report.State == "" {
+		s.report.State = TransportStreamStateExperimental
+	}
+	if s.report.Status == "" {
+		s.report.Status = diagnostics.StatusWarning
+	}
+	if s.report.LastActivity.IsZero() {
+		s.report.LastActivity = time.Now().UTC()
+	}
+	return s.report
+}
 
 func successfulSerialProvider() transportProviderFixture {
 	return transportProviderFixture{
