@@ -3,6 +3,10 @@
 This document records the validation provider landscape for the Android-first
 ACL stack.
 
+This is a reference research log. The formal validation scope and reporting
+requirements live in [VALIDATION_POLICY.md](VALIDATION_POLICY.md) and
+[DIAGNOSTIC_VALIDATION_STANDARD.md](DIAGNOSTIC_VALIDATION_STANDARD.md).
+
 It is intentionally conservative:
 
 - research first
@@ -158,27 +162,12 @@ Interpretation:
 ## Report Contract
 
 Every validation provider should emit a human-readable summary and a structured
-machine-readable report.
+machine-readable report. The canonical reporting fields are defined in
+[DIAGNOSTIC_VALIDATION_STANDARD.md](DIAGNOSTIC_VALIDATION_STANDARD.md).
 
-The common report schema should include:
-
-- schema version
-- provider name
-- mode
-- detected environment
-- architecture
-- tool versions
-- tests executed
-- tests skipped
-- results
-- warnings
-- limitations
-- actions taken
-- remaining recommendations
-- confidence or validation level
-
-That shared schema lets the ACL Engine and future GUI layers compare providers
-without learning provider-specific ad hoc formats.
+This document keeps the provider landscape and environment-specific findings in
+one place so the canonical validation docs do not need to carry the research
+history.
 
 ## Practical Conclusion
 
@@ -189,4 +178,3 @@ without learning provider-specific ad hoc formats.
   preflight aids, not proof of Android behavior.
 - Native Termux and real hardware remain the decision points for Android and
   device claims.
-

@@ -3,6 +3,10 @@
 This document defines the provider model that sits under the Android USB
 transport architecture.
 
+This is a reference document. The validation policy and diagnostic reporting
+requirements are defined in [VALIDATION_POLICY.md](VALIDATION_POLICY.md) and
+[DIAGNOSTIC_VALIDATION_STANDARD.md](DIAGNOSTIC_VALIDATION_STANDARD.md).
+
 It is intentionally broader than USB serial because future transports may be
 DFU, HID, CMSIS-DAP, JTAG, SWD, network-based, or Bluetooth-based.
 
@@ -208,3 +212,6 @@ The provider model is partially implemented as selection infrastructure and
 documented as a reusable architecture.
 
 The actual open/close/protocol/endpoint providers remain future implementation.
+
+The canonical contract wording for transport API stability lives in
+[TRANSPORT_API_STABILIZATION.md](TRANSPORT_API_STABILIZATION.md).

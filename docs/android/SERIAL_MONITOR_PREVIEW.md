@@ -3,12 +3,19 @@
 This is a preview of the future serial monitor workflow that will reuse the
 Android USB transport framework.
 
+It is a reference and operational preview, not a policy document.
+
 It is not an implementation.
 It does not open a live monitor session.
 It does not change runtime behavior.
 
 The transport/session/export contracts now exist as compile-safe ACL
 infrastructure, but live monitoring remains a future workflow.
+
+The monitor contract and evidence-reporting rules are defined in
+[TRANSPORT_STREAM_FOUNDATION.md](TRANSPORT_STREAM_FOUNDATION.md),
+[VALIDATION_POLICY.md](VALIDATION_POLICY.md), and
+[DIAGNOSTIC_VALIDATION_STANDARD.md](DIAGNOSTIC_VALIDATION_STANDARD.md).
 
 ## Goal
 
@@ -93,6 +100,9 @@ The serial monitor report should include:
 - limitations
 - validation level
 - beginner summary and professional details
+
+The exact evidence and claim structure should follow the diagnostic validation
+standard.
 
 ## ACL Integration
 

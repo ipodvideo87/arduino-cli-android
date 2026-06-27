@@ -1,21 +1,26 @@
 # V1 Release Criteria
 
-This document is the engineering release checklist for the Android-first
+This document is the operational release checklist for the Android-first
 platform. It is not a marketing roadmap.
+
+The formal validation levels and evidence-reporting rules live in
+[VALIDATION_POLICY.md](VALIDATION_POLICY.md) and
+[DIAGNOSTIC_VALIDATION_STANDARD.md](DIAGNOSTIC_VALIDATION_STANDARD.md).
 
 Status values:
 
 - Planned
 - Research
 - In Progress
+- Stabilizing
 - Implemented
-- Native Validated
+- Native Termux Validated
 - Production Ready
 
 ## Criteria
 
 - `Implemented` means the code path exists.
-- `Native Validated` means the behavior has been reproduced on native Termux
+- `Native Termux Validated` means the behavior has been reproduced on native Termux
   or real hardware, depending on the subsystem.
 - `Production Ready` means the subsystem is the default path for the release
   target and has the validation evidence that target requires.
@@ -26,11 +31,11 @@ Status values:
 | --- | --- | --- |
 | ACL Engine | Implemented | Orchestrates ordered workflows and structured reports. |
 | Workflow Engine | Implemented | Workflow reports and events exist. |
-| Firmware Packaging | Native Validated | Package generation, flash plan, analysis, validation report, and README are in place. |
+| Firmware Packaging | Native Termux Validated | Package generation, flash plan, analysis, validation report, and README are in place. |
 | Validation Engine | In Progress | Unit tests and native validation policies exist; provider coverage is still expanding. |
-| Android Transport | Native Validated | Discovery, permission, diagnostics, and fd-handoff evidence are validated on native Termux. |
+| Android Transport | Native Termux Validated | Discovery, permission, diagnostics, and fd-handoff evidence are validated on native Termux. |
 | Transport Stream Foundation | Implemented | Bounded stream contracts and diagnostics exist; native byte-stream validation is still pending. |
-| Transport API | Stabilizing | Provider, manager, session, and stream contracts are acceptable for upload-engine foundation work; breaking changes are not expected. |
+| Transport API | Stabilizing | Implementation note only; see [TRANSPORT_API_STABILIZATION.md](TRANSPORT_API_STABILIZATION.md) for the current contract boundary. |
 | Upload Engine | In Progress | The planner plus prepare-only executor exist, the positional CLI contract is validated, and real upload execution must remain transport-neutral until transport proof exists. |
 | Flash Engine | Planned | Must remain transport-based and device-agnostic. |
 | Serial Monitor | Planned | Must consume the same transport stream contract. |

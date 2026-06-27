@@ -19,6 +19,8 @@ to recover context quickly and accurately.
   repository.
 - How the repository should evolve over time without accumulating avoidable
   architectural drift.
+- How governance batches and documentation-ownership rules should be preserved
+  as durable project memory.
 
 ## Operating Rules
 
@@ -36,3 +38,5 @@ to recover context quickly and accurately.
   it.
 - Preserve repository-governance, debt, and interface-stability guidance in
   versioned docs so future evolution remains deliberate rather than accidental.
+- Preserve batch-level governance changes in status and roadmap docs so future
+  contributors can see how the documentation system evolved.

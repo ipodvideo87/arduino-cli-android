@@ -3,12 +3,19 @@
 This is a preview of the future upload workflow that will consume the Android
 USB transport framework.
 
+It is a reference and operational preview, not a policy document.
+
 It is not an implementation.
 It does not perform upload.
 It does not perform USB flashing.
 
 The underlying provider/session/endpoint contracts now exist as compile-safe
 ACL infrastructure, but the workflow itself remains future work.
+
+The prepare-only contract and evidence-reporting rules are defined in
+[UPLOAD_ENGINE_ARCHITECTURE.md](UPLOAD_ENGINE_ARCHITECTURE.md),
+[VALIDATION_POLICY.md](VALIDATION_POLICY.md), and
+[DIAGNOSTIC_VALIDATION_STANDARD.md](DIAGNOSTIC_VALIDATION_STANDARD.md).
 
 ## Goal
 
@@ -115,6 +122,9 @@ The upload report should include:
 - validation level
 - human-readable beginner summary
 - professional diagnostic details
+
+The exact evidence and claim structure should follow the diagnostic validation
+standard.
 
 ## ACL Integration
 

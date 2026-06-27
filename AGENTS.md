@@ -194,6 +194,9 @@ Do not claim a milestone is complete until it has been verified through real-wor
   `docs/android/TECHNICAL_DEBT_POLICY.md`, and
   `docs/android/INTERFACE_STABILITY_POLICY.md`; read them before making
   long-lived architecture, interface, schema, or debt decisions.
+- Governance framework batch 2 focuses on applying ownership and terminology
+  discipline to high-risk docs; prefer canonical references over duplicated
+  policy text when updating those pages.
 
 ## Repository Hygiene
 

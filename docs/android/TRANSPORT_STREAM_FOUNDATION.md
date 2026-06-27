@@ -3,6 +3,10 @@
 This document defines the reusable byte-oriented transport layer that sits
 between transport sessions and the future upload / serial monitor workflows.
 
+This is a reference document. The validation scope and evidence-reporting rules
+are defined in [VALIDATION_POLICY.md](VALIDATION_POLICY.md) and
+[DIAGNOSTIC_VALIDATION_STANDARD.md](DIAGNOSTIC_VALIDATION_STANDARD.md).
+
 It is deliberately conservative. It records the stream abstraction, the
 bounded-lifecycle model, and the validation boundary without claiming upload,
 flashing, or monitor success.
@@ -59,6 +63,9 @@ Stability note:
 - the transport API is stabilizing
 - `StreamSession` is the preferred session name
 - `ByteStreamSession` exists only as a compatibility alias
+
+The canonical API-stability wording lives in
+[TRANSPORT_API_STABILIZATION.md](TRANSPORT_API_STABILIZATION.md).
 
 ## Lifecycle Model
 
@@ -150,7 +157,8 @@ without parsing Android USB internals.
 
 ## Validation Boundary
 
-Validation levels matter:
+Validation levels matter, and the formal level definitions live in
+[VALIDATION_POLICY.md](VALIDATION_POLICY.md). In practice:
 
 - unit tests prove the contract and wrapper behavior
 - native Termux proves Android behavior

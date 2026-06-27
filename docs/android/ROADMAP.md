@@ -31,6 +31,8 @@
   decision framework, and documentation architecture
 - Governance framework batch 1.5: repository governance, engineering
   methodology, architecture review, technical debt, and interface stability
+- Governance framework batch 2: apply ownership and terminology discipline to
+  high-risk validation, transport, and workflow preview docs
 
 ## Next Milestones
 
@@ -70,3 +72,5 @@
   ownership rules.
 - Repository governance and interface-stability guidance should be treated as
   part of the foundation before more architecture or schema changes are added.
+- High-risk doc cleanup should continue to prefer canonical references and
+  concise local summaries over duplicated policy text.

@@ -148,6 +148,8 @@ Repository cleanup:
   - `docs/android/INTERFACE_STABILITY_POLICY.md`
   - updated cross-references in `AGENTS.md`, `STATUS.md`, `ROADMAP.md`, and
     `LIVING_INSTITUTIONAL_MEMORY.md`
+- Governance framework batch 2 has started with high-risk documentation
+  ownership cleanup across validation, transport, and workflow preview docs.
 
 ## Work In Progress
 
@@ -177,6 +179,8 @@ Repository cleanup:
   architecture batches without turning this milestone into a full doc cleanup.
 - Apply the repository governance and evolution framework to later interface,
   schema, and architecture work without rewriting the whole docs set at once.
+- Continue applying the governance framework to the remaining high-risk Android
+  docs, keeping canonical definitions centralized and local summaries concise.
 
 ## Known Blockers
 
