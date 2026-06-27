@@ -10,6 +10,7 @@ import (
 	"time"
 
 	acldiagnostics "github.com/arduino/arduino-cli/internal/acl/diagnostics"
+	"github.com/arduino/arduino-cli/internal/acl/upload"
 )
 
 type StepStatus = acldiagnostics.Status
@@ -93,18 +94,19 @@ func (b *EventBus) Publish(event Event) error {
 }
 
 type WorkflowContext struct {
-	Root        string
-	RuntimeRoot string
-	TargetPath  string
-	BuildPath   string
-	OutputDir   string
-	SketchName  string
-	FQBN        string
+	Root           string
+	RuntimeRoot    string
+	TargetPath     string
+	BuildPath      string
+	OutputDir      string
+	SketchName     string
+	FQBN           string
 	CompileRequest CompileRequest
-	CompileRunner   CompileRunner
-	Events      *EventBus
-	Metadata    map[string]string
-	Data        map[string]any
+	CompileRunner  CompileRunner
+	UploadRequest  upload.UploadRequest
+	Events         *EventBus
+	Metadata       map[string]string
+	Data           map[string]any
 }
 
 func NewContext() *WorkflowContext {

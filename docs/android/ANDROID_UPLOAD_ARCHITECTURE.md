@@ -161,6 +161,10 @@ The compile path now emits a stable firmware package and the install paths now
 run through the shared Android patch pipeline. That is infrastructure only; it
 does not yet prove end-to-end Android USB flashing.
 
+The ACL upload engine foundation now exists as a transport-neutral dry-run
+planner. It consumes firmware packages and flash plans, emits structured
+diagnostics, and does not yet open real transport streams or send bytes.
+
 The transport architecture itself is still a design milestone, not runtime
 behavior.
 

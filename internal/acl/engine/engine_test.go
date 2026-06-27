@@ -8,8 +8,10 @@ import (
 	"sync"
 	"testing"
 
+	acldiagnostics "github.com/arduino/arduino-cli/internal/acl/diagnostics"
 	"github.com/arduino/arduino-cli/internal/acl/firmware"
 	aclscanner "github.com/arduino/arduino-cli/internal/acl/scanner"
+	"github.com/arduino/arduino-cli/internal/acl/upload"
 	aclverifier "github.com/arduino/arduino-cli/internal/acl/verifier"
 	paths "github.com/arduino/go-paths-helper"
 	properties "github.com/arduino/go-properties-orderedmap"
@@ -267,6 +269,58 @@ func TestDiagnosticsWorkflowWithFakes(t *testing.T) {
 	require.Equal(t, "diagnostics", report.Name)
 	require.NotEmpty(t, report.BeginnerSummary())
 	require.NotEmpty(t, report.ProfessionalDetails())
+}
+
+func TestUploadWorkflowUsesDryRunPlanner(t *testing.T) {
+	packageDir := t.TempDir()
+
+	oldEngine := newUploadEngine
+	newUploadEngine = func() upload.UploadEngine {
+		return uploadEngineFunc(func(ctx context.Context, req upload.UploadRequest) (upload.UploadReport, error) {
+			require.Equal(t, packageDir, req.PackageDir)
+			return upload.UploadReport{
+				SchemaVersion: "1",
+				Status:        acldiagnostics.StatusPassed,
+				DryRun:        true,
+				Beginner:      "upload dry-run ready",
+				Professional:  []string{"dry-run: true"},
+				Plan: upload.UploadPlan{
+					PackageDir: packageDir,
+					Steps: []upload.UploadStep{{
+						Name:     "application",
+						Artifact: firmware.ArtifactApplicationBinary,
+						Offset:   0x10000,
+					}},
+				},
+			}, nil
+		})
+	}
+	t.Cleanup(func() { newUploadEngine = oldEngine })
+
+	ctx := NewContext()
+	ctx.UploadRequest = upload.UploadRequest{PackageDir: packageDir}
+
+	report, err := New().Run(context.Background(), UploadWorkflow(), ctx)
+	require.NoError(t, err)
+	require.Equal(t, "upload", report.Name)
+	require.NotEmpty(t, report.Jobs)
+	require.NotNil(t, report.Result)
+	result, ok := report.Result.(upload.UploadReport)
+	require.True(t, ok)
+	require.True(t, result.DryRun)
+	require.Equal(t, packageDir, result.Plan.PackageDir)
+	require.Len(t, result.Plan.Steps, 1)
+}
+
+type uploadEngineFunc func(context.Context, upload.UploadRequest) (upload.UploadReport, error)
+
+func (f uploadEngineFunc) Plan(context.Context, upload.UploadRequest) (upload.UploadPlan, error) {
+	report, err := f(context.Background(), upload.UploadRequest{})
+	return report.Plan, err
+}
+
+func (f uploadEngineFunc) DryRun(ctx context.Context, req upload.UploadRequest) (upload.UploadReport, error) {
+	return f(ctx, req)
 }
 
 type captureSink struct {

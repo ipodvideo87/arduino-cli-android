@@ -158,3 +158,18 @@ These decisions use an ADR-style format.
   stream implementation remains experimentally validated.
 - Validation/evidence if available: transport provider tests, stream wrapper
   tests, and native Termux fd-handoff diagnostics.
+
+## Upload Engine foundation is dry-run only and transport-neutral
+
+- Status: accepted
+- Context: The project needs an upload planning layer that can consume firmware
+  packages and flash plans before real transport execution exists.
+- Decision: implement the Upload Engine foundation as a dry-run planner that
+  validates firmware packages, derives upload steps, and reports diagnostics
+  without opening real transport streams or sending bytes.
+- Alternatives considered: coupling the foundation directly to transport
+  execution; delaying the upload layer until flashing is ready.
+- Consequences: CLI and workflow layers can surface upload planning now, while
+  real flashing remains a later transport-specific milestone.
+- Validation/evidence if available: upload engine package tests and ACL workflow
+  upload-dry-run integration tests.

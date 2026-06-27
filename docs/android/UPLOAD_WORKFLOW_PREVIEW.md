@@ -16,6 +16,12 @@ The upload workflow should let ACL and future GUI layers ask one question:
 
 What transport is available, what can it do, and how do we use it safely?
 
+Current implementation note:
+
+- the ACL upload engine foundation now exists as a dry-run planner
+- it consumes firmware packages and flash plans
+- it does not open real transport streams or send bytes yet
+
 ## Intended Flow
 
 ```text

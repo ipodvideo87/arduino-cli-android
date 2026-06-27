@@ -191,6 +191,7 @@ func newWorkflowCommand(srv rpc.ArduinoCoreServiceServer) *cobra.Command {
 		Short: "Experimental ACL workflow engine commands",
 	}
 	cmd.AddCommand(newWorkflowCompileCommand(srv))
+	cmd.AddCommand(newWorkflowUploadCommand())
 	cmd.AddCommand(newWorkflowBootstrapCommand())
 	cmd.AddCommand(newWorkflowDiagnosticsCommand())
 	return cmd

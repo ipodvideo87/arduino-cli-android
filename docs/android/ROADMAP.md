@@ -26,6 +26,7 @@
 - Termux USB fd-handoff probe and transport-stream diagnostics foundation
 - Transport Stream Foundation
 - Transport API Stabilization
+- Upload Engine foundation and dry-run planning
 
 ## Next Milestones
 
@@ -35,6 +36,7 @@
 - Validate the Termux USB provider and file-descriptor handoff path on native Termux
 - Validate the TERMUX_USB_FD probe surface on native Termux
 - Validate the transport stream foundation on native Termux
+- Validate upload dry-run planning on native Termux
 - Implement the upload workflow
 - Implement the serial monitor workflow
 - Validate the transport API stabilization boundary before upload depends on it
@@ -49,6 +51,8 @@
   useful
 - Implement the first transport provider runtime after the architecture is
   proven stable
+- Implement real upload execution after the dry-run upload foundation is
+  validated on native Termux and real hardware
 - Promote the bounded byte-stream bridge only after native Termux validation
   proves the experimental stream path
 

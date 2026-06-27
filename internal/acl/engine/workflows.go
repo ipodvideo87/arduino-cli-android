@@ -13,8 +13,13 @@ import (
 	aclinstall "github.com/arduino/arduino-cli/internal/acl/install"
 	aclpatcher "github.com/arduino/arduino-cli/internal/acl/patcher"
 	aclscanner "github.com/arduino/arduino-cli/internal/acl/scanner"
+	"github.com/arduino/arduino-cli/internal/acl/upload"
 	aclverifier "github.com/arduino/arduino-cli/internal/acl/verifier"
 )
+
+var newUploadEngine = func() upload.UploadEngine {
+	return upload.NewEngine()
+}
 
 type BootstrapWorkflowReport struct {
 	Root           string                      `json:"root,omitempty"`
@@ -78,6 +83,21 @@ func CompileWorkflow() Workflow {
 					{Name: "flash plan generation", Execute: runFlashPlanHook},
 					{Name: "binary validation", Critical: true, Execute: runBinaryValidationHook},
 					{Name: "workflow report", Critical: true, Execute: runCompileReport},
+				},
+			},
+		},
+	}
+}
+
+func UploadWorkflow() Workflow {
+	return Workflow{
+		Name: "upload",
+		Jobs: []Job{
+			{
+				Name: "upload",
+				Steps: []Step{
+					{Name: "package validation", Critical: true, Execute: runUploadPlan},
+					{Name: "workflow report", Critical: true, Execute: runUploadReport},
 				},
 			},
 		},
@@ -394,6 +414,55 @@ func runCompileReport(_ context.Context, wctx *WorkflowContext) (StepResult, err
 	return StepResult{Status: compileWorkflowStatus(report), Message: report.Beginner, Beginner: report.Beginner, Professional: report.Professional, Data: report}, nil
 }
 
+func runUploadPlan(ctx context.Context, wctx *WorkflowContext) (StepResult, error) {
+	engine := newUploadEngine()
+	if engine == nil {
+		return StepResult{Status: StepStatusFailed, Message: "upload engine is not configured", Beginner: "upload engine is not configured", Critical: true}, fmt.Errorf("upload engine is not configured")
+	}
+	report, err := engine.DryRun(ctx, wctx.UploadRequest)
+	if report.SchemaVersion == "" {
+		report.SchemaVersion = "1"
+	}
+	wctx.Set("upload_report", report)
+	message := report.BeginnerSummary()
+	if strings.TrimSpace(message) == "" {
+		message = "upload dry-run completed"
+	}
+	status := StepStatusPassed
+	if report.Status == acldiagnostics.StatusWarning {
+		status = StepStatusWarning
+	}
+	if report.Status == acldiagnostics.StatusFailed {
+		status = StepStatusFailed
+	}
+	return StepResult{
+		Status:       status,
+		Message:      message,
+		Beginner:     message,
+		Professional: report.ProfessionalDetails(),
+		Data:         report,
+		Critical:     report.Status == acldiagnostics.StatusFailed,
+	}, err
+}
+
+func runUploadReport(_ context.Context, wctx *WorkflowContext) (StepResult, error) {
+	value, ok := wctx.Get("upload_report")
+	if !ok {
+		return StepResult{Status: StepStatusFailed, Message: "upload report is not available", Beginner: "upload report is not available", Critical: true}, fmt.Errorf("upload report is not available")
+	}
+	report, ok := value.(upload.UploadReport)
+	if !ok {
+		return StepResult{Status: StepStatusFailed, Message: "upload report has an unsupported type", Beginner: "upload report is invalid", Critical: true}, fmt.Errorf("upload report has an unsupported type")
+	}
+	return StepResult{
+		Status:       uploadStatus(report),
+		Message:      report.BeginnerSummary(),
+		Beginner:     report.BeginnerSummary(),
+		Professional: report.ProfessionalDetails(),
+		Data:         report,
+	}, nil
+}
+
 func runFlashPackageValidation(_ context.Context, wctx *WorkflowContext) (StepResult, error) {
 	hook, ok := wctx.Get("flash_package_validation")
 	if !ok {
@@ -686,6 +755,19 @@ func compileWorkflowStatus(report CompileWorkflowReport) StepStatus {
 		return StepStatusWarning
 	}
 	return StepStatusPassed
+}
+
+func uploadStatus(report upload.UploadReport) StepStatus {
+	switch report.Status {
+	case acldiagnostics.StatusFailed:
+		return StepStatusFailed
+	case acldiagnostics.StatusWarning:
+		return StepStatusWarning
+	case acldiagnostics.StatusPassed:
+		return StepStatusPassed
+	default:
+		return StepStatusWarning
+	}
 }
 
 func buildFirmwarePackageFromSnapshot(exec CompileExecution, req CompileRequest) (firmware.FirmwarePackage, error) {

@@ -69,6 +69,7 @@ Native Termux validation always takes priority over container or desktop validat
 - Treat compatibility as a first-class layer. Prefer compatible library selection over source patching, record compatibility decisions in build and install reports, and surface beginner-friendly and professional detail separately.
 - Successful compiles should emit a first-class firmware package and install flows should pass through the shared Android patch pipeline, but USB flashing remains a separate milestone until proven on-device.
 - Treat the transport stream foundation as reusable infrastructure. Keep byte-stream claims experimental until native Termux validation proves them, and preserve stream diagnostics even when live byte-stream support is unavailable.
+- Treat the upload engine foundation as transport-neutral dry-run planning. It may validate firmware packages and derive ordered upload steps, but it must not open real transport streams or send bytes until the transport execution milestone is explicitly validated.
 - Read [docs/android/TRANSPORT_API_STABILIZATION.md](docs/android/TRANSPORT_API_STABILIZATION.md) before changing transport contracts. Prefer additive changes; breaking changes should be exceptional and clearly justified.
 - Keep docs and `STATUS.md` updated when architecture, assumptions, or validation evidence changes.
 - Do not claim success beyond the validation level actually achieved.

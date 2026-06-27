@@ -15,6 +15,7 @@ import (
 	aclinstall "github.com/arduino/arduino-cli/internal/acl/install"
 	aclscanner "github.com/arduino/arduino-cli/internal/acl/scanner"
 	"github.com/arduino/arduino-cli/internal/acl/transport"
+	"github.com/arduino/arduino-cli/internal/acl/upload"
 	aclverifier "github.com/arduino/arduino-cli/internal/acl/verifier"
 	rpc "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/commands/v1"
 	"github.com/spf13/cobra"
@@ -311,6 +312,83 @@ func TestACLWorkflowCompileCommandSeparatesBuildAndOutputDirs(t *testing.T) {
 	root.SetArgs([]string{"acl", "workflow", "compile", "--fqbn", "esp32:esp32:esp32s3", "--build-path", buildDir, "--output-dir", outputDir, sketchDir})
 
 	require.NoError(t, root.Execute())
+}
+
+func TestACLWorkflowUploadCommandJSON(t *testing.T) {
+	packageDir := t.TempDir()
+
+	oldRun := workflowUploadRun
+	workflowUploadRun = func(_ context.Context, req workflowUploadRequest) (aclengine.WorkflowReport, error) {
+		require.Equal(t, packageDir, req.PackageDir)
+		return aclengine.WorkflowReport{
+			Name:     "upload",
+			Status:   aclengine.StepStatusPassed,
+			Beginner: "upload dry-run completed",
+			Result: upload.UploadReport{
+				SchemaVersion: "1",
+				Status:        acldiagnostics.StatusPassed,
+				DryRun:        true,
+				Beginner:      "upload dry-run ready",
+				Professional:  []string{"dry-run: true"},
+				Plan: upload.UploadPlan{
+					PackageDir: packageDir,
+				},
+			},
+		}, nil
+	}
+	t.Cleanup(func() { workflowUploadRun = oldRun })
+
+	root := newTestRoot()
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"acl", "workflow", "upload", "--json", packageDir})
+
+	require.NoError(t, root.Execute())
+
+	var report aclengine.WorkflowReport
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &report))
+	require.Equal(t, "upload", report.Name)
+	require.Equal(t, aclengine.StepStatusPassed, report.Status)
+	require.NotNil(t, report.Result)
+}
+
+func TestACLWorkflowUploadCommandTextAndDetails(t *testing.T) {
+	packageDir := t.TempDir()
+
+	oldRun := workflowUploadRun
+	workflowUploadRun = func(_ context.Context, req workflowUploadRequest) (aclengine.WorkflowReport, error) {
+		require.Equal(t, packageDir, req.PackageDir)
+		return aclengine.WorkflowReport{
+			Name:     "upload",
+			Status:   aclengine.StepStatusWarning,
+			Beginner: "upload dry-run completed with warnings",
+			Result: upload.UploadReport{
+				SchemaVersion: "1",
+				Status:        acldiagnostics.StatusWarning,
+				DryRun:        true,
+				Beginner:      "upload dry-run completed with warnings",
+				Professional:  []string{"dry-run: true", "ready: true"},
+				Plan: upload.UploadPlan{
+					PackageDir: packageDir,
+				},
+			},
+		}, nil
+	}
+	t.Cleanup(func() { workflowUploadRun = oldRun })
+
+	root := newTestRoot()
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"acl", "workflow", "upload", "--details", packageDir})
+
+	require.NoError(t, root.Execute())
+
+	output := buf.String()
+	require.Contains(t, output, "ACL Workflow Upload")
+	require.Contains(t, output, "upload dry-run completed with warnings")
+	require.Contains(t, output, "dry-run: true")
 }
 
 func TestACLTransportListCommandJSON(t *testing.T) {

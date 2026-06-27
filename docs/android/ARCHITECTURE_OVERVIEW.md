@@ -25,6 +25,8 @@ Toolchains and hardware
 - `TransportManager` and the future USB bridge sit below upload workflows.
 - `TransportStream` is the reusable byte-oriented boundary between transport
   sessions and future upload / monitor consumers.
+- `UploadEngine` sits between `FirmwarePackage` / `FlashPlan` and future
+  transport execution. The current foundation is dry-run only.
 - The compatibility layer, scanner, verifier, bootstrap, and patch preview are
   shared infrastructure used by multiple workflows.
 
