@@ -190,7 +190,116 @@ func (p *Provider) Open(ctx context.Context, req transport.OpenRequest) (transpo
 	return newSession(req.Device, permission, p.endpointExport()), nil
 }
 
+func (p *Provider) Probe(ctx context.Context, req transport.StreamProbeRequest) (transport.TransportStreamDiagnosticsReport, error) {
+	devicePath := requestDevicePath(req.Device, req.Metadata)
+	if strings.TrimSpace(devicePath) == "" {
+		return transport.TransportStreamDiagnosticsReport{
+			SchemaVersion: "1",
+			Status:        diagnostics.StatusFailed,
+			Provider:      defaultProviderID,
+			ProviderKind:  transport.KindAndroidUSBFD,
+			Beginner:      "fd probe requires a device path",
+			Limitations:   []string{"missing device path"},
+			NextStep:      "run probe-fd with a concrete USB device path",
+			Metadata:      map[string]string{},
+		}, errors.New("device path is required")
+	}
+
+	report := transport.TransportStreamDiagnosticsReport{
+		SchemaVersion: "1",
+		Status:        diagnostics.StatusWarning,
+		Provider:      defaultProviderID,
+		ProviderKind:  transport.KindAndroidUSBFD,
+		Device:        req.Device,
+		Beginner:      "stream probe has not been proven yet",
+		Professional: []string{
+			"stream probing is diagnostics-only until a bounded byte-stream bridge is implemented",
+		},
+		Warnings: []string{},
+		Limitations: []string{
+			"byte-stream support remains experimental",
+		},
+		Metadata: map[string]string{},
+	}
+	report.Device.StableID = devicePath
+	if report.Device.DisplayName == "" {
+		report.Device.DisplayName = devicePath
+	}
+
+	helperCommand := strings.TrimSpace(req.HelperCommand)
+	if helperCommand == "" {
+		helperCommand = defaultProbeHelperCommand()
+	}
+
+	if !p.available() {
+		report.Beginner = "termux-usb is unavailable on this host"
+		report.Limitations = append(report.Limitations, "termux-usb is not present")
+		report.NextStep = "install termux-usb and retry the fd probe on native Termux"
+		return report, nil
+	}
+
+	args := []string{"-r", "-e", helperCommand, devicePath}
+	result := p.runner.Run(ctx, p.commandName(), args...)
+	trace := transport.CommandTrace{
+		Command:        p.commandName(),
+		Args:           append([]string(nil), args...),
+		Stdout:         result.Stdout,
+		Stderr:         result.Stderr,
+		ExitCode:       result.ExitCode,
+		Interpretation: "termux-usb fd handoff probe",
+	}
+	if result.Err != nil {
+		trace.Err = result.Err.Error()
+	}
+
+	parsed, parseErr := parseStreamProbeReport(result.Stdout)
+	if parseErr != nil {
+		report.Status = diagnostics.StatusFailed
+		report.Beginner = "fd probe helper output could not be parsed"
+		report.Warnings = append(report.Warnings, parseErr.Error())
+		if result.Err != nil {
+			report.Warnings = append(report.Warnings, result.Err.Error())
+		}
+		if trimmed := strings.TrimSpace(result.Stderr); trimmed != "" {
+			report.Professional = append(report.Professional, "helper stderr: "+trimmed)
+		}
+		report.Limitations = append(report.Limitations, "helper JSON output was malformed")
+		report.NextStep = "fix the helper output parser before attempting a byte-stream bridge"
+		report.Traces = []transport.CommandTrace{trace}
+		return report, nil
+	}
+
+	report = parsed
+	report.Provider = defaultProviderID
+	report.ProviderKind = transport.KindAndroidUSBFD
+	report.Device.StableID = devicePath
+	if report.Device.DisplayName == "" {
+		report.Device.DisplayName = devicePath
+	}
+	if report.Metadata == nil {
+		report.Metadata = map[string]string{}
+	}
+	report.Metadata["device_path"] = devicePath
+	report.Metadata["helper_command"] = helperCommand
+	report.Traces = append([]transport.CommandTrace{trace}, report.Traces...)
+	if result.Err != nil {
+		report.Warnings = append(report.Warnings, result.Err.Error())
+	}
+	if result.ExitCode != 0 && report.Status == "" {
+		report.Status = diagnostics.StatusFailed
+	}
+	if report.NextStep == "" {
+		report.NextStep = "native byte-stream support remains experimental"
+	}
+	return report, nil
+}
+
 func (p *Provider) Diagnostics(ctx context.Context, req transport.DiagnosticsRequest) (transport.TransportDiagnosticsReport, error) {
+	device := transport.DiscoveredDevice{}
+	if req.Device != nil {
+		device = *req.Device
+	}
+	streamProbe := buildSessionStreamProbeReport(device, endpointExportProbeReport(), permissionStatus(device.Permission))
 	report := transport.TransportDiagnosticsReport{
 		SchemaVersion:    "1",
 		Status:           diagnostics.StatusWarning,
@@ -200,6 +309,9 @@ func (p *Provider) Diagnostics(ctx context.Context, req transport.DiagnosticsReq
 		DiscoveryStatus:  diagnostics.StatusWarning,
 		PermissionStatus: diagnostics.StatusSkipped,
 		ConnectionStatus: diagnostics.StatusSkipped,
+		StreamProbe:      streamProbe,
+		StreamStatus:     streamProbe.Status,
+		NextStep:         streamProbe.NextStep,
 		Beginner:         "Termux USB diagnostics completed with limitations",
 		Professional: []string{
 			"discovery is implemented through termux-usb -l",
@@ -256,6 +368,9 @@ func (p *Provider) Diagnostics(ctx context.Context, req transport.DiagnosticsReq
 	if export.Kind == transport.EndpointExportUnsupported {
 		report.Limitations = append(report.Limitations, export.Reason)
 	}
+	report.StreamProbe = buildSessionStreamProbeReport(report.Device, export, report.PermissionStatus)
+	report.StreamStatus = report.StreamProbe.Status
+	report.NextStep = report.StreamProbe.NextStep
 	if !usbAvailable {
 		report.Beginner = "termux-usb is unavailable on this host"
 		if report.Status != diagnostics.StatusFailed {
@@ -431,6 +546,144 @@ func (p *Provider) endpointExport() transport.EndpointExport {
 	}
 }
 
+func defaultProbeHelperCommand() string {
+	return fmt.Sprintf("%s acl transport probe-fd-helper --json", os.Args[0])
+}
+
+func parseStreamProbeReport(raw string) (transport.TransportStreamDiagnosticsReport, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return transport.TransportStreamDiagnosticsReport{}, errors.New("empty stream probe output")
+	}
+	var report transport.TransportStreamDiagnosticsReport
+	if err := json.Unmarshal([]byte(raw), &report); err != nil {
+		return transport.TransportStreamDiagnosticsReport{}, err
+	}
+	return report, nil
+}
+
+func HelperStreamProbeReportFromEnv() transport.TransportStreamDiagnosticsReport {
+	raw := strings.TrimSpace(os.Getenv("TERMUX_USB_FD"))
+	report := transport.TransportStreamDiagnosticsReport{
+		SchemaVersion:   "1",
+		Status:          diagnostics.StatusWarning,
+		Provider:        defaultProviderID,
+		ProviderKind:    transport.KindAndroidUSBFD,
+		FDEnvPresent:    raw != "",
+		FDEnvValue:      raw,
+		StreamSupported: false,
+		StreamProven:    false,
+		ReadState:       transport.StreamObservationUnsupported,
+		WriteState:      transport.StreamObservationUnsupported,
+		CloseState:      transport.StreamObservationUnsupported,
+		EOFState:        transport.StreamObservationUnsupported,
+		DisconnectState: transport.StreamObservationUnsupported,
+		Metadata:        map[string]string{},
+		NextStep:        "run a bounded read/write bridge before claiming byte-stream support",
+	}
+	if raw == "" {
+		report.Beginner = "TERMUX_USB_FD is not set"
+		report.Limitations = []string{"fd handoff is unavailable outside termux-usb -e"}
+		report.Professional = []string{
+			"the helper did not observe an fd handoff",
+			"run the helper via termux-usb -r -e to inspect TERMUX_USB_FD",
+		}
+		return report
+	}
+	report.FDObserved = true
+	fd, err := strconv.Atoi(raw)
+	if err != nil {
+		report.Status = diagnostics.StatusFailed
+		report.Beginner = "TERMUX_USB_FD is invalid"
+		report.Warnings = []string{"TERMUX_USB_FD could not be parsed"}
+		report.Limitations = []string{"fd value is not a valid integer"}
+		report.Professional = []string{
+			"TERMUX_USB_FD could not be parsed",
+			"raw value: " + raw,
+		}
+		report.NextStep = "fix the helper invocation before probing the stream"
+		return report
+	}
+	report.FDValid = true
+	file := os.NewFile(uintptr(fd), "TERMUX_USB_FD")
+	if file == nil {
+		report.Status = diagnostics.StatusFailed
+		report.Beginner = "TERMUX_USB_FD could not be wrapped as a file"
+		report.Warnings = []string{"os.NewFile returned nil"}
+		report.Limitations = []string{"fd wrapping failed"}
+		report.NextStep = "debug the Termux fd handoff path"
+		return report
+	}
+	defer file.Close()
+	if _, err := file.Stat(); err != nil {
+		report.Status = diagnostics.StatusFailed
+		report.Beginner = "TERMUX_USB_FD is not inspectable"
+		report.Warnings = []string{err.Error()}
+		report.Limitations = []string{"fd metadata could not be inspected"}
+		report.Professional = []string{
+			"TERMUX_USB_FD was present but stat failed",
+			"fd: " + raw,
+		}
+		report.NextStep = "verify the fd handoff path before attempting byte-stream work"
+		return report
+	}
+	report.FDInspectable = true
+	report.Beginner = "TERMUX_USB_FD observed; stream support remains experimental"
+	report.Professional = []string{
+		"TERMUX_USB_FD was observed and inspected successfully",
+		"byte-stream read/write behavior is still unproven",
+	}
+	report.Limitations = []string{
+		"no bounded read/write bridge has been implemented",
+		"the helper does not attempt destructive device I/O",
+	}
+	report.NextStep = "add a bounded byte-stream bridge or transport stream adapter"
+	return report
+}
+
+func buildSessionStreamProbeReport(device transport.DiscoveredDevice, endpoint transport.EndpointExport, permission diagnostics.Status) transport.TransportStreamDiagnosticsReport {
+	report := HelperStreamProbeReportFromEnv()
+	report.Device = device
+	if report.Device.StableID == "" {
+		report.Device.StableID = device.StableID
+	}
+	if report.Device.DisplayName == "" {
+		report.Device.DisplayName = device.DisplayName
+	}
+	report.StreamSupported = false
+	report.StreamProven = false
+	report.ReadState = transport.StreamObservationUnsupported
+	report.WriteState = transport.StreamObservationUnsupported
+	report.CloseState = transport.StreamObservationUnsupported
+	report.EOFState = transport.StreamObservationUnsupported
+	report.DisconnectState = transport.StreamObservationUnsupported
+	report.Metadata["permission_state"] = string(permission)
+	if endpoint.Kind == transport.EndpointExportFileDescriptor {
+		report.Metadata["endpoint"] = "file-descriptor"
+		if report.NextStep == "" {
+			report.NextStep = "probe-fd can inspect the fd handoff, but stream support remains experimental"
+		}
+	} else {
+		report.Metadata["endpoint"] = "unsupported"
+		if report.NextStep == "" {
+			report.NextStep = "run probe-fd once TERMUX_USB_FD handoff is available"
+		}
+	}
+	return report
+}
+
+func endpointExportProbeReport() transport.EndpointExport {
+	return transport.EndpointExport{
+		Kind:        transport.EndpointExportUnsupported,
+		Supported:   false,
+		Reason:      "stream probe has not been run",
+		UserMessage: "stream probe has not been run",
+		Professional: []string{
+			"run acl transport probe-fd to inspect TERMUX_USB_FD handoff",
+		},
+	}
+}
+
 func newSession(device transport.DiscoveredDevice, permission transport.PermissionResult, endpoint transport.EndpointExport) *Session {
 	caps := transport.CapabilitiesFromList(
 		transport.CapabilityDiscovery,
@@ -451,6 +704,9 @@ func newSession(device transport.DiscoveredDevice, permission transport.Permissi
 		PermissionStatus: permissionStatus(permission.State),
 		ConnectionStatus: diagnostics.StatusWarning,
 		SelectedEndpoint: endpoint,
+		StreamProbe:      buildSessionStreamProbeReport(device, endpoint, permissionStatus(permission.State)),
+		StreamStatus:     diagnostics.StatusWarning,
+		NextStep:         "run acl transport probe-fd to inspect TERMUX_USB_FD handoff",
 		Beginner:         "Termux USB session is diagnostic-only",
 		Professional: []string{
 			"the provider does not yet expose a byte stream",
@@ -463,7 +719,10 @@ func newSession(device transport.DiscoveredDevice, permission transport.Permissi
 		report.Status = diagnostics.StatusPassed
 		report.ConnectionStatus = diagnostics.StatusPassed
 		report.Beginner = "Termux USB session is ready for file-descriptor handoff"
+		report.NextStep = "probe-fd can now inspect fd handoff evidence"
 	}
+	report.StreamProbe = buildSessionStreamProbeReport(device, endpoint, permissionStatus(permission.State))
+	report.StreamStatus = report.StreamProbe.Status
 	return &Session{
 		devicePath: device.StableID,
 		permission: permission,

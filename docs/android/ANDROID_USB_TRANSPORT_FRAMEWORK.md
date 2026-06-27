@@ -20,9 +20,12 @@ along with safe diagnostic CLI surfaces:
 - `arduino-cli acl transport list`
 - `arduino-cli acl transport diagnose`
 - `arduino-cli acl transport acquire --device <path>`
+- `arduino-cli acl transport probe-fd --device <path>`
 
 It is still a contract and diagnostics layer only: no real Android USB API
 calls, no USB flashing, and no upload or serial-monitor implementation yet.
+The fd probe is intentionally bounded and only records `TERMUX_USB_FD`
+handoff evidence.
 
 The framework exists so Arduino CLI and future tool integrations can keep
 talking to a serial-like endpoint while ACL owns Android-specific USB
@@ -40,6 +43,8 @@ discovery, permission, and bridge logic.
 - Termux USB discovery, permission acquisition, and file-descriptor reporting
   are isolated behind the transport provider contract and remain diagnostic-only
   until native Termux validation proves the on-device behavior
+- the fd-handoff probe exists as a transport-neutral diagnostic boundary, but a
+  real byte-stream bridge remains unproven
 
 ## Related Docs
 

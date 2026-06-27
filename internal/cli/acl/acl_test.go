@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -432,11 +433,83 @@ func TestACLTransportAcquireCommandJSON(t *testing.T) {
 	require.Equal(t, "/dev/bus/usb/001/002", report.DevicePath)
 }
 
+func TestACLTransportProbeFDCommandJSON(t *testing.T) {
+	oldFactory := newTransportProvider
+	newTransportProvider = func() transportProvider {
+		return fakeCLITransportProvider{
+			desc: transport.TransportDescriptor{
+				Kind:      transport.KindAndroidUSBFD,
+				Name:      "termux-usb",
+				Provider:  "termuxusb",
+				Available: true,
+			},
+			probe: transport.TransportStreamDiagnosticsReport{
+				SchemaVersion:   "1",
+				Status:          acldiagnostics.StatusWarning,
+				Provider:        "termuxusb",
+				ProviderKind:    transport.KindAndroidUSBFD,
+				FDEnvPresent:    true,
+				FDObserved:      true,
+				FDValid:         true,
+				FDInspectable:   true,
+				StreamSupported: false,
+				StreamProven:    false,
+				ReadState:       transport.StreamObservationUnsupported,
+				WriteState:      transport.StreamObservationUnsupported,
+				CloseState:      transport.StreamObservationUnsupported,
+				EOFState:        transport.StreamObservationUnsupported,
+				DisconnectState: transport.StreamObservationUnsupported,
+				Beginner:        "TERMUX_USB_FD observed; stream support remains experimental",
+				Professional:    []string{"fd handoff observed", "byte-stream bridge not yet implemented"},
+				NextStep:        "add a bounded byte-stream bridge or transport stream adapter",
+			},
+		}
+	}
+	t.Cleanup(func() { newTransportProvider = oldFactory })
+
+	root := newTestRoot()
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"acl", "transport", "probe-fd", "--json", "--device", "/dev/bus/usb/001/002"})
+
+	require.NoError(t, root.Execute())
+
+	var report transport.TransportStreamDiagnosticsReport
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &report))
+	require.True(t, report.FDObserved)
+	require.Equal(t, acldiagnostics.StatusWarning, report.Status)
+	require.Contains(t, report.BeginnerSummary(), "TERMUX_USB_FD")
+}
+
+func TestACLTransportProbeFDHelperCommandJSON(t *testing.T) {
+	file, err := os.CreateTemp(t.TempDir(), "termux-usb-fd-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = file.Close() })
+	t.Setenv("TERMUX_USB_FD", fmt.Sprintf("%d", file.Fd()))
+
+	root := newTestRoot()
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"acl", "transport", "probe-fd-helper", "--json"})
+
+	require.NoError(t, root.Execute())
+
+	var report transport.TransportStreamDiagnosticsReport
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &report))
+	require.True(t, report.FDObserved)
+	require.True(t, report.FDValid)
+	require.True(t, report.FDInspectable)
+	require.Equal(t, acldiagnostics.StatusWarning, report.Status)
+}
+
 type fakeCLITransportProvider struct {
 	desc       transport.TransportDescriptor
 	report     transport.TransportDiagnosticsReport
 	permission transport.PermissionResult
 	devices    []transport.DiscoveredDevice
+	probe      transport.TransportStreamDiagnosticsReport
 }
 
 func (f fakeCLITransportProvider) Descriptor() transport.TransportDescriptor { return f.desc }
@@ -458,6 +531,18 @@ func (f fakeCLITransportProvider) Open(context.Context, transport.OpenRequest) (
 
 func (f fakeCLITransportProvider) Diagnostics(context.Context, transport.DiagnosticsRequest) (transport.TransportDiagnosticsReport, error) {
 	return f.report, nil
+}
+
+func (f fakeCLITransportProvider) Probe(context.Context, transport.StreamProbeRequest) (transport.TransportStreamDiagnosticsReport, error) {
+	if f.probe.SchemaVersion == "" {
+		return transport.TransportStreamDiagnosticsReport{
+			SchemaVersion: "1",
+			Status:        acldiagnostics.StatusWarning,
+			Beginner:      "stream probe is unavailable",
+			Limitations:   []string{"probe not implemented in fake"},
+		}, nil
+	}
+	return f.probe, nil
 }
 
 type testBootstrapExecutor struct {

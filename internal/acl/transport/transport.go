@@ -469,6 +469,15 @@ func mergeDiagnostics(base, overlay TransportDiagnosticsReport) TransportDiagnos
 	if overlay.SelectedEndpoint.Kind != "" || overlay.SelectedEndpoint.Path != "" || overlay.SelectedEndpoint.URL != "" {
 		base.SelectedEndpoint = overlay.SelectedEndpoint
 	}
+	if overlay.StreamProbe.SchemaVersion != "" || overlay.StreamProbe.Status != "" || overlay.StreamProbe.Provider != "" || overlay.StreamProbe.FDEnvPresent || overlay.StreamProbe.StreamSupported || overlay.StreamProbe.StreamProven || len(overlay.StreamProbe.Traces) > 0 {
+		base.StreamProbe = overlay.StreamProbe
+	}
+	if overlay.StreamStatus != "" {
+		base.StreamStatus = overlay.StreamStatus
+	}
+	if strings.TrimSpace(overlay.NextStep) != "" {
+		base.NextStep = overlay.NextStep
+	}
 	if len(overlay.Interfaces) > 0 {
 		base.Interfaces = append([]InterfaceSummary(nil), overlay.Interfaces...)
 	}

@@ -38,6 +38,9 @@ Current validation posture:
 - Emulated ARM64 smoke tests are useful preflight checks only and do not prove Android success.
 - The Termux USB provider now has a native-Termux validation checklist documenting expected outputs for discovery, permission, stale-path handling, and fd handoff evidence.
 - Discovery and permission acquisition for the Termux USB provider are now native-Termux validated on Samsung A17 / Android 16; byte-stream and upload behavior remain unvalidated.
+- The Termux USB provider now also exposes a bounded `acl transport probe-fd`
+  / `probe-fd-helper` stream-diagnostics path that records `TERMUX_USB_FD`
+  evidence without claiming a usable byte stream.
 - USB flashing is still unimplemented and must not be claimed as complete.
 
 Repository cleanup:
@@ -84,7 +87,7 @@ Repository cleanup:
 - Android USB host access has been demonstrated on the same ESP32-S3 hardware by third-party apps, so the remaining work is transport integration rather than basic hardware discovery.
 - Termux USB enumeration and permission flow are functional, but acquisition timing still needs root-cause analysis.
 - The ACL transport manager now exists as a capability-based selector for native serial, Android USB fd, PTY, RFC2217, and future transports.
-- The Termux USB transport provider now exists as a diagnostic-only implementation with discovery, permission, session, and endpoint-export contracts, plus `arduino-cli acl transport list|diagnose|acquire` CLI surfaces.
+- The Termux USB transport provider now exists as a diagnostic-only implementation with discovery, permission, session, endpoint-export, and bounded fd-probe contracts, plus `arduino-cli acl transport list|diagnose|acquire|probe-fd` CLI surfaces.
 - The ACL firmware package foundation now exists, including the build manifest, flash plan, firmware package wrapper, and binary validator.
 - The firmware package now also emits `analysis.json` and `README_FLASHING.txt`, and the ACL compile path uses metadata-first bootloader detection with an app-only fallback warning when the bootloader artifacts are incomplete.
 - The ACL compatibility layer now exists as a rule-based decision layer for runtime, library, firmware, and transport compatibility.
@@ -118,6 +121,8 @@ Repository cleanup:
 - Implement the first real transport provider runtime after the contract layer is proven stable.
 - Validate the Termux USB transport provider on native Termux and confirm the exact discovery, permission, and file-descriptor handoff behavior on-device.
 - Probe `TERMUX_USB_FD` handoff and build the byte-stream bridge foundation for the Termux USB provider.
+- Validate the `acl transport probe-fd` surface on native Termux and only then
+  consider byte-stream bridge work.
 - Finish the Android preflight and dry-run reporting surfaces so they can be consumed by future UI workspaces.
 - Keep the development workflow aligned with the two-environment model: native Termux as the source of truth, Ubuntu/proot as a tooling environment.
 - Polish the ACL CLI diagnostic surfaces and wire them into future workspace UI layers.
@@ -142,6 +147,8 @@ Repository cleanup:
 - Native Android upload/flash architecture is not yet implemented end-to-end; it still needs a reusable USB host and serial bridge before upload is marked complete.
 - The cause of the intermittent `termux-usb` acquisition/opening failures remains unknown.
 - Termux USB discovery and permission acquisition are now validated on Samsung A17 / Android 16, but `TERMUX_USB_FD` handoff remains unproven.
+- The bounded TERMUX_USB_FD probe exists in code and tests, but native Termux
+  validation of the probe itself is still pending.
 - Successful proot execution does not prove Android-native compatibility.
 - Firmware upload on real hardware has not yet been demonstrated.
 - The Android USB transport bridge is not yet implemented, so end-to-end upload remains unproven.

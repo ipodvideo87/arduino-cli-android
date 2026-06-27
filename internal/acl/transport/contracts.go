@@ -423,28 +423,148 @@ type EndpointExportSession interface {
 	ExportEndpoint() (EndpointExport, error)
 }
 
+type StreamObservationState string
+
+const (
+	StreamObservationUnknown      StreamObservationState = "unknown"
+	StreamObservationUnavailable  StreamObservationState = "unavailable"
+	StreamObservationUnsupported  StreamObservationState = "unsupported"
+	StreamObservationObserved     StreamObservationState = "observed"
+	StreamObservationExperimental StreamObservationState = "experimental"
+	StreamObservationPassed       StreamObservationState = "passed"
+	StreamObservationFailed       StreamObservationState = "failed"
+)
+
+type TransportStreamCapabilities struct {
+	Read         bool `json:"read,omitempty"`
+	Write        bool `json:"write,omitempty"`
+	Close        bool `json:"close,omitempty"`
+	EOF          bool `json:"eof,omitempty"`
+	Disconnect   bool `json:"disconnect,omitempty"`
+	Experimental bool `json:"experimental,omitempty"`
+}
+
+type TransportStream interface {
+	io.ReadWriteCloser
+	Capabilities() TransportStreamCapabilities
+	Diagnostics() TransportStreamDiagnosticsReport
+}
+
+type StreamProbeRequest struct {
+	Selection            SelectionRequest  `json:"selection,omitempty"`
+	Device               DiscoveredDevice  `json:"device,omitempty"`
+	Permission           PermissionResult  `json:"permission,omitempty"`
+	HelperCommand        string            `json:"helper_command,omitempty"`
+	ExpectedCapabilities []Capability      `json:"expected_capabilities,omitempty"`
+	Metadata             map[string]string `json:"metadata,omitempty"`
+}
+
+type TransportStreamDiagnosticsReport struct {
+	SchemaVersion   string                 `json:"schema_version,omitempty"`
+	Status          diagnostics.Status     `json:"status,omitempty"`
+	Provider        string                 `json:"provider,omitempty"`
+	ProviderKind    Kind                   `json:"provider_kind,omitempty"`
+	Device          DiscoveredDevice       `json:"device,omitempty"`
+	FDEnvPresent    bool                   `json:"fd_env_present,omitempty"`
+	FDEnvValue      string                 `json:"fd_env_value,omitempty"`
+	FDObserved      bool                   `json:"fd_observed,omitempty"`
+	FDValid         bool                   `json:"fd_valid,omitempty"`
+	FDInspectable   bool                   `json:"fd_inspectable,omitempty"`
+	StreamSupported bool                   `json:"stream_supported,omitempty"`
+	StreamProven    bool                   `json:"stream_proven,omitempty"`
+	ReadState       StreamObservationState `json:"read_state,omitempty"`
+	WriteState      StreamObservationState `json:"write_state,omitempty"`
+	CloseState      StreamObservationState `json:"close_state,omitempty"`
+	EOFState        StreamObservationState `json:"eof_state,omitempty"`
+	DisconnectState StreamObservationState `json:"disconnect_state,omitempty"`
+	Warnings        []string               `json:"warnings,omitempty"`
+	Limitations     []string               `json:"limitations,omitempty"`
+	Traces          []CommandTrace         `json:"traces,omitempty"`
+	Beginner        string                 `json:"beginner_summary,omitempty"`
+	Professional    []string               `json:"professional_details,omitempty"`
+	NextStep        string                 `json:"next_step,omitempty"`
+	Metadata        map[string]string      `json:"metadata,omitempty"`
+}
+
+func (r TransportStreamDiagnosticsReport) BeginnerSummary() string {
+	if strings.TrimSpace(r.Beginner) != "" {
+		return r.Beginner
+	}
+	switch r.Status {
+	case diagnostics.StatusPassed:
+		return "stream probe completed"
+	case diagnostics.StatusWarning:
+		return "stream probe completed with warnings"
+	case diagnostics.StatusFailed:
+		return "stream probe failed"
+	case diagnostics.StatusSkipped:
+		return "stream probe skipped"
+	default:
+		return "stream probe pending"
+	}
+}
+
+func (r TransportStreamDiagnosticsReport) ProfessionalDetails() []string {
+	details := append([]string(nil), r.Professional...)
+	if r.Provider != "" {
+		details = append(details, "provider: "+r.Provider)
+	}
+	if r.ProviderKind != "" {
+		details = append(details, "provider kind: "+string(r.ProviderKind))
+	}
+	if r.FDEnvPresent {
+		details = append(details, "TERMUX_USB_FD present")
+	}
+	if r.FDObserved {
+		details = append(details, "TERMUX_USB_FD observed")
+	}
+	if r.FDValid {
+		details = append(details, "TERMUX_USB_FD valid")
+	}
+	if r.FDInspectable {
+		details = append(details, "TERMUX_USB_FD inspectable")
+	}
+	if len(r.Warnings) > 0 {
+		details = append(details, "warnings: "+strings.Join(r.Warnings, "; "))
+	}
+	if len(r.Limitations) > 0 {
+		details = append(details, "limitations: "+strings.Join(r.Limitations, "; "))
+	}
+	if r.NextStep != "" {
+		details = append(details, "next step: "+r.NextStep)
+	}
+	return details
+}
+
+type StreamProber interface {
+	Probe(context.Context, StreamProbeRequest) (TransportStreamDiagnosticsReport, error)
+}
+
 type TransportDiagnosticsReport struct {
-	SchemaVersion    string                `json:"schema_version,omitempty"`
-	Status           diagnostics.Status    `json:"status,omitempty"`
-	Provider         string                `json:"provider,omitempty"`
-	ProviderKind     Kind                  `json:"provider_kind,omitempty"`
-	Selected         TransportDescriptor   `json:"selected,omitempty"`
-	Alternatives     []TransportDescriptor `json:"alternatives,omitempty"`
-	Device           DiscoveredDevice      `json:"device,omitempty"`
-	Devices          []DiscoveredDevice    `json:"devices,omitempty"`
-	DiscoveryStatus  diagnostics.Status    `json:"discovery_status,omitempty"`
-	PermissionStatus diagnostics.Status    `json:"permission_status,omitempty"`
-	ConnectionStatus diagnostics.Status    `json:"connection_status,omitempty"`
-	SelectedEndpoint EndpointExport        `json:"selected_endpoint,omitempty"`
-	Interfaces       []InterfaceSummary    `json:"interfaces,omitempty"`
-	Endpoints        []EndpointSummary     `json:"endpoints,omitempty"`
-	Warnings         []string              `json:"warnings,omitempty"`
-	Limitations      []string              `json:"limitations,omitempty"`
-	Traces           []CommandTrace        `json:"traces,omitempty"`
-	Beginner         string                `json:"beginner_summary,omitempty"`
-	Professional     []string              `json:"professional_details,omitempty"`
-	Fields           map[string]string     `json:"fields,omitempty"`
-	Metadata         map[string]string     `json:"metadata,omitempty"`
+	SchemaVersion    string                           `json:"schema_version,omitempty"`
+	Status           diagnostics.Status               `json:"status,omitempty"`
+	Provider         string                           `json:"provider,omitempty"`
+	ProviderKind     Kind                             `json:"provider_kind,omitempty"`
+	Selected         TransportDescriptor              `json:"selected,omitempty"`
+	Alternatives     []TransportDescriptor            `json:"alternatives,omitempty"`
+	Device           DiscoveredDevice                 `json:"device,omitempty"`
+	Devices          []DiscoveredDevice               `json:"devices,omitempty"`
+	DiscoveryStatus  diagnostics.Status               `json:"discovery_status,omitempty"`
+	PermissionStatus diagnostics.Status               `json:"permission_status,omitempty"`
+	ConnectionStatus diagnostics.Status               `json:"connection_status,omitempty"`
+	SelectedEndpoint EndpointExport                   `json:"selected_endpoint,omitempty"`
+	StreamProbe      TransportStreamDiagnosticsReport `json:"stream_probe,omitempty"`
+	StreamStatus     diagnostics.Status               `json:"stream_status,omitempty"`
+	NextStep         string                           `json:"next_step,omitempty"`
+	Interfaces       []InterfaceSummary               `json:"interfaces,omitempty"`
+	Endpoints        []EndpointSummary                `json:"endpoints,omitempty"`
+	Warnings         []string                         `json:"warnings,omitempty"`
+	Limitations      []string                         `json:"limitations,omitempty"`
+	Traces           []CommandTrace                   `json:"traces,omitempty"`
+	Beginner         string                           `json:"beginner_summary,omitempty"`
+	Professional     []string                         `json:"professional_details,omitempty"`
+	Fields           map[string]string                `json:"fields,omitempty"`
+	Metadata         map[string]string                `json:"metadata,omitempty"`
 }
 
 func (r TransportDiagnosticsReport) BeginnerSummary() string {
@@ -490,6 +610,15 @@ func (r TransportDiagnosticsReport) ProfessionalDetails() []string {
 	}
 	if len(r.Limitations) > 0 {
 		details = append(details, "limitations: "+strings.Join(r.Limitations, "; "))
+	}
+	if r.StreamStatus != "" {
+		details = append(details, "stream status: "+string(r.StreamStatus))
+	}
+	if r.StreamProbe.Status != "" || strings.TrimSpace(r.StreamProbe.Beginner) != "" {
+		details = append(details, "stream probe: "+r.StreamProbe.BeginnerSummary())
+	}
+	if r.NextStep != "" {
+		details = append(details, "next step: "+r.NextStep)
 	}
 	return details
 }

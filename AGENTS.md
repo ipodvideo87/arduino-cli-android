@@ -53,9 +53,9 @@ Native Termux validation always takes priority over container or desktop validat
   proven impossible.
 - Treat Android USB work as a generic transport problem. Do not hardcode VID/PID, interface numbers, baud rates, or board-specific control sequences unless the evidence shows there is no generic path.
 - Keep Arduino CLI unaware of Android internals. ACL owns USB discovery, permission acquisition, bridge selection, diagnostics, and PTY export.
-- Use the `arduino-cli acl transport list|diagnose|acquire` commands as the
-  safe diagnostic surface for Termux USB work. Do not claim Android USB success
-  unless it has been validated on native Termux.
+- Use the `arduino-cli acl transport list|diagnose|acquire|probe-fd` commands as
+  the safe diagnostic surface for Termux USB work. Do not claim Android USB
+  success unless it has been validated on native Termux.
 - The Android post-install pipeline should be shared and automatic: extract, patch or repair, validate, register, and self-test. Platform and tool installers should call it; library installs should opt in only when they contain executable payloads.
 - Treat compatibility as a first-class layer. Prefer compatible library selection over source patching, record compatibility decisions in build and install reports, and surface beginner-friendly and professional detail separately.
 - Successful compiles should emit a first-class firmware package and install flows should pass through the shared Android patch pipeline, but USB flashing remains a separate milestone until proven on-device.

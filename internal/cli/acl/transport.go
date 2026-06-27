@@ -16,6 +16,7 @@ type transportProvider interface {
 	transport.PermissionRequester
 	transport.DiagnosticsReporter
 	transport.SessionOpener
+	transport.StreamProber
 }
 
 var newTransportProvider = func() transportProvider {
@@ -47,6 +48,8 @@ func newTransportCommand() *cobra.Command {
 	cmd.AddCommand(newTransportListCommand())
 	cmd.AddCommand(newTransportDiagnoseCommand())
 	cmd.AddCommand(newTransportAcquireCommand())
+	cmd.AddCommand(newTransportProbeFDCommand())
+	cmd.AddCommand(newTransportProbeFDHelperCommand())
 	return cmd
 }
 
@@ -160,6 +163,51 @@ func newTransportAcquireCommand() *cobra.Command {
 	return cmd
 }
 
+func newTransportProbeFDCommand() *cobra.Command {
+	opts := transportCommandOptions{}
+	var devicePath string
+	cmd := &cobra.Command{
+		Use:   "probe-fd",
+		Short: "Probe TERMUX_USB_FD handoff for a Termux USB device",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			provider := newTransportProvider()
+			report, err := provider.Probe(cmd.Context(), transport.StreamProbeRequest{
+				Device: transport.DiscoveredDevice{
+					StableID:        devicePath,
+					DisplayName:     devicePath,
+					TransportFamily: transport.TransportFamilyUSBSerial,
+				},
+				Metadata: map[string]string{
+					"device_path": devicePath,
+				},
+			})
+			if err != nil && strings.TrimSpace(report.Beginner) == "" {
+				report.Beginner = err.Error()
+			}
+			if isJSON(cmd) {
+				return writeJSON(cmd, report)
+			}
+			return writeTransportStreamProbeReport(cmd, report, opts.details)
+		},
+	}
+	cmd.Flags().BoolVar(&opts.details, "details", false, "Show professional-level details")
+	cmd.Flags().StringVar(&devicePath, "device", "", "USB device path to probe")
+	_ = cmd.MarkFlagRequired("device")
+	return cmd
+}
+
+func newTransportProbeFDHelperCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:    "probe-fd-helper",
+		Hidden: true,
+		Short:  "Internal helper for TERMUX_USB_FD diagnostics",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return writeJSON(cmd, termuxusb.HelperStreamProbeReportFromEnv())
+		},
+	}
+	return cmd
+}
+
 type transportCommandOptions struct {
 	details bool
 }
@@ -237,6 +285,30 @@ func writeTransportAcquireReport(cmd *cobra.Command, report transportAcquireRepo
 			fmt.Fprintln(cmd.OutOrStdout(), detail)
 		}
 		for _, trace := range report.Diagnostics.Traces {
+			fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", trace.Command, strings.Join(trace.Args, " "))
+			if trace.Stdout != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "stdout: %s\n", trace.Stdout)
+			}
+			if trace.Stderr != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "stderr: %s\n", trace.Stderr)
+			}
+			if trace.Interpretation != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "interpretation: %s\n", trace.Interpretation)
+			}
+		}
+	}
+	return nil
+}
+
+func writeTransportStreamProbeReport(cmd *cobra.Command, report transport.TransportStreamDiagnosticsReport, details bool) error {
+	fmt.Fprintln(cmd.OutOrStdout(), "ACL Transport Probe FD")
+	fmt.Fprintln(cmd.OutOrStdout(), report.BeginnerSummary())
+	fmt.Fprintf(cmd.OutOrStdout(), "Status: %s\n", report.Status)
+	if details {
+		for _, detail := range report.ProfessionalDetails() {
+			fmt.Fprintln(cmd.OutOrStdout(), detail)
+		}
+		for _, trace := range report.Traces {
 			fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", trace.Command, strings.Join(trace.Args, " "))
 			if trace.Stdout != "" {
 				fmt.Fprintf(cmd.OutOrStdout(), "stdout: %s\n", trace.Stdout)

@@ -245,6 +245,15 @@ diagnostic commands:
 These commands are intended to surface discovery, permission, and endpoint
 metadata, not to perform upload or monitor operations.
 
+The Termux USB provider also exposes a bounded fd-handoff probe surface:
+
+- `arduino-cli acl transport probe-fd --device <path>`
+- `arduino-cli acl transport probe-fd-helper --json` (internal helper)
+
+That probe only reports `TERMUX_USB_FD` evidence and stream diagnostics. It
+does not claim a usable byte stream, upload capability, or serial monitor
+support.
+
 ## Stable Design Conclusion
 
 The architecture is stable if the system can answer these questions cleanly:
@@ -256,6 +265,8 @@ The architecture is stable if the system can answer these questions cleanly:
 - why was this transport selected?
 - what alternatives were available?
 - what happened when the session failed?
+- what fd-handoff evidence was observed?
+- what stream support remains unproven?
 
 That is the reusable foundation for every future hardware interaction in this
 project.

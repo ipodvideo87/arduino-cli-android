@@ -55,10 +55,18 @@ This file is a logbook of tested findings from the project history.
 - Environment: native Termux validation planning
 - Command/evidence: `docs/android/MILESTONE_TERMUX_USB_PROVIDER.md`
 - Result: a native-Termux checklist now exists for `acl transport list`,
-  `acl transport diagnose --details`, and `acl transport acquire --device`
-  validation flows
+  `acl transport diagnose --details`, `acl transport acquire --device`, and the
+  bounded `acl transport probe-fd` fd-handoff probe
 - Confidence: high
 - Notes: documentation only; no new device result is claimed by this entry
+
+- Environment: repository unit-test environment
+- Command/evidence: `go test ./internal/acl/transport/... ./internal/cli/acl/...`
+- Result: the Termux USB provider now includes a bounded fd-handoff probe and
+  the helper/CLI surface passes unit tests
+- Confidence: high
+- Notes: this validates the contract boundary only; native Termux validation of
+  the probe is still pending
 
 - Environment: native Termux on Samsung A17 / Android 16
 - Command/evidence: `./arduino-cli acl transport list`,

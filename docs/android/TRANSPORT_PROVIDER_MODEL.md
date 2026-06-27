@@ -40,6 +40,9 @@ Current implementation note:
 - the Termux USB provider is diagnostic-first and reports discovery, permission
   acquisition traces, and file-descriptor availability through the transport
   report model
+- the Termux USB provider also exposes a bounded `probe-fd` / `probe-fd-helper`
+  path that records `TERMUX_USB_FD` evidence without claiming a usable byte
+  stream
 - byte-stream access, upload, and monitor behavior remain future work
 
 ## Provider Categories

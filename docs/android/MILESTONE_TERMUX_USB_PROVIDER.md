@@ -22,6 +22,7 @@ Not validated by this milestone:
 - flashing
 - serial monitor
 - usable byte-stream endpoint
+- TERMUX_USB_FD handoff probe on native Termux
 
 ## Scope
 
@@ -31,6 +32,7 @@ Validate only:
 - permission acquisition
 - diagnostics
 - file-descriptor handoff evidence
+- bounded TERMUX_USB_FD probe evidence
 
 Do not use this checklist to claim:
 
@@ -166,6 +168,33 @@ Example interpretation:
   export
 - upload and monitor remain unimplemented
 
+### 8. TERMUX_USB_FD handoff probe
+
+The provider now also exposes a safe fd-handoff probe surface:
+
+```sh
+./arduino-cli acl transport probe-fd --device <device-path>
+./arduino-cli acl transport probe-fd --json --device <device-path>
+./arduino-cli acl transport probe-fd-helper --json
+```
+
+Expected behavior:
+
+- the probe reports whether `TERMUX_USB_FD` is present
+- the helper records whether the fd value is valid and inspectable
+- the report stays diagnostic-only
+- the report does not prove read/write stream support
+- the report does not prove upload, flashing, or serial monitor behavior
+
+Expected interpretation:
+
+- `fd_observed=true` means the helper saw a Termux fd handoff
+- `fd_valid=true` means the environment variable parsed as an integer fd
+- `fd_inspectable=true` means the helper could inspect the file descriptor
+- `stream_supported=false` means no usable byte-stream bridge is claimed yet
+- `read_state`, `write_state`, `close_state`, `eof_state`, and
+  `disconnect_state` remain bounded diagnostics until a real bridge exists
+
 ## Native-Termux Validation Result
 
 Observed on the Samsung A17 / Android 16 / native Termux environment:
@@ -196,6 +225,7 @@ Validated conclusion:
 Next recommended milestone:
 
 - `TERMUX_USB_FD` handoff probe / byte-stream bridge foundation
+- native-Termux validation of `acl transport probe-fd`
 
 ## What Success Means
 

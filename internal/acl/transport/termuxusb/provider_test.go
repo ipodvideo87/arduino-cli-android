@@ -191,3 +191,112 @@ func TestProviderDiagnosticsReportsUnsupportedEndpointWithoutFD(t *testing.T) {
 	require.False(t, report.SelectedEndpoint.Supported)
 	require.Contains(t, report.SelectedEndpoint.Reason, "TERMUX_USB_FD")
 }
+
+func TestProviderProbeReportsMissingFD(t *testing.T) {
+	require.NoError(t, os.Unsetenv("TERMUX_USB_FD"))
+
+	report := HelperStreamProbeReportFromEnv()
+	require.False(t, report.FDObserved)
+	require.Equal(t, transport.StreamObservationUnsupported, report.ReadState)
+	require.Contains(t, report.BeginnerSummary(), "TERMUX_USB_FD is not set")
+}
+
+func TestProviderProbeReportsInvalidFD(t *testing.T) {
+	oldFD := os.Getenv("TERMUX_USB_FD")
+	t.Cleanup(func() {
+		_ = os.Setenv("TERMUX_USB_FD", oldFD)
+	})
+	require.NoError(t, os.Setenv("TERMUX_USB_FD", "not-a-number"))
+
+	report := HelperStreamProbeReportFromEnv()
+	require.True(t, report.FDObserved)
+	require.False(t, report.FDValid)
+	require.Equal(t, transport.StreamObservationUnsupported, report.ReadState)
+	require.Contains(t, report.BeginnerSummary(), "invalid")
+}
+
+func TestProviderProbeParsesHelperReport(t *testing.T) {
+	oldFD := os.Getenv("TERMUX_USB_FD")
+	t.Cleanup(func() {
+		_ = os.Setenv("TERMUX_USB_FD", oldFD)
+	})
+	require.NoError(t, os.Setenv("TERMUX_USB_FD", "17"))
+
+	provider := NewProviderWithRunner(&scriptedRunner{
+		results: map[string]CommandResult{
+			defaultCommandName + " -r -e helper /dev/bus/usb/001/002": {
+				Stdout:   `{"schema_version":"1","status":"warning","provider":"termuxusb","provider_kind":"android-usb-fd","fd_env_present":true,"fd_observed":true,"fd_valid":true,"fd_inspectable":true,"stream_supported":false,"stream_proven":false,"read_state":"unsupported","write_state":"unsupported","close_state":"unsupported","eof_state":"unsupported","disconnect_state":"unsupported","beginner_summary":"TERMUX_USB_FD observed; stream support remains experimental","professional_details":["fd handoff observed"],"next_step":"add a bounded byte-stream bridge or transport stream adapter"}`,
+				ExitCode: 0,
+			},
+		},
+	})
+
+	report, err := provider.Probe(context.Background(), transport.StreamProbeRequest{
+		Device: transport.DiscoveredDevice{
+			StableID: "/dev/bus/usb/001/002",
+		},
+		HelperCommand: "helper",
+	})
+	require.NoError(t, err)
+	require.True(t, report.FDObserved)
+	require.True(t, report.FDValid)
+	require.True(t, report.FDInspectable)
+	require.Equal(t, transport.StreamObservationUnsupported, report.ReadState)
+	require.Contains(t, report.BeginnerSummary(), "TERMUX_USB_FD observed")
+	require.Contains(t, report.ProfessionalDetails(), "fd handoff observed")
+}
+
+func TestProviderProbeHandlesMalformedHelperOutput(t *testing.T) {
+	oldFD := os.Getenv("TERMUX_USB_FD")
+	t.Cleanup(func() {
+		_ = os.Setenv("TERMUX_USB_FD", oldFD)
+	})
+	require.NoError(t, os.Setenv("TERMUX_USB_FD", "17"))
+
+	provider := NewProviderWithRunner(&scriptedRunner{
+		results: map[string]CommandResult{
+			defaultCommandName + " -r -e helper /dev/bus/usb/001/002": {
+				Stdout:   "not-json",
+				ExitCode: 0,
+			},
+		},
+	})
+
+	report, err := provider.Probe(context.Background(), transport.StreamProbeRequest{
+		Device: transport.DiscoveredDevice{
+			StableID: "/dev/bus/usb/001/002",
+		},
+		HelperCommand: "helper",
+	})
+	require.NoError(t, err)
+	require.Equal(t, diagnostics.StatusFailed, report.Status)
+	require.Contains(t, report.BeginnerSummary(), "could not be parsed")
+}
+
+func TestProviderProbeHandlesHelperFailure(t *testing.T) {
+	oldFD := os.Getenv("TERMUX_USB_FD")
+	t.Cleanup(func() {
+		_ = os.Setenv("TERMUX_USB_FD", oldFD)
+	})
+	require.NoError(t, os.Setenv("TERMUX_USB_FD", "17"))
+
+	provider := NewProviderWithRunner(&scriptedRunner{
+		results: map[string]CommandResult{
+			defaultCommandName + " -r -e helper /dev/bus/usb/001/002": {
+				Stderr:   "permission denied",
+				ExitCode: 1,
+				Err:      errors.New("exit status 1"),
+			},
+		},
+	})
+
+	report, err := provider.Probe(context.Background(), transport.StreamProbeRequest{
+		Device: transport.DiscoveredDevice{
+			StableID: "/dev/bus/usb/001/002",
+		},
+		HelperCommand: "helper",
+	})
+	require.NoError(t, err)
+	require.Contains(t, report.Warnings, "exit status 1")
+	require.Contains(t, strings.Join(report.ProfessionalDetails(), " "), "permission denied")
+}
