@@ -49,6 +49,11 @@ Use the lightest validation level that can answer the question:
 - native Termux for Android behavior
 - real hardware for upload, flash, and runtime claims
 
+When native Termux evidence is required, the evidence plan should already be
+written as a Native Validation Package in the development workflow. That
+package should order commands from safest to most invasive and define how each
+result changes the next step.
+
 ### Compare approaches
 
 Compare only approaches that the evidence and architecture make plausible.
@@ -96,3 +101,7 @@ Close the task only when the repository can answer:
 - what remains uncertain
 - what changed in the docs
 - what future work this enables or blocks
+
+For native validation tasks, close the task only after the Native Validation
+Package completion criteria are satisfied or explicitly narrowed by the
+observed evidence.

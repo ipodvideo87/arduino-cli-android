@@ -56,6 +56,32 @@ Before working, write down the preview:
 - documentation impact
 - expected risks
 
+### Native Validation Package
+
+If native Android/Termux validation is required, expand the preview into a
+Native Validation Package before running any device commands. This is the
+canonical pre-execution plan for native validation work.
+
+The package must answer:
+
+- the engineering question being answered
+- why native validation is required
+- exactly what evidence is needed from the device or from the user
+- the exact commands to run, ordered from safest to most invasive
+- what each command is expected to prove
+- the expected successful outcome for each command
+- the expected failure outcome for each command
+- the technical interpretation of each possible result
+- how each outcome changes confidence
+- how each outcome changes validation level
+- how each outcome affects architecture
+- the remaining uncertainty after each outcome
+- the decision matrix for the next milestone
+- the exact output to paste back
+- the completion criteria for honest milestone closeout
+
+Do not start native validation until this package exists.
+
 If the task is architecture-heavy, validation-heavy, or spans subsystems, do the
 architecture review before implementation.
 
@@ -96,6 +122,10 @@ Use the lightest validation level that can answer the question:
 - host validation for local logic
 - native Termux for Android behavior
 - real hardware for upload, flash, and runtime claims
+
+For native validation work, execute the commands in the Native Validation
+Package order and do not add extra device tests unless the evidence changes the
+decision.
 
 Do not claim a higher validation level than the evidence supports.
 
@@ -142,6 +172,10 @@ Every completed task should answer:
 - Does `ROADMAP.md` require updating?
 - Was technical debt introduced?
 - Was architecture affected?
+
+For native validation tasks, the review should also confirm that the Native
+Validation Package evidence, outcomes, and decision matrix were captured in the
+appropriate canonical artifacts.
 
 If any answer is still no, the task is not closed.
 

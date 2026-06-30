@@ -57,6 +57,12 @@ Where a provider resolves or narrows a meaningful engineering question, record
 that outcome in the decision log or uncertainty register so the evidence is not
 lost after the test run ends.
 
+Native Termux validation requests should be written as a Native Validation
+Package before device execution. The package belongs in the development
+workflow and should justify why native validation is required, specify the
+minimum safe command sequence, and define how each result changes confidence,
+validation level, architecture, and the next milestone.
+
 ## Rules
 
 - Emulated ARM64 or QEMU smoke tests are useful preflight checks only.
