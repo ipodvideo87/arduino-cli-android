@@ -40,8 +40,9 @@
 
 - Finish full-flash bootloader package validation on native Termux
 - Add emulated ARM64 / Termux-like smoke tests
-- Validate the native Termux transport stream boundary
+- Validate the diagnostic-only USB topology bridge foundation on native Termux
 - Build a generic Android USB transport bridge
+- Validate the native Termux transport stream boundary
 - Validate the Termux USB provider and file-descriptor handoff path on native Termux
 - Validate the TERMUX_USB_FD probe surface on native Termux
 - Validate the transport stream foundation on native Termux

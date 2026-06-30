@@ -3,6 +3,7 @@ package termuxusb
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -173,11 +174,93 @@ func TestProviderDiagnosticsReportsTracesAndEndpointAvailability(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, diagnostics.StatusPassed, report.Status)
-	require.Len(t, report.Traces, 1)
+	require.Equal(t, diagnostics.StatusWarning, report.Status)
+	require.Len(t, report.Traces, 2)
 	require.Equal(t, transport.EndpointExportFileDescriptor, report.SelectedEndpoint.Kind)
 	require.Equal(t, int(fdFile.Fd()), report.SelectedEndpoint.FileDescriptor)
 	require.Equal(t, "/dev/bus/usb/001/002", report.Device.StableID)
+}
+
+func TestHelperUSBTopologyReportUsesInspector(t *testing.T) {
+	oldInspector := inspectUSBTopology
+	inspectUSBTopology = func(fd int, args []string) (transport.DiscoveredDevice, error) {
+		require.NotZero(t, fd)
+		require.Contains(t, strings.Join(args, " "), "/dev/bus/usb/001/002")
+		return transport.DiscoveredDevice{
+			StableID:        "/dev/bus/usb/001/002",
+			DisplayName:     "/dev/bus/usb/001/002",
+			TransportFamily: transport.TransportFamilyUSBSerial,
+			VID:             0x1234,
+			PID:             0x5678,
+			Manufacturer:    "Acme",
+			Product:         "Widget",
+			SerialNumber:    "SN123",
+			Interfaces: []transport.InterfaceSummary{{
+				Number:      2,
+				Alternate:   0,
+				Class:       "vendor-specific",
+				Subclass:    "0xff",
+				Protocol:    "0x01",
+				Description: "CDC function",
+				Endpoints: []transport.EndpointSummary{{
+					Address:       0x81,
+					Direction:     "in",
+					Type:          "bulk",
+					MaxPacketSize: 64,
+					Usage:         "bulk",
+				}},
+			}},
+			Metadata: map[string]string{
+				"claim_release_state": "not_attempted",
+				"bridge_state":        "experimental",
+			},
+		}, nil
+	}
+	t.Cleanup(func() { inspectUSBTopology = oldInspector })
+
+	fdFile, err := os.CreateTemp(t.TempDir(), "termux-usb-topology-*")
+	require.NoError(t, err)
+	oldFD := os.Getenv("TERMUX_USB_FD")
+	t.Cleanup(func() {
+		_ = os.Setenv("TERMUX_USB_FD", oldFD)
+		_ = fdFile.Close()
+	})
+	require.NoError(t, os.Setenv("TERMUX_USB_FD", strconv.FormatUint(uint64(fdFile.Fd()), 10)))
+
+	report := HelperUSBTopologyReportFromInvocation([]string{"/dev/bus/usb/001/002"})
+	require.Equal(t, diagnostics.StatusWarning, report.Status)
+	require.True(t, report.FDObserved)
+	require.True(t, report.FDInspectable)
+	require.Equal(t, "experimental", report.BridgeState)
+	require.Equal(t, "not_attempted", report.ClaimReleaseState)
+	require.Equal(t, uint16(0x1234), report.Device.VID)
+	require.Len(t, report.Device.Interfaces, 1)
+	require.Len(t, report.Device.Interfaces[0].Endpoints, 1)
+	require.Equal(t, "/dev/bus/usb/001/002", report.Device.StableID)
+}
+
+func TestProviderDiscoverEnrichesTopologyEvidence(t *testing.T) {
+	helperCommand := defaultUSBTopologyHelperCommand()
+	provider := NewProviderWithRunner(&scriptedRunner{
+		results: map[string]CommandResult{
+			defaultCommandName + " -l": {
+				Stdout:   "[\"/dev/bus/usb/001/002\"]",
+				ExitCode: 0,
+			},
+			fmt.Sprintf("%s -r -E -e %s /dev/bus/usb/001/002", defaultCommandName, helperCommand): {
+				Stdout:   `{"schema_version":"1","status":"warning","provider":"termuxusb","provider_kind":"android-usb-fd","bridge_state":"experimental","claim_release_state":"not_attempted","device":{"stable_id":"/dev/bus/usb/001/002","display_name":"/dev/bus/usb/001/002","transport_family":"usb-serial","vid":4660,"pid":22136,"manufacturer":"Acme","product":"Widget","serial_number":"SN123","interfaces":[{"number":2,"alternate":0,"class":"vendor-specific","subclass":"0xff","protocol":"0x01","description":"CDC function","endpoints":[{"address":129,"direction":"in","type":"bulk","max_packet_size":64,"usage":"bulk"}]}],"metadata":{"bridge_state":"experimental","claim_release_state":"not_attempted","topology_source":"libusb"}},"limitations":["no payload transfers were attempted","claim/release diagnostics were not attempted"],"beginner_summary":"TERMUX_USB_FD observed via environment; USB topology bridge remains experimental","professional_details":["TERMUX_USB_FD was observed and the USB topology could be inspected","descriptors, interfaces, and endpoints were collected without payload transfers"],"next_step":"use the topology evidence to decide whether a later transfer milestone is safe","metadata":{"device_path":"/dev/bus/usb/001/002","helper_args":"","bridge_state":"experimental","claim_release_state":"not_attempted","fd_source":"environment","handoff_mode":"env","topology_source":"libusb"}}`,
+				ExitCode: 0,
+			},
+		},
+	})
+
+	devices, err := provider.Discover(context.Background(), transport.DiscoveryRequest{})
+	require.NoError(t, err)
+	require.Len(t, devices, 1)
+	require.Equal(t, uint16(0x1234), devices[0].VID)
+	require.Len(t, devices[0].Interfaces, 1)
+	require.Len(t, devices[0].Interfaces[0].Endpoints, 1)
+	require.Equal(t, "experimental", devices[0].Metadata["bridge_state"])
 }
 
 func TestProviderDiagnosticsReportsUnsupportedEndpointWithoutFD(t *testing.T) {

@@ -563,6 +563,8 @@ func (p *Provider) Diagnostics(ctx context.Context, req transport.DiagnosticsReq
 		report.Interfaces = append([]transport.InterfaceSummary(nil), selectedDevice.Interfaces...)
 		report.Endpoints = flattenInterfaces(selectedDevice.Interfaces)
 		report.PermissionStatus = permissionStatus(selectedDevice.Permission)
+		report.Warnings = append(report.Warnings, selectedDevice.Warnings...)
+		report.Limitations = append(report.Limitations, selectedDevice.Limitations...)
 	} else if selectedPath != "" {
 		report.Device = transport.DiscoveredDevice{
 			Provider:        defaultProviderID,
@@ -597,13 +599,14 @@ func (p *Provider) Diagnostics(ctx context.Context, req transport.DiagnosticsReq
 			report.Status = diagnostics.StatusWarning
 		}
 	} else if selectedDevice != nil && selectedPath != "" {
-		report.Beginner = "Termux USB diagnostics completed for the selected device"
+		if len(report.Interfaces) > 0 || len(report.Endpoints) > 0 {
+			report.Beginner = "Termux USB diagnostics completed for the selected device with USB topology evidence"
+			report.NextStep = "use the USB topology evidence to decide whether claim/release diagnostics are safe"
+		} else {
+			report.Beginner = "Termux USB diagnostics completed for the selected device"
+		}
 		if report.Status != diagnostics.StatusFailed {
-			if export.Kind == transport.EndpointExportFileDescriptor {
-				report.Status = diagnostics.StatusPassed
-			} else {
-				report.Status = diagnostics.StatusWarning
-			}
+			report.Status = diagnostics.StatusWarning
 		}
 	} else if p.available() {
 		report.Beginner = "Termux USB diagnostics completed"
@@ -712,7 +715,36 @@ func (p *Provider) collectDiscovery(ctx context.Context, metadata map[string]str
 			status = diagnostics.StatusWarning
 		}
 	}
-	return devices, []transport.CommandTrace{trace}, status, nil
+
+	topologyHelper := strings.TrimSpace(metadata["topology_helper_command"])
+	if topologyHelper == "" {
+		topologyHelper = defaultUSBTopologyHelperCommand()
+	}
+	topologyTraces := make([]transport.CommandTrace, 0, len(devices))
+	for i := range devices {
+		topology, topoTrace, topologyErr := p.collectUSBTopology(ctx, devices[i].StableID, topologyHelper)
+		topologyTraces = append(topologyTraces, topoTrace)
+		devices[i] = mergeUSBTopologyDevice(devices[i], topology.Device)
+		devices[i].Warnings = appendUniqueStrings(devices[i].Warnings, topology.Warnings...)
+		devices[i].Limitations = appendUniqueStrings(devices[i].Limitations, topology.Limitations...)
+		if devices[i].Metadata == nil {
+			devices[i].Metadata = map[string]string{}
+		}
+		if topology.BridgeState != "" {
+			devices[i].Metadata["bridge_state"] = topology.BridgeState
+		}
+		if topology.ClaimReleaseState != "" {
+			devices[i].Metadata["claim_release_state"] = topology.ClaimReleaseState
+		}
+		if topologyErr != nil {
+			devices[i].Warnings = appendUniqueStrings(devices[i].Warnings, topologyErr.Error())
+			status = diagnostics.StatusWarning
+		}
+	}
+	if len(devices) > 0 {
+		status = diagnostics.StatusWarning
+	}
+	return devices, append([]transport.CommandTrace{trace}, topologyTraces...), status, nil
 }
 
 func (p *Provider) termuxAPIAvailable() bool {
@@ -759,6 +791,36 @@ func (p *Provider) endpointExport() transport.EndpointExport {
 			"TERMUX_USB_FD is set for the current process",
 		},
 	}
+}
+
+func (p *Provider) collectUSBTopology(ctx context.Context, devicePath, helperCommand string) (USBTopologyReport, transport.CommandTrace, error) {
+	args := []string{"-r", "-E", "-e", helperCommand, devicePath}
+	result := p.runner.Run(ctx, p.commandName(), args...)
+	trace := transport.CommandTrace{
+		Command:        p.commandName(),
+		Args:           append([]string(nil), args...),
+		Stdout:         result.Stdout,
+		Stderr:         result.Stderr,
+		ExitCode:       result.ExitCode,
+		Interpretation: "termux-usb USB topology bridge",
+	}
+	if result.Err != nil {
+		trace.Err = result.Err.Error()
+	}
+	report, parseErr := parseUSBTopologyReport(result.Stdout)
+	if parseErr != nil {
+		return USBTopologyReport{}, trace, parseErr
+	}
+	if report.Metadata == nil {
+		report.Metadata = map[string]string{}
+	}
+	report.Metadata["device_path"] = devicePath
+	report.Metadata["helper_command"] = helperCommand
+	report.Metadata["termux_usb_command"] = formatCommand(p.commandName(), args)
+	if result.Err != nil {
+		report.Warnings = append(report.Warnings, result.Err.Error())
+	}
+	return report, trace, nil
 }
 
 func defaultProbeHelperCommand() string {
@@ -1620,9 +1682,23 @@ func deviceSummaryDetails(devices []transport.DiscoveredDevice) []string {
 		if line == "" {
 			line = "usb device"
 		}
+		if device.VID != 0 || device.PID != 0 {
+			line = fmt.Sprintf("%s (vid=0x%04x pid=0x%04x)", line, device.VID, device.PID)
+		}
+		if len(device.Interfaces) > 0 {
+			line = fmt.Sprintf("%s interfaces=%d endpoints=%d", line, len(device.Interfaces), countEndpoints(device.Interfaces))
+		}
 		details = append(details, line)
 	}
 	return details
+}
+
+func countEndpoints(interfaces []transport.InterfaceSummary) int {
+	total := 0
+	for _, iface := range interfaces {
+		total += len(iface.Endpoints)
+	}
+	return total
 }
 
 func syntheticTrace(command string, args []string, interpretation string) transport.CommandTrace {

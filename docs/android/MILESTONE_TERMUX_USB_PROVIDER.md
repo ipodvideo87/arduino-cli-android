@@ -227,6 +227,23 @@ Root cause and fix:
 - the helper now accepts both env and argv fd sources so diagnostics can record
   either handoff mode clearly
 
+## USB Topology Bridge Foundation
+
+The Termux USB provider now has a diagnostic-only USB topology bridge
+foundation that uses the same `termux-usb -r -E -e <helper> <device>` handoff
+shape to inspect descriptors, interfaces, and endpoints without sending payload
+data.
+
+Expected behavior:
+
+- `./arduino-cli acl transport diagnose --details --device /dev/bus/usb/001/002`
+  should surface USB topology evidence when the helper can run under the native
+  Termux fd handoff
+- descriptor, interface, and endpoint evidence should remain diagnostic-only
+- claim/release should remain `not_attempted` until a later milestone proves it
+- `stream-status` and `stream-validate` should remain experimental and should
+  not overclaim byte-stream readiness
+
 ## Native-Termux Validation Result
 
 Observed on the Samsung A17 / Android 16 / native Termux environment:
@@ -281,9 +298,9 @@ Validated conclusion:
 
 Next recommended milestone:
 
-- bounded byte-stream bridge foundation
-- native validation of bounded `read_state` and `write_state` behavior without
-  claiming upload or serial bridge success
+- native validation of the USB topology bridge foundation
+- bounded byte-stream bridge foundation after the topology evidence has been
+  recorded and the bridge boundary is understood
 
 ## What Success Means
 
@@ -310,6 +327,8 @@ When running native Termux validation, record:
 - whether the device path changed
 - whether `TERMUX_USB_FD` was present
 - whether the endpoint export remained unsupported
+- whether the USB topology bridge reported descriptors, interfaces, and
+  endpoints without payload transfers
 
 Store the results in:
 

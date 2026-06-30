@@ -73,6 +73,10 @@ Current validation posture:
   raw write on the current fd can return `invalid argument`; the helper keeps
   read and write probes separate so the diagnostics do not overclaim generic
   byte-stream behavior.
+- The Termux USB provider now also exposes a diagnostic-only USB topology
+  bridge foundation that wraps the Termux fd through the helper handoff path
+  and reports descriptors, interfaces, and endpoints without sending payload
+  data or claiming claim/release readiness.
 - The transport stream foundation now exists as a reusable bounded stream
   wrapper and report model; the stream state is still experimental until native
   Termux byte-stream validation proves read/write behavior.
@@ -199,6 +203,7 @@ Repository cleanup:
 - Validate the ACL upload prepare-only executor in native Termux before wiring real transport execution, and keep the report surface aligned with the GUI contract.
 - Implement the first real transport provider runtime after the contract layer is proven stable.
 - Validate the Termux USB transport provider on native Termux and confirm the exact discovery, permission, and file-descriptor handoff behavior on-device.
+- Validate the diagnostic-only USB topology bridge foundation on native Termux.
 - Probe `TERMUX_USB_FD` handoff and build the byte-stream bridge foundation for the Termux USB provider.
 - Validate the transport stream foundation on native Termux before claiming any
   byte-stream support.

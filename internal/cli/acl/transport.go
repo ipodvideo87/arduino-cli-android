@@ -53,6 +53,7 @@ func newTransportCommand() *cobra.Command {
 	cmd.AddCommand(newTransportProbeFDCommand())
 	cmd.AddCommand(newTransportStreamStatusCommand())
 	cmd.AddCommand(newTransportStreamValidateCommand())
+	cmd.AddCommand(newTransportUSBTopologyHelperCommand())
 	cmd.AddCommand(newTransportProbeFDHelperCommand())
 	cmd.AddCommand(newTransportStreamValidateHelperCommand())
 	return cmd
@@ -283,6 +284,19 @@ func newTransportStreamValidateHelperCommand() *cobra.Command {
 	return cmd
 }
 
+func newTransportUSBTopologyHelperCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:    "usb-topology-helper",
+		Hidden: true,
+		Short:  "Internal helper for TERMUX_USB_FD USB topology diagnostics",
+		Args:   cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return writeJSON(cmd, termuxusb.HelperUSBTopologyReportFromInvocation(args))
+		},
+	}
+	return cmd
+}
+
 type transportCommandOptions struct {
 	details bool
 }
@@ -342,6 +356,7 @@ func writeTransportDiagnosticsReport(cmd *cobra.Command, report transport.Transp
 		for _, detail := range report.ProfessionalDetails() {
 			fmt.Fprintln(cmd.OutOrStdout(), detail)
 		}
+		writeTransportDeviceTopology(cmd, report)
 		for _, trace := range report.Traces {
 			fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", trace.Command, strings.Join(trace.Args, " "))
 			if trace.Stdout != "" {
@@ -356,6 +371,39 @@ func writeTransportDiagnosticsReport(cmd *cobra.Command, report transport.Transp
 		}
 	}
 	return nil
+}
+
+func writeTransportDeviceTopology(cmd *cobra.Command, report transport.TransportDiagnosticsReport) {
+	if report.Device.VID != 0 || report.Device.PID != 0 || strings.TrimSpace(report.Device.Manufacturer) != "" || strings.TrimSpace(report.Device.Product) != "" || strings.TrimSpace(report.Device.SerialNumber) != "" {
+		fmt.Fprintf(cmd.OutOrStdout(), "device descriptor: vid=0x%04x pid=0x%04x\n", report.Device.VID, report.Device.PID)
+		if strings.TrimSpace(report.Device.Manufacturer) != "" {
+			fmt.Fprintf(cmd.OutOrStdout(), "manufacturer: %s\n", report.Device.Manufacturer)
+		}
+		if strings.TrimSpace(report.Device.Product) != "" {
+			fmt.Fprintf(cmd.OutOrStdout(), "product: %s\n", report.Device.Product)
+		}
+		if strings.TrimSpace(report.Device.SerialNumber) != "" {
+			fmt.Fprintf(cmd.OutOrStdout(), "serial: %s\n", report.Device.SerialNumber)
+		}
+	}
+	for _, iface := range report.Interfaces {
+		fmt.Fprintf(cmd.OutOrStdout(), "interface %d alt %d: class=%s subclass=%s protocol=%s\n", iface.Number, iface.Alternate, iface.Class, iface.Subclass, iface.Protocol)
+		if strings.TrimSpace(iface.Description) != "" {
+			fmt.Fprintf(cmd.OutOrStdout(), "  description: %s\n", iface.Description)
+		}
+		for _, note := range iface.Notes {
+			fmt.Fprintf(cmd.OutOrStdout(), "  note: %s\n", note)
+		}
+		for _, endpoint := range iface.Endpoints {
+			fmt.Fprintf(cmd.OutOrStdout(), "  endpoint 0x%02x: direction=%s type=%s mps=%d interval=%d\n", endpoint.Address, endpoint.Direction, endpoint.Type, endpoint.MaxPacketSize, endpoint.Interval)
+			if strings.TrimSpace(endpoint.Usage) != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "    usage: %s\n", endpoint.Usage)
+			}
+			for _, note := range endpoint.Notes {
+				fmt.Fprintf(cmd.OutOrStdout(), "    note: %s\n", note)
+			}
+		}
+	}
 }
 
 func writeTransportAcquireReport(cmd *cobra.Command, report transportAcquireReport, details bool) error {
