@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/arduino/arduino-cli/internal/acl/diagnostics"
 	"github.com/arduino/arduino-cli/internal/acl/transport"
@@ -191,6 +192,167 @@ func (p *Provider) Open(ctx context.Context, req transport.OpenRequest) (transpo
 	return newSession(req.Device, permission, p.endpointExport()), nil
 }
 
+func (p *Provider) Validate(ctx context.Context, req transport.StreamValidationRequest) (transport.TransportStreamValidationReport, error) {
+	devicePath := requestDevicePath(req.Device, req.Metadata)
+	if strings.TrimSpace(devicePath) == "" {
+		return transport.TransportStreamValidationReport{
+			SchemaVersion: "1",
+			Status:        diagnostics.StatusFailed,
+			Provider:      defaultProviderID,
+			ProviderKind:  transport.KindAndroidUSBFD,
+			Beginner:      "stream validation requires a device path",
+			Limitations:   []string{"missing device path"},
+			NextStep:      "run stream-validate with a concrete USB device path",
+			Metadata:      map[string]string{},
+		}, errors.New("device path is required")
+	}
+
+	helperCommand := strings.TrimSpace(req.HelperCommand)
+	if helperCommand == "" {
+		helperCommand = defaultStreamValidateHelperCommand(req)
+	}
+	report := transport.TransportStreamValidationReport{
+		SchemaVersion: "1",
+		Status:        diagnostics.StatusWarning,
+		Provider:      defaultProviderID,
+		ProviderKind:  transport.KindAndroidUSBFD,
+		Device:        req.Device,
+		ValidateRead:  req.ValidateRead,
+		ValidateWrite: req.ValidateWrite,
+		Timeout:       req.Timeout,
+		HelperArgs:    []string{},
+		StreamProbe: transport.TransportStreamDiagnosticsReport{
+			SchemaVersion:   "1",
+			Status:          diagnostics.StatusWarning,
+			Provider:        defaultProviderID,
+			ProviderKind:    transport.KindAndroidUSBFD,
+			Device:          req.Device,
+			State:           transport.TransportStreamStateExperimental,
+			StateReason:     "experimental stream bridge",
+			ReadState:       transport.StreamObservationExperimental,
+			WriteState:      transport.StreamObservationExperimental,
+			CloseState:      transport.StreamObservationExperimental,
+			EOFState:        transport.StreamObservationExperimental,
+			DisconnectState: transport.StreamObservationExperimental,
+			Beginner:        "TERMUX_USB_FD stream validation is experimental",
+			Professional: []string{
+				"stream validation is diagnostics-only until the bounded byte-stream path is proven",
+			},
+			Limitations: []string{
+				"byte-stream support remains experimental",
+			},
+		},
+		StreamStatus: diagnostics.StatusWarning,
+		Beginner:     "TERMUX_USB_FD stream validation is experimental",
+		Professional: []string{
+			"stream validation is diagnostics-only until the bounded byte-stream path is proven",
+		},
+		Limitations: []string{
+			"byte-stream support remains experimental",
+		},
+		NextStep: "run the helper through termux-usb -r -E to inspect TERMUX_USB_FD and validate the stream boundary",
+		Metadata: map[string]string{},
+	}
+	report.Device.StableID = devicePath
+	if report.Device.DisplayName == "" {
+		report.Device.DisplayName = devicePath
+	}
+	report.Metadata["device_path"] = devicePath
+	report.Metadata["helper_command"] = helperCommand
+	report.Metadata["handoff_mode"] = "env"
+
+	if !p.available() {
+		report.Status = diagnostics.StatusFailed
+		report.StreamProbe.State = transport.TransportStreamStateUnavailable
+		report.StreamProbe.StateReason = "termux-usb unavailable"
+		report.StreamProbe.Beginner = "termux-usb is unavailable on this host"
+		report.Beginner = "termux-usb is unavailable on this host"
+		report.Limitations = append(report.Limitations, "termux-usb is not present")
+		report.NextStep = "install termux-usb and retry stream validation on native Termux"
+		return report, nil
+	}
+
+	args := []string{"-r", "-E", "-e", helperCommand, devicePath}
+	report.TermuxUSBCommand = formatCommand(p.commandName(), args)
+	report.Metadata["termux_usb_command"] = report.TermuxUSBCommand
+
+	result := p.runner.Run(ctx, p.commandName(), args...)
+	trace := transport.CommandTrace{
+		Command:        p.commandName(),
+		Args:           append([]string(nil), args...),
+		Stdout:         result.Stdout,
+		Stderr:         result.Stderr,
+		ExitCode:       result.ExitCode,
+		Interpretation: "termux-usb stream validation",
+	}
+	if result.Err != nil {
+		trace.Err = result.Err.Error()
+	}
+
+	parsed, parseErr := parseStreamValidationReport(result.Stdout)
+	if parseErr != nil {
+		report.Traces = []transport.CommandTrace{trace}
+		report.Warnings = append(report.Warnings, parseErr.Error())
+		if result.Err != nil {
+			report.Warnings = append(report.Warnings, result.Err.Error())
+		}
+		if trimmed := strings.TrimSpace(result.Stderr); trimmed != "" {
+			report.Professional = append(report.Professional, "helper stderr: "+trimmed)
+		}
+		if trimmed := strings.TrimSpace(result.Stdout); trimmed != "" {
+			report.Professional = append(report.Professional, "helper stdout: "+trimmed)
+		}
+		report.Status = diagnostics.StatusFailed
+		report.StreamProbe.State = transport.TransportStreamStateFailed
+		report.StreamProbe.StateReason = "helper JSON output could not be parsed"
+		if result.Err != nil || result.ExitCode != 0 {
+			report.Beginner = "termux-usb handoff failed before stream validation JSON was produced"
+			report.StreamProbe.Beginner = report.Beginner
+			report.Limitations = append(report.Limitations, "termux-usb did not hand off execution to the helper")
+			report.NextStep = "run stream-validate through termux-usb -r -E to receive TERMUX_USB_FD"
+			return report, nil
+		}
+		report.Beginner = "stream validation helper output could not be parsed"
+		report.StreamProbe.Beginner = report.Beginner
+		report.Limitations = append(report.Limitations, "helper JSON output was malformed")
+		report.NextStep = "fix the helper output parser before attempting bounded stream validation"
+		return report, nil
+	}
+
+	report = parsed
+	report.Provider = defaultProviderID
+	report.ProviderKind = transport.KindAndroidUSBFD
+	report.Device.StableID = devicePath
+	if report.Device.DisplayName == "" {
+		report.Device.DisplayName = devicePath
+	}
+	if report.Metadata == nil {
+		report.Metadata = map[string]string{}
+	}
+	report.Metadata["device_path"] = devicePath
+	report.Metadata["helper_command"] = helperCommand
+	report.Metadata["handoff_mode"] = "env"
+	report.TermuxUSBCommand = formatCommand(p.commandName(), args)
+	report.Metadata["termux_usb_command"] = report.TermuxUSBCommand
+	report.Traces = append([]transport.CommandTrace{trace}, report.Traces...)
+	if result.Err != nil {
+		report.Warnings = append(report.Warnings, result.Err.Error())
+	}
+	if result.ExitCode != 0 && report.Status == "" {
+		report.Status = diagnostics.StatusFailed
+	}
+	if report.StreamProbe.State == "" {
+		report.StreamProbe.State = transport.TransportStreamStateExperimental
+	}
+	if report.StreamProbe.StateReason == "" {
+		report.StreamProbe.StateReason = "experimental stream bridge"
+	}
+	if report.NextStep == "" {
+		report.NextStep = "run the helper through termux-usb -r -E to inspect TERMUX_USB_FD and validate the stream boundary"
+	}
+	return report, nil
+}
+
 func (p *Provider) Probe(ctx context.Context, req transport.StreamProbeRequest) (transport.TransportStreamDiagnosticsReport, error) {
 	devicePath := requestDevicePath(req.Device, req.Metadata)
 	if strings.TrimSpace(devicePath) == "" {
@@ -331,6 +493,18 @@ func (p *Provider) Probe(ctx context.Context, req transport.StreamProbeRequest) 
 	}
 	if report.NextStep == "" {
 		report.NextStep = "native byte-stream support remains experimental"
+	}
+	return report, nil
+}
+
+func parseStreamValidationReport(raw string) (transport.TransportStreamValidationReport, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return transport.TransportStreamValidationReport{}, errors.New("empty stream validation output")
+	}
+	var report transport.TransportStreamValidationReport
+	if err := json.Unmarshal([]byte(raw), &report); err != nil {
+		return transport.TransportStreamValidationReport{}, err
 	}
 	return report, nil
 }
@@ -591,6 +765,20 @@ func defaultProbeHelperCommand() string {
 	return fmt.Sprintf("%s acl transport probe-fd-helper --json", os.Args[0])
 }
 
+func defaultStreamValidateHelperCommand(req transport.StreamValidationRequest) string {
+	args := []string{"acl", "transport", "stream-validate-helper", "--json"}
+	if req.ValidateRead {
+		args = append(args, "--validate-read")
+	}
+	if req.ValidateWrite {
+		args = append(args, "--validate-write")
+	}
+	if req.Timeout > 0 {
+		args = append(args, "--timeout", req.Timeout.String())
+	}
+	return fmt.Sprintf("%s %s", os.Args[0], strings.Join(args, " "))
+}
+
 func formatCommand(name string, args []string) string {
 	return strings.TrimSpace(strings.Join(append([]string{name}, args...), " "))
 }
@@ -788,6 +976,305 @@ func HelperStreamProbeReportFromInvocation(args []string) transport.TransportStr
 		report.State = transport.TransportStreamStateUnavailable
 		report.Metadata["fd_source"] = report.FDSource
 		report.Metadata["handoff_mode"] = report.HandoffMode
+		return report
+	}
+}
+
+func HelperStreamValidationReportFromEnv(validateRead, validateWrite bool, timeout time.Duration) transport.TransportStreamValidationReport {
+	return HelperStreamValidationReportFromInvocation(nil, validateRead, validateWrite, timeout)
+}
+
+func HelperStreamValidationReportFromInvocation(args []string, validateRead, validateWrite bool, timeout time.Duration) transport.TransportStreamValidationReport {
+	rawEnv := strings.TrimSpace(os.Getenv("TERMUX_USB_FD"))
+	rawArg, argPresent, argMalformed := probeFDFromArgs(args)
+	report := transport.TransportStreamValidationReport{
+		SchemaVersion: "1",
+		Status:        diagnostics.StatusWarning,
+		Provider:      defaultProviderID,
+		ProviderKind:  transport.KindAndroidUSBFD,
+		Device:        transport.DiscoveredDevice{},
+		ValidateRead:  validateRead,
+		ValidateWrite: validateWrite,
+		Timeout:       timeout,
+		HelperArgs:    append([]string(nil), args...),
+		StreamProbe: transport.TransportStreamDiagnosticsReport{
+			SchemaVersion:   "1",
+			Status:          diagnostics.StatusWarning,
+			Provider:        defaultProviderID,
+			ProviderKind:    transport.KindAndroidUSBFD,
+			State:           transport.TransportStreamStateExperimental,
+			StateReason:     "experimental stream bridge",
+			ReadState:       transport.StreamObservationExperimental,
+			WriteState:      transport.StreamObservationExperimental,
+			CloseState:      transport.StreamObservationExperimental,
+			EOFState:        transport.StreamObservationExperimental,
+			DisconnectState: transport.StreamObservationExperimental,
+			Beginner:        "TERMUX_USB_FD stream validation is experimental",
+			Professional: []string{
+				"bounded stream validation is diagnostics-only until the live fd path is proven",
+			},
+			Limitations: []string{
+				"byte-stream support remains experimental",
+			},
+			Metadata: map[string]string{},
+		},
+		StreamStatus: diagnostics.StatusWarning,
+		Beginner:     "TERMUX_USB_FD stream validation is experimental",
+		Professional: []string{
+			"bounded stream validation is diagnostics-only until the live fd path is proven",
+		},
+		Limitations: []string{
+			"byte-stream support remains experimental",
+		},
+		NextStep: "run through termux-usb -r -E so the helper can inspect TERMUX_USB_FD",
+		Metadata: map[string]string{},
+	}
+	report.Metadata["helper_args"] = strings.Join(args, " ")
+	report.StreamProbe.Metadata["helper_args"] = strings.Join(args, " ")
+
+	switch {
+	case rawEnv != "":
+		report.StreamProbe.FDEnvPresent = true
+		report.StreamProbe.FDEnvValue = rawEnv
+		report.StreamProbe.FDObserved = true
+		report.StreamProbe.FDSource = "environment"
+		report.StreamProbe.HandoffMode = "env"
+		report.Metadata["fd_source"] = "environment"
+		report.Metadata["handoff_mode"] = "env"
+		fd, err := strconv.Atoi(rawEnv)
+		if err != nil {
+			report.Status = diagnostics.StatusFailed
+			report.StreamProbe.Status = diagnostics.StatusFailed
+			report.StreamProbe.State = transport.TransportStreamStateFailed
+			report.Beginner = "TERMUX_USB_FD is invalid"
+			report.StreamProbe.Beginner = report.Beginner
+			report.Warnings = []string{"TERMUX_USB_FD could not be parsed"}
+			report.Limitations = []string{"fd value is not a valid integer"}
+			report.Professional = []string{
+				"TERMUX_USB_FD could not be parsed",
+				"raw value: " + rawEnv,
+			}
+			report.NextStep = "fix the helper invocation before probing the stream"
+			return report
+		}
+		report.StreamProbe.FDValid = true
+		file := os.NewFile(uintptr(fd), "TERMUX_USB_FD")
+		if file == nil {
+			report.Status = diagnostics.StatusFailed
+			report.StreamProbe.Status = diagnostics.StatusFailed
+			report.StreamProbe.State = transport.TransportStreamStateFailed
+			report.Beginner = "TERMUX_USB_FD could not be wrapped as a file"
+			report.StreamProbe.Beginner = report.Beginner
+			report.Warnings = []string{"os.NewFile returned nil"}
+			report.Limitations = []string{"fd wrapping failed"}
+			report.NextStep = "debug the Termux fd handoff path"
+			return report
+		}
+		defer file.Close()
+		if _, err := file.Stat(); err != nil {
+			report.Status = diagnostics.StatusFailed
+			report.StreamProbe.Status = diagnostics.StatusFailed
+			report.StreamProbe.State = transport.TransportStreamStateFailed
+			report.Beginner = "TERMUX_USB_FD is not inspectable"
+			report.StreamProbe.Beginner = report.Beginner
+			report.Warnings = []string{err.Error()}
+			report.Limitations = []string{"fd metadata could not be inspected"}
+			report.Professional = []string{
+				"TERMUX_USB_FD was present but stat failed",
+				"fd: " + rawEnv,
+			}
+			report.NextStep = "verify the fd handoff path before attempting bounded stream validation"
+			return report
+		}
+		report.StreamProbe.FDInspectable = true
+		report.StreamProbe.State = transport.TransportStreamStateExperimental
+		report.StreamProbe.ReadState = transport.StreamObservationExperimental
+		report.StreamProbe.WriteState = transport.StreamObservationExperimental
+		report.StreamProbe.CloseState = transport.StreamObservationExperimental
+		report.StreamProbe.EOFState = transport.StreamObservationExperimental
+		report.StreamProbe.DisconnectState = transport.StreamObservationExperimental
+		report.StreamProbe.Beginner = "TERMUX_USB_FD observed via environment; stream validation remains experimental"
+		report.StreamProbe.Professional = []string{
+			"TERMUX_USB_FD was observed and inspected successfully",
+			"bounded read/write behavior is still being validated",
+		}
+		report.StreamProbe.Limitations = []string{
+			"no bounded read/write bridge has been proven on-device yet",
+			"the helper does not attempt destructive device I/O",
+		}
+		report.StreamProbe.NextStep = "add --validate-read and/or --validate-write to exercise the live stream"
+
+		streamReport := report.StreamProbe
+		streamReport.Status = diagnostics.StatusWarning
+		stream := transport.NewExperimentalTransportStream(file, streamReport)
+		if timeout > 0 {
+			if timeoutController, ok := stream.(transport.TransportStreamTimeoutController); ok {
+				_ = timeoutController.SetTimeouts(transport.TransportStreamTimeouts{Read: timeout, Write: timeout, Idle: timeout})
+			}
+		}
+		if validateRead {
+			buf := make([]byte, 1)
+			n, err := stream.Read(buf)
+			report.ReadBytes = int64(n)
+			if err != nil {
+				report.ReadError = err.Error()
+			}
+			if n > 0 && report.StreamProbe.ReadState == transport.StreamObservationExperimental {
+				report.StreamProbe.ReadState = transport.StreamObservationPassed
+			}
+			if err != nil {
+				report.StreamProbe.ReadState = transport.StreamObservationFailed
+				report.Warnings = append(report.Warnings, "read probe error: "+err.Error())
+			}
+		}
+		if validateWrite {
+			n, err := stream.Write([]byte{0})
+			report.WriteBytes = int64(n)
+			if err != nil {
+				report.WriteError = err.Error()
+			}
+			if n > 0 && report.StreamProbe.WriteState == transport.StreamObservationExperimental {
+				report.StreamProbe.WriteState = transport.StreamObservationPassed
+			}
+			if err != nil {
+				report.StreamProbe.WriteState = transport.StreamObservationFailed
+				report.Warnings = append(report.Warnings, "write probe error: "+err.Error())
+			}
+		}
+		_ = stream.Close()
+		finalStreamReport := stream.Diagnostics()
+		report.StreamProbe.State = finalStreamReport.State
+		report.StreamProbe.StateReason = finalStreamReport.StateReason
+		report.StreamProbe.CloseState = finalStreamReport.CloseState
+		report.StreamProbe.EOFState = finalStreamReport.EOFState
+		report.StreamProbe.DisconnectState = finalStreamReport.DisconnectState
+		report.StreamProbe.BytesRead = finalStreamReport.BytesRead
+		report.StreamProbe.BytesWritten = finalStreamReport.BytesWritten
+		report.StreamProbe.LastActivity = finalStreamReport.LastActivity
+		report.StreamProbe.CloseReason = finalStreamReport.CloseReason
+		report.StreamProbe.DisconnectReason = finalStreamReport.DisconnectReason
+		report.StreamProbe.Metadata = finalStreamReport.Metadata
+		report.StreamProbe.Traces = finalStreamReport.Traces
+		report.StreamStatus = report.StreamProbe.Status
+		report.Status = diagnostics.StatusWarning
+		report.Beginner = "TERMUX_USB_FD observed via environment; stream validation remains experimental"
+		if !validateRead && !validateWrite {
+			report.Professional = append(report.Professional, "no byte probes were requested")
+			report.NextStep = "add --validate-read and/or --validate-write to exercise the bounded stream"
+		} else {
+			report.Professional = append(report.Professional, "bounded byte probes completed")
+			if report.ReadError != "" || report.WriteError != "" {
+				report.NextStep = "inspect the probe error and compare it with native Termux evidence"
+			} else {
+				report.NextStep = "if native Termux matches these results, keep the stream state experimental until readiness is proven"
+			}
+		}
+		report.TermuxUSBCommand = ""
+		report.StreamProbe.TermuxUSBCommand = ""
+		return report
+	case argPresent && !argMalformed:
+		report.StreamProbe.FDObserved = true
+		report.StreamProbe.FDSource = "argument"
+		report.StreamProbe.HandoffMode = "argv"
+		report.Metadata["fd_source"] = "argument"
+		report.Metadata["handoff_mode"] = "argv"
+		fd, err := strconv.Atoi(rawArg)
+		if err != nil {
+			report.Status = diagnostics.StatusFailed
+			report.StreamProbe.Status = diagnostics.StatusFailed
+			report.StreamProbe.State = transport.TransportStreamStateFailed
+			report.Beginner = "fd argument is invalid"
+			report.StreamProbe.Beginner = report.Beginner
+			report.Warnings = []string{"file descriptor argument could not be parsed"}
+			report.Limitations = []string{"fd argument is not a valid integer"}
+			report.Professional = []string{
+				"fd argument could not be parsed",
+				"raw argument: " + rawArg,
+			}
+			report.NextStep = "fix the helper invocation before probing the stream"
+			return report
+		}
+		report.StreamProbe.FDValid = true
+		file := os.NewFile(uintptr(fd), "TERMUX_USB_FD")
+		if file == nil {
+			report.Status = diagnostics.StatusFailed
+			report.StreamProbe.Status = diagnostics.StatusFailed
+			report.StreamProbe.State = transport.TransportStreamStateFailed
+			report.Beginner = "fd argument could not be wrapped as a file"
+			report.StreamProbe.Beginner = report.Beginner
+			report.Warnings = []string{"os.NewFile returned nil"}
+			report.Limitations = []string{"fd wrapping failed"}
+			report.NextStep = "debug the Termux fd handoff path"
+			return report
+		}
+		defer file.Close()
+		if _, err := file.Stat(); err != nil {
+			report.Status = diagnostics.StatusFailed
+			report.StreamProbe.Status = diagnostics.StatusFailed
+			report.StreamProbe.State = transport.TransportStreamStateFailed
+			report.Beginner = "fd argument is not inspectable"
+			report.StreamProbe.Beginner = report.Beginner
+			report.Warnings = []string{err.Error()}
+			report.Limitations = []string{"fd metadata could not be inspected"}
+			report.Professional = []string{
+				"fd argument was present but stat failed",
+				"fd: " + rawArg,
+			}
+			report.NextStep = "verify the fd handoff path before attempting bounded stream validation"
+			return report
+		}
+		report.StreamProbe.FDInspectable = true
+		report.StreamProbe.State = transport.TransportStreamStateExperimental
+		report.StreamProbe.ReadState = transport.StreamObservationExperimental
+		report.StreamProbe.WriteState = transport.StreamObservationExperimental
+		report.StreamProbe.CloseState = transport.StreamObservationExperimental
+		report.StreamProbe.EOFState = transport.StreamObservationExperimental
+		report.StreamProbe.DisconnectState = transport.StreamObservationExperimental
+		report.StreamProbe.Beginner = "file descriptor observed via command-line argument; stream validation remains experimental"
+		report.StreamProbe.Professional = []string{
+			"fd argument was observed and inspected successfully",
+			"bounded read/write behavior is still being validated",
+		}
+		report.StreamProbe.Limitations = []string{
+			"no bounded read/write bridge has been proven on-device yet",
+			"the helper does not attempt destructive device I/O",
+		}
+		report.StreamProbe.NextStep = "add --validate-read and/or --validate-write to exercise the live stream"
+		return report
+	case argPresent && argMalformed:
+		report.StreamProbe.FDObserved = true
+		report.StreamProbe.FDSource = "argument"
+		report.StreamProbe.HandoffMode = "argv"
+		report.Metadata["fd_source"] = "argument"
+		report.Metadata["handoff_mode"] = "argv"
+		report.Status = diagnostics.StatusFailed
+		report.StreamProbe.Status = diagnostics.StatusFailed
+		report.StreamProbe.State = transport.TransportStreamStateFailed
+		report.Beginner = "fd argument is invalid"
+		report.StreamProbe.Beginner = report.Beginner
+		report.Warnings = []string{"file descriptor argument could not be parsed"}
+		report.Limitations = []string{"fd argument is not a valid integer"}
+		report.Professional = []string{
+			"fd argument could not be parsed",
+			"raw argument: " + rawArg,
+		}
+		report.NextStep = "fix the helper invocation before probing the stream"
+		return report
+	default:
+		report.Status = diagnostics.StatusFailed
+		report.StreamProbe.Status = diagnostics.StatusFailed
+		report.StreamProbe.State = transport.TransportStreamStateUnavailable
+		report.StreamProbe.StateReason = "TERMUX_USB_FD is not set"
+		report.Beginner = "TERMUX_USB_FD is not set; stream validation must run through termux-usb -r -E -e"
+		report.StreamProbe.Beginner = report.Beginner
+		report.Limitations = []string{"fd handoff is unavailable outside termux-usb -e"}
+		report.Professional = []string{
+			"the helper did not observe an fd handoff",
+			"run the helper via termux-usb -r -E to inspect TERMUX_USB_FD and validate the stream boundary",
+		}
+		report.NextStep = "run stream-validate through termux-usb -r -E -e so the helper receives TERMUX_USB_FD"
+		report.Metadata["fd_source"] = "none"
+		report.Metadata["handoff_mode"] = "env"
 		return report
 	}
 }

@@ -515,6 +515,18 @@ type StreamProbeRequest struct {
 	Metadata             map[string]string `json:"metadata,omitempty"`
 }
 
+type StreamValidationRequest struct {
+	Selection     SelectionRequest  `json:"selection,omitempty"`
+	Device        DiscoveredDevice  `json:"device,omitempty"`
+	Permission    PermissionResult  `json:"permission,omitempty"`
+	HelperCommand string            `json:"helper_command,omitempty"`
+	HandoffMode   string            `json:"handoff_mode,omitempty"`
+	ValidateRead  bool              `json:"validate_read,omitempty"`
+	ValidateWrite bool              `json:"validate_write,omitempty"`
+	Timeout       time.Duration     `json:"timeout,omitempty"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
+}
+
 type TransportStreamDiagnosticsReport struct {
 	SchemaVersion    string                  `json:"schema_version,omitempty"`
 	Status           diagnostics.Status      `json:"status,omitempty"`
@@ -552,6 +564,107 @@ type TransportStreamDiagnosticsReport struct {
 	Professional     []string                `json:"professional_details,omitempty"`
 	NextStep         string                  `json:"next_step,omitempty"`
 	Metadata         map[string]string       `json:"metadata,omitempty"`
+}
+
+type TransportStreamValidationReport struct {
+	SchemaVersion    string                           `json:"schema_version,omitempty"`
+	Status           diagnostics.Status               `json:"status,omitempty"`
+	Provider         string                           `json:"provider,omitempty"`
+	ProviderKind     Kind                             `json:"provider_kind,omitempty"`
+	Device           DiscoveredDevice                 `json:"device,omitempty"`
+	ValidateRead     bool                             `json:"validate_read,omitempty"`
+	ValidateWrite    bool                             `json:"validate_write,omitempty"`
+	Timeout          time.Duration                    `json:"timeout,omitempty"`
+	HelperArgs       []string                         `json:"helper_args,omitempty"`
+	TermuxUSBCommand string                           `json:"termux_usb_command,omitempty"`
+	StreamProbe      TransportStreamDiagnosticsReport `json:"stream_probe,omitempty"`
+	StreamStatus     diagnostics.Status               `json:"stream_status,omitempty"`
+	ReadBytes        int64                            `json:"read_bytes,omitempty"`
+	WriteBytes       int64                            `json:"write_bytes,omitempty"`
+	ReadError        string                           `json:"read_error,omitempty"`
+	WriteError       string                           `json:"write_error,omitempty"`
+	Warnings         []string                         `json:"warnings,omitempty"`
+	Limitations      []string                         `json:"limitations,omitempty"`
+	Traces           []CommandTrace                   `json:"traces,omitempty"`
+	Beginner         string                           `json:"beginner_summary,omitempty"`
+	Professional     []string                         `json:"professional_details,omitempty"`
+	NextStep         string                           `json:"next_step,omitempty"`
+	Metadata         map[string]string                `json:"metadata,omitempty"`
+}
+
+func (r TransportStreamValidationReport) BeginnerSummary() string {
+	if strings.TrimSpace(r.Beginner) != "" {
+		return r.Beginner
+	}
+	switch r.Status {
+	case diagnostics.StatusPassed:
+		return "stream validation completed"
+	case diagnostics.StatusWarning:
+		return "stream validation completed with warnings"
+	case diagnostics.StatusFailed:
+		return "stream validation failed"
+	case diagnostics.StatusSkipped:
+		return "stream validation skipped"
+	default:
+		return "stream validation pending"
+	}
+}
+
+func (r TransportStreamValidationReport) ProfessionalDetails() []string {
+	details := append([]string(nil), r.Professional...)
+	if r.Provider != "" {
+		details = append(details, "provider: "+r.Provider)
+	}
+	if r.ProviderKind != "" {
+		details = append(details, "provider kind: "+string(r.ProviderKind))
+	}
+	if r.ValidateRead {
+		details = append(details, "validate read: true")
+	}
+	if r.ValidateWrite {
+		details = append(details, "validate write: true")
+	}
+	if r.Timeout != 0 {
+		details = append(details, "timeout: "+r.Timeout.String())
+	}
+	if r.TermuxUSBCommand != "" {
+		details = append(details, "termux-usb command: "+r.TermuxUSBCommand)
+	}
+	if len(r.HelperArgs) > 0 {
+		details = append(details, "helper args: "+strings.Join(r.HelperArgs, " "))
+	}
+	if r.StreamProbe.HasContent() {
+		details = append(details, "stream probe: "+r.StreamProbe.BeginnerSummary())
+	}
+	if r.StreamProbe.State != "" {
+		details = append(details, "stream state: "+string(r.StreamProbe.State))
+	}
+	if r.StreamStatus != "" {
+		details = append(details, "stream status: "+string(r.StreamStatus))
+	}
+	if r.ReadBytes != 0 || r.WriteBytes != 0 {
+		details = append(details, fmt.Sprintf("bytes: read=%d written=%d", r.ReadBytes, r.WriteBytes))
+	}
+	if r.ReadError != "" {
+		details = append(details, "read error: "+r.ReadError)
+	}
+	if r.WriteError != "" {
+		details = append(details, "write error: "+r.WriteError)
+	}
+	if len(r.Warnings) > 0 {
+		details = append(details, "warnings: "+strings.Join(r.Warnings, "; "))
+	}
+	if len(r.Limitations) > 0 {
+		details = append(details, "limitations: "+strings.Join(r.Limitations, "; "))
+	}
+	if r.NextStep != "" {
+		details = append(details, "next step: "+r.NextStep)
+	}
+	return details
+}
+
+type StreamValidator interface {
+	Validate(context.Context, StreamValidationRequest) (TransportStreamValidationReport, error)
 }
 
 func (r TransportStreamDiagnosticsReport) HasContent() bool {

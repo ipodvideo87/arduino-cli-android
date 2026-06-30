@@ -5,12 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	acldiagnostics "github.com/arduino/arduino-cli/internal/acl/diagnostics"
 	aclengine "github.com/arduino/arduino-cli/internal/acl/engine"
@@ -698,6 +698,7 @@ func TestACLTransportStreamStatusCommandText(t *testing.T) {
 
 func TestACLTransportStreamValidateCommandJSON(t *testing.T) {
 	oldFactory := newTransportProvider
+	var captured transport.StreamValidationRequest
 	newTransportProvider = func() transportProvider {
 		return fakeCLITransportProvider{
 			desc: transport.TransportDescriptor{
@@ -706,8 +707,23 @@ func TestACLTransportStreamValidateCommandJSON(t *testing.T) {
 				Provider:  "termuxusb",
 				Available: true,
 			},
-			openFn: func(_ context.Context, _ transport.OpenRequest) (transport.TransportSession, error) {
-				return newTestStreamSession("abc"), nil
+			validateFn: func(_ context.Context, req transport.StreamValidationRequest) (transport.TransportStreamValidationReport, error) {
+				captured = req
+				return transport.TransportStreamValidationReport{
+					SchemaVersion:    "1",
+					Status:           acldiagnostics.StatusWarning,
+					Provider:         "termuxusb",
+					ProviderKind:     transport.KindAndroidUSBFD,
+					Device:           req.Device,
+					ValidateRead:     req.ValidateRead,
+					ValidateWrite:    req.ValidateWrite,
+					Timeout:          req.Timeout,
+					TermuxUSBCommand: "termux-usb -r -E -e ./arduino-cli acl transport stream-validate-helper --json --validate-read --validate-write --timeout 2s /dev/bus/usb/001/002",
+					Beginner:         "TERMUX_USB_FD stream validation is experimental",
+					Professional:     []string{"stream validation is diagnostics-only until the bounded byte-stream path is proven"},
+					Limitations:      []string{"byte-stream support remains experimental"},
+					Metadata:         map[string]string{"helper_command": "./arduino-cli acl transport stream-validate-helper --json --validate-read --validate-write --timeout 2s"},
+				}, nil
 			},
 		}
 	}
@@ -727,21 +743,22 @@ func TestACLTransportStreamValidateCommandJSON(t *testing.T) {
 
 	require.NoError(t, root.Execute())
 
-	var report transportStreamValidateReport
+	var report transport.TransportStreamValidationReport
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &report))
 	require.Equal(t, acldiagnostics.StatusWarning, report.Status)
 	require.True(t, report.ValidateRead)
 	require.True(t, report.ValidateWrite)
-	require.Equal(t, int64(1), report.ReadBytes)
-	require.Equal(t, int64(1), report.WriteBytes)
-	require.Equal(t, int64(1), report.Diagnostics.StreamProbe.BytesRead)
-	require.Equal(t, int64(1), report.Diagnostics.StreamProbe.BytesWritten)
-	require.Equal(t, transport.TransportStreamStateClosed, report.StreamState)
-	require.Equal(t, "closed by caller", report.CloseReason)
+	require.Equal(t, "/dev/bus/usb/001/002", captured.Device.StableID)
+	require.True(t, captured.ValidateRead)
+	require.True(t, captured.ValidateWrite)
+	require.Equal(t, 2*time.Second, captured.Timeout)
+	require.Contains(t, report.TermuxUSBCommand, "termux-usb -r -E -e")
+	require.Contains(t, report.TermuxUSBCommand, "stream-validate-helper")
 }
 
 func TestACLTransportStreamValidateCommandText(t *testing.T) {
 	oldFactory := newTransportProvider
+	var captured transport.StreamValidationRequest
 	newTransportProvider = func() transportProvider {
 		return fakeCLITransportProvider{
 			desc: transport.TransportDescriptor{
@@ -750,8 +767,19 @@ func TestACLTransportStreamValidateCommandText(t *testing.T) {
 				Provider:  "termuxusb",
 				Available: true,
 			},
-			openFn: func(_ context.Context, _ transport.OpenRequest) (transport.TransportSession, error) {
-				return newTestStreamSession("abc"), nil
+			validateFn: func(_ context.Context, req transport.StreamValidationRequest) (transport.TransportStreamValidationReport, error) {
+				captured = req
+				return transport.TransportStreamValidationReport{
+					SchemaVersion: "1",
+					Status:        acldiagnostics.StatusWarning,
+					Provider:      "termuxusb",
+					ProviderKind:  transport.KindAndroidUSBFD,
+					Device:        req.Device,
+					Beginner:      "TERMUX_USB_FD stream validation is experimental",
+					Professional:  []string{"stream validation is diagnostics-only until the bounded byte-stream path is proven"},
+					Limitations:   []string{"byte-stream support remains experimental"},
+					NextStep:      "run the helper through termux-usb -r -E to inspect TERMUX_USB_FD and validate the stream boundary",
+				}, nil
 			},
 		}
 	}
@@ -764,17 +792,16 @@ func TestACLTransportStreamValidateCommandText(t *testing.T) {
 	root.SetArgs([]string{
 		"acl", "transport", "stream-validate",
 		"--device", "/dev/bus/usb/001/002",
-		"--validate-read",
-		"--validate-write",
 	})
 
 	require.NoError(t, root.Execute())
 
 	output := buf.String()
 	require.Contains(t, output, "ACL Transport Stream Validate")
-	require.Contains(t, output, "Validate read: requested")
-	require.Contains(t, output, "Validate write: requested")
-	require.Contains(t, output, "Bytes: read=1 written=1")
+	require.Contains(t, output, "TERMUX_USB_FD stream validation is experimental")
+	require.NotContains(t, output, "Validate read: requested")
+	require.NotContains(t, output, "Validate write: requested")
+	require.Equal(t, "/dev/bus/usb/001/002", captured.Device.StableID)
 }
 
 func TestACLTransportProbeFDHelperCommandJSON(t *testing.T) {
@@ -830,7 +857,7 @@ type fakeCLITransportProvider struct {
 	permission transport.PermissionResult
 	devices    []transport.DiscoveredDevice
 	probe      transport.TransportStreamDiagnosticsReport
-	openFn     func(context.Context, transport.OpenRequest) (transport.TransportSession, error)
+	validateFn func(context.Context, transport.StreamValidationRequest) (transport.TransportStreamValidationReport, error)
 }
 
 func (f fakeCLITransportProvider) Descriptor() transport.TransportDescriptor { return f.desc }
@@ -846,11 +873,20 @@ func (f fakeCLITransportProvider) RequestPermission(context.Context, transport.P
 	return f.permission, nil
 }
 
-func (f fakeCLITransportProvider) Open(ctx context.Context, req transport.OpenRequest) (transport.TransportSession, error) {
-	if f.openFn != nil {
-		return f.openFn(ctx, req)
-	}
+func (f fakeCLITransportProvider) Open(context.Context, transport.OpenRequest) (transport.TransportSession, error) {
 	return nil, fmt.Errorf("open not implemented")
+}
+
+func (f fakeCLITransportProvider) Validate(ctx context.Context, req transport.StreamValidationRequest) (transport.TransportStreamValidationReport, error) {
+	if f.validateFn != nil {
+		return f.validateFn(ctx, req)
+	}
+	return transport.TransportStreamValidationReport{
+		SchemaVersion: "1",
+		Status:        acldiagnostics.StatusWarning,
+		Beginner:      "stream validation is unavailable",
+		Limitations:   []string{"validate not implemented in fake"},
+	}, nil
 }
 
 func (f fakeCLITransportProvider) Diagnostics(context.Context, transport.DiagnosticsRequest) (transport.TransportDiagnosticsReport, error) {
@@ -867,116 +903,6 @@ func (f fakeCLITransportProvider) Probe(context.Context, transport.StreamProbeRe
 		}, nil
 	}
 	return f.probe, nil
-}
-
-type testStreamSession struct {
-	stream transport.TransportStream
-}
-
-func newTestStreamSession(data string) transport.TransportSession {
-	return testStreamSession{
-		stream: &testTransportStream{
-			reader: strings.NewReader(data),
-			report: transport.TransportStreamDiagnosticsReport{
-				SchemaVersion: "1",
-				Status:        acldiagnostics.StatusWarning,
-				Provider:      "termuxusb",
-				ProviderKind:  transport.KindAndroidUSBFD,
-				State:         transport.TransportStreamStateExperimental,
-				Beginner:      "stream boundary fixture",
-			},
-		},
-	}
-}
-
-func (s testStreamSession) Close() error { return nil }
-
-func (s testStreamSession) Capabilities() transport.TransportCapabilities {
-	return transport.CapabilitiesFromList(
-		transport.CapabilityDiscovery,
-		transport.CapabilityPermission,
-		transport.CapabilityUSBHandle,
-		transport.CapabilityDescriptorDiscovery,
-		transport.CapabilityBulkTransfer,
-		transport.CapabilityInterruptTransfer,
-		transport.CapabilityControlTransfer,
-	)
-}
-
-func (s testStreamSession) Diagnostics() transport.TransportDiagnosticsReport {
-	report := transport.TransportDiagnosticsReport{
-		SchemaVersion:    "1",
-		Status:           acldiagnostics.StatusWarning,
-		Provider:         "termuxusb",
-		ProviderKind:     transport.KindAndroidUSBFD,
-		DiscoveryStatus:  acldiagnostics.StatusPassed,
-		PermissionStatus: acldiagnostics.StatusPassed,
-		ConnectionStatus: acldiagnostics.StatusWarning,
-		Beginner:         "test stream session",
-	}
-	report.StreamProbe = s.stream.Diagnostics()
-	report.StreamStatus = report.StreamProbe.Status
-	return report
-}
-
-func (s testStreamSession) Stream() (transport.TransportStream, error) {
-	return s.stream, nil
-}
-
-type testTransportStream struct {
-	reader *strings.Reader
-	writer bytes.Buffer
-	report transport.TransportStreamDiagnosticsReport
-	closed bool
-}
-
-func (s *testTransportStream) Read(p []byte) (int, error) {
-	if s.reader == nil {
-		return 0, io.EOF
-	}
-	return s.reader.Read(p)
-}
-
-func (s *testTransportStream) Write(p []byte) (int, error) {
-	return s.writer.Write(p)
-}
-
-func (s *testTransportStream) Close() error {
-	s.closed = true
-	return nil
-}
-
-func (s *testTransportStream) Capabilities() transport.TransportStreamCapabilities {
-	return transport.TransportStreamCapabilities{
-		Read:         true,
-		Write:        true,
-		Close:        true,
-		Timeouts:     true,
-		Cancellation: true,
-		LastActivity: true,
-		CloseReason:  true,
-		EOF:          true,
-		Disconnect:   true,
-		Experimental: true,
-	}
-}
-
-func (s *testTransportStream) Diagnostics() transport.TransportStreamDiagnosticsReport {
-	report := s.report
-	if report.SchemaVersion == "" {
-		report.SchemaVersion = "1"
-	}
-	if report.Status == "" {
-		report.Status = acldiagnostics.StatusWarning
-	}
-	if report.State == "" {
-		report.State = transport.TransportStreamStateExperimental
-	}
-	if s.closed {
-		report.State = transport.TransportStreamStateClosed
-		report.CloseReason = "closed by caller"
-	}
-	return report
 }
 
 type testBootstrapExecutor struct {

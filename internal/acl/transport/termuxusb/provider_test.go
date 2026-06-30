@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/arduino/arduino-cli/internal/acl/diagnostics"
 	"github.com/arduino/arduino-cli/internal/acl/transport"
@@ -410,4 +411,44 @@ func TestProviderProbeUsesExpectedCommandShape(t *testing.T) {
 	require.NotEmpty(t, runner.calls)
 	require.Equal(t, defaultCommandName+" -r -E -e helper /dev/bus/usb/001/002", runner.calls[0])
 	require.Equal(t, transport.TransportStreamStateExperimental, report.State)
+}
+
+func TestProviderValidateUsesExpectedCommandShape(t *testing.T) {
+	runner := &scriptedRunner{
+		results: map[string]CommandResult{
+			defaultCommandName + " -r -E -e helper /dev/bus/usb/001/002": {
+				Stdout:   `{"schema_version":"1","status":"warning","provider":"termuxusb","provider_kind":"android-usb-fd","device":{"stable_id":"/dev/bus/usb/001/002","display_name":"/dev/bus/usb/001/002"},"validate_read":true,"validate_write":true,"timeout":2000000000,"helper_args":["--validate-read","--validate-write","--timeout","2s"],"termux_usb_command":"termux-usb -r -E -e helper /dev/bus/usb/001/002","stream_probe":{"schema_version":"1","status":"warning","provider":"termuxusb","provider_kind":"android-usb-fd","device":{"stable_id":"/dev/bus/usb/001/002","display_name":"/dev/bus/usb/001/002"},"state":"experimental","beginner_summary":"TERMUX_USB_FD stream validation is experimental","professional_details":["bounded stream validation is diagnostics-only until the live fd path is proven"],"limitations":["byte-stream support remains experimental"]},"stream_status":"warning","beginner_summary":"TERMUX_USB_FD stream validation is experimental","professional_details":["bounded stream validation is diagnostics-only until the live fd path is proven"],"limitations":["byte-stream support remains experimental"],"next_step":"run the helper through termux-usb -r -E to inspect TERMUX_USB_FD","metadata":{"device_path":"/dev/bus/usb/001/002","helper_command":"helper","handoff_mode":"env","termux_usb_command":"termux-usb -r -E -e helper /dev/bus/usb/001/002"}}`,
+				ExitCode: 0,
+			},
+		},
+	}
+	provider := NewProviderWithRunner(runner)
+
+	report, err := provider.Validate(context.Background(), transport.StreamValidationRequest{
+		Device: transport.DiscoveredDevice{
+			StableID: "/dev/bus/usb/001/002",
+		},
+		HelperCommand: "helper",
+		ValidateRead:  true,
+		ValidateWrite: true,
+		Timeout:       2 * time.Second,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "termux-usb -r -E -e helper /dev/bus/usb/001/002", report.TermuxUSBCommand)
+	require.NotEmpty(t, runner.calls)
+	require.Equal(t, defaultCommandName+" -r -E -e helper /dev/bus/usb/001/002", runner.calls[0])
+	require.Equal(t, transport.TransportStreamStateExperimental, report.StreamProbe.State)
+	require.True(t, report.ValidateRead)
+	require.True(t, report.ValidateWrite)
+	require.Equal(t, 2*time.Second, report.Timeout)
+}
+
+func TestHelperStreamValidationReportsMissingFD(t *testing.T) {
+	require.NoError(t, os.Unsetenv("TERMUX_USB_FD"))
+
+	report := HelperStreamValidationReportFromInvocation(nil, false, false, 0)
+	require.Equal(t, diagnostics.StatusFailed, report.Status)
+	require.Contains(t, report.Beginner, "TERMUX_USB_FD is not set")
+	require.Equal(t, transport.TransportStreamStateUnavailable, report.StreamProbe.State)
+	require.Contains(t, report.NextStep, "termux-usb -r -E -e")
 }
