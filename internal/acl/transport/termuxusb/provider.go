@@ -1112,6 +1112,20 @@ func HelperStreamValidationReportFromInvocation(args []string, validateRead, val
 				_ = timeoutController.SetTimeouts(transport.TransportStreamTimeouts{Read: timeout, Write: timeout, Idle: timeout})
 			}
 		}
+		if validateWrite {
+			n, err := stream.Write([]byte{0})
+			report.WriteBytes = int64(n)
+			if err != nil {
+				report.WriteError = err.Error()
+			}
+			if n > 0 && report.StreamProbe.WriteState == transport.StreamObservationExperimental {
+				report.StreamProbe.WriteState = transport.StreamObservationPassed
+			}
+			if err != nil {
+				report.StreamProbe.WriteState = transport.StreamObservationFailed
+				report.Warnings = append(report.Warnings, "write probe error: "+err.Error())
+			}
+		}
 		if validateRead {
 			buf := make([]byte, 1)
 			n, err := stream.Read(buf)
@@ -1125,20 +1139,6 @@ func HelperStreamValidationReportFromInvocation(args []string, validateRead, val
 			if err != nil {
 				report.StreamProbe.ReadState = transport.StreamObservationFailed
 				report.Warnings = append(report.Warnings, "read probe error: "+err.Error())
-			}
-		}
-		if validateWrite {
-			n, err := stream.Write([]byte{0})
-			report.WriteBytes = int64(n)
-			if err != nil {
-				report.WriteError = err.Error()
-			}
-			if n > 0 && report.StreamProbe.WriteState == transport.StreamObservationExperimental {
-				report.StreamProbe.WriteState = transport.StreamObservationPassed
-			}
-			if err != nil {
-				report.StreamProbe.WriteState = transport.StreamObservationFailed
-				report.Warnings = append(report.Warnings, "write probe error: "+err.Error())
 			}
 		}
 		_ = stream.Close()

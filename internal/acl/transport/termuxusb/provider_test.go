@@ -452,3 +452,22 @@ func TestHelperStreamValidationReportsMissingFD(t *testing.T) {
 	require.Equal(t, transport.TransportStreamStateUnavailable, report.StreamProbe.State)
 	require.Contains(t, report.NextStep, "termux-usb -r -E -e")
 }
+
+func TestHelperStreamValidationRunsWriteBeforeRead(t *testing.T) {
+	file, err := os.CreateTemp(t.TempDir(), "termux-usb-stream-validate-*")
+	require.NoError(t, err)
+	defer file.Close()
+
+	oldFD := os.Getenv("TERMUX_USB_FD")
+	t.Cleanup(func() { _ = os.Setenv("TERMUX_USB_FD", oldFD) })
+	require.NoError(t, os.Setenv("TERMUX_USB_FD", strconv.FormatUint(uint64(file.Fd()), 10)))
+
+	report := HelperStreamValidationReportFromEnv(true, true, 2*time.Second)
+	require.Equal(t, diagnostics.StatusWarning, report.Status)
+	require.Empty(t, report.WriteError)
+	require.Contains(t, report.ReadError, "EOF")
+	require.Equal(t, int64(1), report.WriteBytes)
+	require.Equal(t, transport.TransportStreamStateClosed, report.StreamProbe.State)
+	require.Equal(t, transport.StreamObservationPassed, report.StreamProbe.WriteState)
+	require.Equal(t, transport.StreamObservationFailed, report.StreamProbe.ReadState)
+}
