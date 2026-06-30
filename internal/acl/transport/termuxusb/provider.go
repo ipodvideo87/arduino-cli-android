@@ -1122,23 +1122,33 @@ func HelperStreamValidationReportFromInvocation(args []string, validateRead, val
 				report.StreamProbe.WriteState = transport.StreamObservationPassed
 			}
 			if err != nil {
-				report.StreamProbe.WriteState = transport.StreamObservationFailed
+				report.StreamProbe.WriteState = classifyWriteProbeState(err)
 				report.Warnings = append(report.Warnings, "write probe error: "+err.Error())
+				if report.StreamProbe.WriteState == transport.StreamObservationUnsupported {
+					report.Professional = append(report.Professional, "raw write probe returned invalid argument; TERMUX_USB_FD is not behaving like a generic byte-stream fd")
+					report.Limitations = append(report.Limitations, "raw byte-stream write is unsupported on this native Termux fd")
+					report.NextStep = "investigate a USB-transfer-oriented bridge instead of raw fd read/write"
+				}
 			}
 		}
 		if validateRead {
-			buf := make([]byte, 1)
-			n, err := stream.Read(buf)
-			report.ReadBytes = int64(n)
-			if err != nil {
-				report.ReadError = err.Error()
-			}
-			if n > 0 && report.StreamProbe.ReadState == transport.StreamObservationExperimental {
-				report.StreamProbe.ReadState = transport.StreamObservationPassed
-			}
-			if err != nil {
-				report.StreamProbe.ReadState = transport.StreamObservationFailed
-				report.Warnings = append(report.Warnings, "read probe error: "+err.Error())
+			if report.WriteError != "" {
+				report.StreamProbe.ReadState = transport.StreamObservationUnavailable
+				report.Warnings = append(report.Warnings, "read probe skipped after write probe failure")
+			} else {
+				buf := make([]byte, 1)
+				n, err := stream.Read(buf)
+				report.ReadBytes = int64(n)
+				if err != nil {
+					report.ReadError = err.Error()
+				}
+				if n > 0 && report.StreamProbe.ReadState == transport.StreamObservationExperimental {
+					report.StreamProbe.ReadState = transport.StreamObservationPassed
+				}
+				if err != nil {
+					report.StreamProbe.ReadState = transport.StreamObservationFailed
+					report.Warnings = append(report.Warnings, "read probe error: "+err.Error())
+				}
 			}
 		}
 		_ = stream.Close()
@@ -1291,6 +1301,17 @@ func probeFDFromArgs(args []string) (string, bool, bool) {
 		return trimmed, true, true
 	}
 	return "", false, false
+}
+
+func classifyWriteProbeState(err error) transport.StreamObservationState {
+	if err == nil {
+		return transport.StreamObservationPassed
+	}
+	lowered := strings.ToLower(err.Error())
+	if strings.Contains(lowered, "invalid argument") || strings.Contains(lowered, "bad file descriptor") {
+		return transport.StreamObservationUnsupported
+	}
+	return transport.StreamObservationFailed
 }
 
 func buildSessionStreamProbeReport(device transport.DiscoveredDevice, endpoint transport.EndpointExport, permission diagnostics.Status) transport.TransportStreamDiagnosticsReport {

@@ -99,6 +99,15 @@ This file is a logbook of tested findings from the project history.
 
 ## 2026-06-29
 
+- Environment: native Termux on Samsung A17 / Android 16
+- Command/evidence: `./arduino-cli acl transport stream-validate --device /dev/bus/usb/001/002 --details`,
+  `./arduino-cli acl transport stream-validate --device /dev/bus/usb/001/002 --details --validate-read`,
+  `./arduino-cli acl transport stream-validate --device /dev/bus/usb/001/002 --details --validate-write`, and
+  `./arduino-cli acl transport stream-validate --device /dev/bus/usb/001/002 --details --validate-read --validate-write`
+- Result: baseline `stream-validate` succeeds through the Termux fd handoff path; the fd is observed, valid, and inspectable; read-only validation returns `EOF`; write-only validation returns `write TERMUX_USB_FD: invalid argument`; combined validation does not prove a generic byte stream
+- Confidence: high
+- Notes: this is native evidence against treating `TERMUX_USB_FD` as a normal byte-stream fd. It does not prove upload, flashing, or serial-monitor behavior, and it points toward a USB-transfer-oriented follow-on milestone rather than byte-stream readiness
+
 - Environment: repository unit-test environment
 - Command/evidence: `go test ./internal/acl/transport/... ./internal/acl/transport/termuxusb/...` and `go test ./internal/cli/acl/...`
 - Result: the bounded transport stream now has explicit host coverage for read/write bound exhaustion, short-write handling, EOF handling, and closed-state reporting; the Termux USB provider CLI diagnostics continue to report the stream boundary as experimental

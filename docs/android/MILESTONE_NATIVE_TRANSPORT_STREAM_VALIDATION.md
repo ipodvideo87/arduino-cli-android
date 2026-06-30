@@ -83,6 +83,11 @@ Do not claim stream readiness until the native Termux evidence includes:
 If bounded read/write behavior is not proven on-device, keep the stream state
 `experimental`.
 
+If native Termux shows `write TERMUX_USB_FD: invalid argument`, treat that as
+evidence that the fd should not be assumed to be a generic byte-stream endpoint.
+Use the result to choose the next transport-oriented milestone rather than
+promoting stream readiness.
+
 ## Current Milestone Status
 
 This milestone is defined and ready for implementation and validation.

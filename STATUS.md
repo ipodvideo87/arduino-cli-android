@@ -69,6 +69,10 @@ Current validation posture:
 - The Termux USB provider now also exposes `acl transport stream-validate`, a
   bounded stream wrapper diagnostic that can optionally exercise a one-byte
   read/write probe without claiming byte-stream readiness.
+- Native Termux validation now shows that `TERMUX_USB_FD` is inspectable but
+  raw write on the current fd can return `invalid argument`; the helper keeps
+  read and write probes separate so the diagnostics do not overclaim generic
+  byte-stream behavior.
 - The transport stream foundation now exists as a reusable bounded stream
   wrapper and report model; the stream state is still experimental until native
   Termux byte-stream validation proves read/write behavior.
@@ -82,6 +86,10 @@ Current validation posture:
   `termux-usb -r -E -e "./arduino-cli acl transport probe-fd-helper --json" /dev/bus/usb/001/002`.
 - Native Termux has now validated `./arduino-cli acl transport probe-fd --device /dev/bus/usb/001/002 --details`
   and `./arduino-cli --json acl transport probe-fd --device /dev/bus/usb/001/002`.
+- Native Termux `stream-validate` evidence now shows baseline handoff success,
+  `EOF` on the read probe, and `write TERMUX_USB_FD: invalid argument` on the
+  write probe; that is evidence against treating the fd as a normal generic
+  byte-stream endpoint.
 - USB flashing is still unimplemented and must not be claimed as complete.
 
 Repository cleanup:

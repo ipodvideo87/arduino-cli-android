@@ -471,3 +471,9 @@ func TestHelperStreamValidationRunsWriteBeforeRead(t *testing.T) {
 	require.Equal(t, transport.StreamObservationPassed, report.StreamProbe.WriteState)
 	require.Equal(t, transport.StreamObservationFailed, report.StreamProbe.ReadState)
 }
+
+func TestClassifyWriteProbeState(t *testing.T) {
+	require.Equal(t, transport.StreamObservationUnsupported, classifyWriteProbeState(errors.New("write TERMUX_USB_FD: invalid argument")))
+	require.Equal(t, transport.StreamObservationFailed, classifyWriteProbeState(errors.New("unexpected transport failure")))
+	require.Equal(t, transport.StreamObservationPassed, classifyWriteProbeState(nil))
+}
