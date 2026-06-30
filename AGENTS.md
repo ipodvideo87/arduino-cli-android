@@ -1,5 +1,50 @@
 # Repository Guidelines
 
+## Engineering Laws
+
+These laws are constitutional. They have highest priority over every other
+repository guide, policy, workflow, and convention.
+
+1. Never Wing It
+   - Do not guess when evidence is available.
+   - Research the repository, relevant documentation, implementation, and
+     authoritative sources when necessary before making assumptions,
+     conclusions, or implementation choices.
+   - If a statement cannot be supported by repository evidence, implementation
+     evidence, validation evidence, research, or established engineering facts,
+     it must not be presented as fact.
+   - If evidence is insufficient, continue researching, name the uncertainty,
+     ask clarifying questions when necessary, and delay implementation until the
+     decision is informed.
+   - If evidence conflicts, treat the conflict itself as evidence and investigate
+     it until the discrepancy is understood or explicitly documented.
+
+2. Architecture Before Implementation
+   - Protect long-term architecture over short-term convenience.
+
+3. Evidence Before Claims
+   - Never claim more than has actually been validated.
+
+4. Validate Before Completion
+   - Completion requires appropriate validation, not merely successful builds or
+     passing host tests.
+
+5. Preserve Engineering Knowledge
+   - Every meaningful task should leave the repository in a more knowledgeable
+     state than before.
+
+6. Stop at the Smallest Proven Milestone
+   - Prefer small, fully validated milestones over large speculative
+     implementations.
+
+7. Build Generic Solutions
+   - Prefer reusable, maintainable, interface-driven designs over special-case
+     implementations whenever practical.
+
+These laws govern every future engineering task, decision, implementation,
+review, validation, and documentation update. If another repository document
+conflicts with them, the laws win.
+
 ## Mission
 This repository aims to become a production-quality Arduino CLI that runs natively on Android without chroots, PRoot, Docker, virtual machines, or a traditional Linux distribution. It is also the flagship implementation of the Android Compatibility Layer (ACL), a reusable framework for running Linux developer tools reliably on Android.
 
@@ -16,9 +61,13 @@ Native Termux validation always takes priority over container or desktop validat
 ## Android Research Policy
 - Before starting any task that may change architecture, validation, reporting,
   or long-lived documentation, also read:
+  - [docs/android/DEVELOPMENT_WORKFLOW.md](docs/android/DEVELOPMENT_WORKFLOW.md)
   - [docs/android/CODEX_OPERATING_MODEL.md](docs/android/CODEX_OPERATING_MODEL.md)
   - [docs/android/ENGINEERING_PRINCIPLES.md](docs/android/ENGINEERING_PRINCIPLES.md)
   - [docs/android/DECISION_FRAMEWORK.md](docs/android/DECISION_FRAMEWORK.md)
+  - [docs/android/ENGINEERING_KNOWLEDGE_FRAMEWORK.md](docs/android/ENGINEERING_KNOWLEDGE_FRAMEWORK.md)
+  - [docs/android/ENGINEERING_LIFECYCLE.md](docs/android/ENGINEERING_LIFECYCLE.md)
+  - [docs/android/CONFIDENCE_MODEL.md](docs/android/CONFIDENCE_MODEL.md)
   - [docs/android/DOCUMENTATION_ARCHITECTURE.md](docs/android/DOCUMENTATION_ARCHITECTURE.md)
   - [docs/android/ENGINEERING_METHODOLOGY.md](docs/android/ENGINEERING_METHODOLOGY.md)
   - [docs/android/REPOSITORY_GOVERNANCE.md](docs/android/REPOSITORY_GOVERNANCE.md)
@@ -29,6 +78,9 @@ Native Termux validation always takes priority over container or desktop validat
   - [docs/android/PROJECT_NORTH_STAR.md](docs/android/PROJECT_NORTH_STAR.md)
   - [docs/android/LIVING_INSTITUTIONAL_MEMORY.md](docs/android/LIVING_INSTITUTIONAL_MEMORY.md)
   - [docs/android/ENGINEERING_DECISIONS.md](docs/android/ENGINEERING_DECISIONS.md)
+  - [docs/android/DECISION_LOG.md](docs/android/DECISION_LOG.md)
+  - [docs/android/UNCERTAINTY_REGISTER.md](docs/android/UNCERTAINTY_REGISTER.md)
+  - [docs/android/LESSONS_LEARNED.md](docs/android/LESSONS_LEARNED.md)
   - [docs/android/ARCHITECTURE_OVERVIEW.md](docs/android/ARCHITECTURE_OVERVIEW.md)
   - [docs/android/DEVELOPMENT_WORKFLOW.md](docs/android/DEVELOPMENT_WORKFLOW.md)
   - [docs/android/VALIDATION_POLICY.md](docs/android/VALIDATION_POLICY.md)
@@ -90,6 +142,7 @@ Native Termux validation always takes priority over container or desktop validat
 - The `arduino-cli acl` command group is the CLI-facing diagnostic surface for scanner, verifier, patch preview, and bootstrap workflows. Keep its beginner/professional separation aligned with the underlying ACL reports.
 - The ACL engine is the orchestration boundary for future workspace and GUI calls. Prefer adding workflow steps there instead of teaching UI layers to call scanner/verifier/patch-preview utilities directly.
 - The known `.acl/runtime/ld-linux-aarch64.so.1` permission-denied case should remain visible in validation and bootstrap evidence instead of being hidden behind a manual repair step.
+- Use `docs/android/DEVELOPMENT_WORKFLOW.md` as the operational front door for task execution, and treat the remaining governance docs as canonical references that support it.
 
 ## Core Principles
 - Android-first engineering.

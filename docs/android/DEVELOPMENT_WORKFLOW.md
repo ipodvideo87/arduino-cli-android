@@ -1,38 +1,163 @@
 # Development Workflow
 
-## Core Rules
+This is the primary day-to-day front door for engineering work in this
+repository.
 
-- Plan before coding when architecture is involved.
-- Implement in small milestones.
-- Run focused tests first.
-- Run emulated ARM64 validation when native Termux is unavailable and the
-  validation scripts are usable.
-- Run native Termux validation when Android behavior is affected.
-- Run real hardware validation before claiming upload or flash success.
-- Update docs and `STATUS.md` when behavior or evidence changes.
-- Push to GitHub after completed validated change sets unless instructed otherwise.
+If you have a task, start here. Do not try to assemble the operating model from
+memory.
+This workflow operates under the Engineering Laws at the top of `AGENTS.md`.
+
+## 1. Understand The Task
+
+First identify what kind of work it is:
+
+- documentation only
+- research only
+- code inspection
+- implementation
+- validation
+- review or audit
+- cross-subsystem architecture work
+
+Then state the objective in plain terms.
+
+## 2. Read The Right Canonical Docs
+
+Use the smallest set of canonical docs that owns the problem:
+
+- `AGENTS.md`
+- `docs/android/CODEX_OPERATING_MODEL.md`
+- `docs/android/ENGINEERING_PRINCIPLES.md`
+- `docs/android/DECISION_FRAMEWORK.md`
+- `docs/android/ENGINEERING_KNOWLEDGE_FRAMEWORK.md`
+- `docs/android/ENGINEERING_LIFECYCLE.md`
+- `docs/android/CONFIDENCE_MODEL.md`
+- `docs/android/DOCUMENTATION_ARCHITECTURE.md`
+- `docs/android/ENGINEERING_METHODOLOGY.md`
+- `docs/android/REPOSITORY_GOVERNANCE.md`
+- `docs/android/ARCHITECTURE_REVIEW_PROCESS.md`
+- `docs/android/TECHNICAL_DEBT_POLICY.md`
+- `docs/android/INTERFACE_STABILITY_POLICY.md`
+- `STATUS.md`
+- `docs/android/ROADMAP.md`
+
+Read additional subsystem docs only when the task needs them.
+
+## 3. Engineering Preview
+
+Before working, write down the preview:
+
+- objective
+- expected outcome
+- known assumptions
+- open unknowns
+- expected validation level
+- architecture impact
+- documentation impact
+- expected risks
+
+If the task is architecture-heavy, validation-heavy, or spans subsystems, do the
+architecture review before implementation.
+
+## 4. Research When Required
+
+Research before implementing when:
+
+- Android or Termux behavior may differ from host behavior
+- evidence is incomplete
+- project history contains prior findings or rejected approaches
+- the request could encode an assumption as fact
+- multiple approaches are technically viable
+
+Prefer evidence over intuition. If the evidence is not enough, stop and compare
+alternatives before acting.
+
+## 5. Decide And Plan
+
+Compare only the approaches that the evidence and architecture make plausible.
+Prefer the option that is most durable, least duplicative, and easiest to
+validate in native Termux.
+
+If the right direction is still unclear, ask the user before implementing.
+
+## 6. Implement In Small Milestones
+
+- Make the smallest change that resolves the current uncertainty.
+- Prefer reusable ACL infrastructure over one-off fixes.
+- Keep architecture decisions documented as they land.
+- Use explicit installation for validation bootstraps. The default action is
+  inspect/report only.
+
+## 7. Validate
+
+Use the lightest validation level that can answer the question:
+
+- static review for structure and ownership
+- host validation for local logic
+- native Termux for Android behavior
+- real hardware for upload, flash, and runtime claims
+
+Do not claim a higher validation level than the evidence supports.
+
+## 8. Record Knowledge
+
+Capture the result in the smallest canonical artifact that owns it:
+
+- evidence -> `docs/android/VALIDATED_FINDINGS.md`
+- temporary uncertainty -> `docs/android/UNCERTAINTY_REGISTER.md`
+- task-level decision -> `docs/android/DECISION_LOG.md`
+- durable architecture decision -> `docs/android/ENGINEERING_DECISIONS.md`
+- reusable lesson -> `docs/android/LESSONS_LEARNED.md`
+- confidence change -> `docs/android/CONFIDENCE_MODEL.md`
+
+## 9. Update Docs And Status
+
+Update `STATUS.md` and `docs/android/ROADMAP.md` only when the change affects
+project state or milestone sequencing.
+
+Use the synchronization rules in `STATUS.md` and `docs/android/ROADMAP.md`:
+
+- `STATUS.md` owns the current snapshot of work, blockers, validation state,
+  and the next engineering milestone.
+- `ROADMAP.md` owns the ordered list of future milestones and the long-range
+  direction.
+- Update both when a validated change changes current state and also changes
+  future sequencing.
+- If they conflict, `STATUS.md` wins for the current snapshot and `ROADMAP.md`
+  wins for future ordering.
+
+## 10. Engineering Review And Closeout
+
+Every completed task should answer:
+
+- Was implementation completed?
+- Was validation performed?
+- Was evidence recorded?
+- Were assumptions confirmed or invalidated?
+- Were uncertainties updated?
+- Was confidence updated?
+- Were lessons captured?
+- Was documentation updated?
+- Does `STATUS.md` require updating?
+- Does `ROADMAP.md` require updating?
+- Was technical debt introduced?
+- Was architecture affected?
+
+If any answer is still no, the task is not closed.
 
 ## Working Practices
 
-- Prefer reusable ACL infrastructure over one-off fixes.
-- Keep architecture decisions documented as they land.
-- When unsure, document the assumption and the open question.
-- Treat queued branches as reference material unless reviewed and intentionally
-  merged.
-- Use explicit installation for validation bootstraps. The default action is
-  inspect/report only.
-- Record which validation provider was used in docs and status updates.
-
-## Git Practices
-
+- Keep changes modular, maintainable, and reviewable.
 - Do not use `git add .` blindly when untracked or WIP files exist.
 - Stage only the files in scope for the change.
 - Keep commits small enough that the evidence and intent are readable later.
-- Push after a completion so the remote branch reflects the current validated state.
+- Push after a completion so the remote branch reflects the current validated
+  state.
 
 ## Validation Expectations
 
 - Do not merge to `main` until real Android validation is complete.
-- Do not claim success beyond the validation level actually achieved.
 - Keep preflight, emulated, native, and hardware evidence distinct.
 - Do not claim Android success from emulation.
+- Do not claim upload, flashing, or monitor success without the required
+  validation level.

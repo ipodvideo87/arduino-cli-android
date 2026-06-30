@@ -1,6 +1,7 @@
 # Engineering Principles
 
 These are the durable engineering principles for this repository.
+They elaborate the Engineering Laws at the top of `AGENTS.md`.
 
 ## Principles
 
@@ -44,6 +45,11 @@ These are the durable engineering principles for this repository.
 
 - Reduce future maintenance burden
   - Prefer changes that make the next change simpler and safer.
+
+- Stop at the smallest useful milestone
+  - Resolve the current engineering uncertainty before adding extra features or
+    scope.
+  - Do not expand the work just because more functionality could fit nearby.
 
 - If a mistake can happen twice, make it harder to happen a third time
   - Add structure, validation, tests, or documentation that prevents the same

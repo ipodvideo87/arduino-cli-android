@@ -33,11 +33,14 @@
   methodology, architecture review, technical debt, and interface stability
 - Governance framework batch 2: apply ownership and terminology discipline to
   high-risk validation, transport, and workflow preview docs
+- Governance framework batch 3: Engineering Knowledge Framework, lifecycle,
+  decision log, uncertainty register, confidence model, and lessons learned
 
 ## Next Milestones
 
 - Finish full-flash bootloader package validation on native Termux
 - Add emulated ARM64 / Termux-like smoke tests
+- Validate the native Termux transport stream boundary
 - Build a generic Android USB transport bridge
 - Validate the Termux USB provider and file-descriptor handoff path on native Termux
 - Validate the TERMUX_USB_FD probe surface on native Termux
@@ -61,6 +64,19 @@
   validated on native Termux and real hardware
 - Promote the bounded byte-stream bridge only after native Termux validation
   proves the experimental stream path
+
+## STATUS Sync
+
+`STATUS.md` is the authoritative snapshot of current work, blockers, and the
+next engineering milestone.
+
+`ROADMAP.md` is the authoritative list of future milestone ordering and long-
+range direction.
+
+Update both documents when a validated change affects the current snapshot and
+the future milestone sequence. If they diverge, treat `STATUS.md` as the source
+of truth for the present state and `ROADMAP.md` as the source of truth for the
+future order.
 
 ## Roadmap Notes
 

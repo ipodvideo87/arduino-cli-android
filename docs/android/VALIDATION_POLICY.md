@@ -1,6 +1,7 @@
 # Validation Policy
 
 This project uses evidence levels to avoid overclaiming.
+This policy applies the Engineering Laws in `AGENTS.md` to validation work.
 
 This document is the canonical home for validation scope and provider-level policy. Other documents may summarize validation expectations for readability, but they should reference this document instead of duplicating the rules.
 
@@ -51,6 +52,10 @@ Every provider should emit:
 - warnings
 - limitations
 - validation level or confidence boundary
+
+Where a provider resolves or narrows a meaningful engineering question, record
+that outcome in the decision log or uncertainty register so the evidence is not
+lost after the test run ends.
 
 ## Rules
 

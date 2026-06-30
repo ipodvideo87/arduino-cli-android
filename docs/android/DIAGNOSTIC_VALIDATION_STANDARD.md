@@ -1,6 +1,8 @@
 # Diagnostic Validation Standard
 
 This document defines the repository standard for validation reporting.
+It operationalizes the Engineering Laws in `AGENTS.md` for evidence-backed
+claims and completion reports.
 
 This is the canonical home for diagnostic validation reporting requirements. Other documents may include brief reporting reminders for readability, but they should reference this standard rather than duplicating it.
 
@@ -187,6 +189,10 @@ Prefer concrete artifacts over conclusions. Examples:
 - test names
 - observed device behavior
 - generated reports
+
+For task closeouts, pair the validation report with the engineering knowledge
+framework so the repository retains the question, decision, uncertainty, and
+lesson that the evidence produced.
 
 ## Capability Reporting States
 

@@ -97,6 +97,14 @@ This file is a logbook of tested findings from the project history.
 - Notes: this validates the code boundary only; native Termux USB hardware behavior
   still needs on-device validation
 
+## 2026-06-29
+
+- Environment: repository unit-test environment
+- Command/evidence: `go test ./internal/acl/transport/... ./internal/acl/transport/termuxusb/...` and `go test ./internal/cli/acl/...`
+- Result: the bounded transport stream now has explicit host coverage for read/write bound exhaustion, short-write handling, EOF handling, and closed-state reporting; the Termux USB provider CLI diagnostics continue to report the stream boundary as experimental
+- Confidence: high
+- Notes: this is host validation only; native Termux byte-stream readiness remains unproven
+
 - Environment: native Termux validation planning
 - Command/evidence: `docs/android/MILESTONE_TERMUX_USB_PROVIDER.md`
 - Result: a native-Termux checklist now exists for `acl transport list`,

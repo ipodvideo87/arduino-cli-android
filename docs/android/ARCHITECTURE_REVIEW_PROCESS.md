@@ -80,6 +80,8 @@ Review whether the change requires:
 - a new ADR
 - a reference update
 - a historical note
+- a decision log entry
+- an uncertainty register update
 
 ### 8. Validation Impact
 

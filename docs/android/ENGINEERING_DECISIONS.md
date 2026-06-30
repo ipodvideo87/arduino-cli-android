@@ -188,3 +188,21 @@ These decisions use an ADR-style format.
   depend on the positional package contract without guessing about hidden flags.
 - Validation/evidence if available: native Termux help output and dry-run
   validation from the current milestone.
+
+## Engineering Knowledge Framework is the repository knowledge spine
+
+- Status: accepted
+- Context: The repository needs a durable way to turn each engineering task into
+  persistent knowledge instead of isolated implementation history.
+- Decision: add a canonical engineering knowledge framework with dedicated
+  lifecycle, decision log, uncertainty register, confidence model, and lessons
+  learned documents, and treat it as the connective tissue between existing
+  decisions, findings, validation policy, and roadmap/status reporting.
+- Alternatives considered: leaving task closeout knowledge in chat history;
+  embedding the same responsibilities into existing ADR and findings docs
+  without separate knowledge artifacts.
+- Consequences: future tasks can answer the same closeout questions
+  consistently, and the repository gains a single route for question -> evidence
+  -> decision -> confidence -> lesson -> roadmap impact.
+- Validation/evidence if available: documentation review and the current
+  governance framework integration.

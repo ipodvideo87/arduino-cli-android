@@ -93,6 +93,32 @@ The owning document should be the place where future contributors look first for
 the authoritative version of the rule, contract, or policy. Other documents may
 summarize it for local readability, but they should not redefine it.
 
+Task-level engineering knowledge should also have one canonical route:
+
+- the question is recorded in the uncertainty register or decision log
+- the evidence is recorded in validated findings or the task report
+- the decision is recorded in the decision log or ADR
+- the reusable lesson is recorded in lessons learned
+
+This keeps the knowledge lifecycle separate from the decision lifecycle while
+still letting them reinforce one another.
+
+## Operational Workflow Expectations
+
+For day-to-day work, use the engineering workflow front door rather than
+reconstructing the process from individual policy documents.
+
+The workflow should:
+
+- begin with an engineering preview
+- route evidence, decisions, uncertainties, and lessons to the correct
+  canonical artifact
+- end with an engineering review and closeout check
+- update status and roadmap only when the project view actually changes
+
+If a task stops after research or review, record the result in the smallest
+artifact that owns it rather than creating a new category.
+
 ## Backwards Compatibility Expectations
 
 Compatibility should be preserved when practical.
@@ -157,6 +183,8 @@ A healthy repository has:
 - documented migration paths
 - a manageable amount of debt
 - no hidden competing authorities
+- a visible engineering knowledge trail that answers what was learned and what
+  remains uncertain
 
 Health should be judged by whether future work can proceed safely and
 predictably.

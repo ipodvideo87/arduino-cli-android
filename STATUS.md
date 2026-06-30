@@ -12,11 +12,32 @@ Native Termux on Android is the production target and final validation environme
 Ubuntu inside `proot-distro` is used for development tooling and repository work, but it
 does not replace native Android validation.
 
+## STATUS Versus ROADMAP
+
+`STATUS.md` is authoritative for the current snapshot:
+
+- current mission
+- completed milestones
+- active work
+- known blockers
+- the next engineering milestone
+
+`docs/android/ROADMAP.md` is authoritative for future ordering:
+
+- long-range milestone sequence
+- planned follow-on work
+- broad direction beyond the current snapshot
+
+Update both when a validated change changes the current state and the future
+milestone order. If the two documents conflict, `STATUS.md` wins for the current
+snapshot and `ROADMAP.md` wins for future ordering.
+
 ## Living Institutional Memory
 
 - Project North Star: [docs/android/PROJECT_NORTH_STAR.md](docs/android/PROJECT_NORTH_STAR.md)
 - Living Institutional Memory: [docs/android/LIVING_INSTITUTIONAL_MEMORY.md](docs/android/LIVING_INSTITUTIONAL_MEMORY.md)
 - Engineering Decisions: [docs/android/ENGINEERING_DECISIONS.md](docs/android/ENGINEERING_DECISIONS.md)
+- Engineering Knowledge Framework: [docs/android/ENGINEERING_KNOWLEDGE_FRAMEWORK.md](docs/android/ENGINEERING_KNOWLEDGE_FRAMEWORK.md)
 - Architecture Overview: [docs/android/ARCHITECTURE_OVERVIEW.md](docs/android/ARCHITECTURE_OVERVIEW.md)
 - Development Workflow: [docs/android/DEVELOPMENT_WORKFLOW.md](docs/android/DEVELOPMENT_WORKFLOW.md)
 - Validation Policy: [docs/android/VALIDATION_POLICY.md](docs/android/VALIDATION_POLICY.md)
@@ -29,6 +50,7 @@ does not replace native Android validation.
 - Transport Stream Foundation: [docs/android/TRANSPORT_STREAM_FOUNDATION.md](docs/android/TRANSPORT_STREAM_FOUNDATION.md)
 - Transport API Stabilization: [docs/android/TRANSPORT_API_STABILIZATION.md](docs/android/TRANSPORT_API_STABILIZATION.md)
 - Termux USB Provider Validation Checklist: [docs/android/MILESTONE_TERMUX_USB_PROVIDER.md](docs/android/MILESTONE_TERMUX_USB_PROVIDER.md)
+- Native Transport Stream Validation: [docs/android/MILESTONE_NATIVE_TRANSPORT_STREAM_VALIDATION.md](docs/android/MILESTONE_NATIVE_TRANSPORT_STREAM_VALIDATION.md)
 - V1 Release Criteria: [docs/android/V1_RELEASE_CRITERIA.md](docs/android/V1_RELEASE_CRITERIA.md)
 - Upload Workflow Preview: [docs/android/UPLOAD_WORKFLOW_PREVIEW.md](docs/android/UPLOAD_WORKFLOW_PREVIEW.md)
 - Serial Monitor Preview: [docs/android/SERIAL_MONITOR_PREVIEW.md](docs/android/SERIAL_MONITOR_PREVIEW.md)
@@ -150,6 +172,13 @@ Repository cleanup:
     `LIVING_INSTITUTIONAL_MEMORY.md`
 - Governance framework batch 2 has started with high-risk documentation
   ownership cleanup across validation, transport, and workflow preview docs.
+- Governance framework batch 3 is now in place:
+  - `docs/android/ENGINEERING_KNOWLEDGE_FRAMEWORK.md`
+  - `docs/android/ENGINEERING_LIFECYCLE.md`
+  - `docs/android/DECISION_LOG.md`
+  - `docs/android/UNCERTAINTY_REGISTER.md`
+  - `docs/android/CONFIDENCE_MODEL.md`
+  - `docs/android/LESSONS_LEARNED.md`
 
 ## Work In Progress
 
@@ -214,4 +243,4 @@ Repository cleanup:
 
 ## Next Engineering Milestone
 
-Finish the generic native Android USB transport bridge, validate upload and monitor flow on real hardware, and move Android post-install repair into a shared automatic pipeline. In parallel, validate the transport stream foundation and upload prepare-only planning on native Termux, then refine the ACL CLI diagnostic surfaces for future UI consumption.
+Validate the native Termux transport stream boundary, including fd/session/stream diagnostics and bounded stream state reporting, before any real upload or monitor execution work. Keep the transport runtime generic and the diagnostics safe, diagnostic-only, and board-agnostic.

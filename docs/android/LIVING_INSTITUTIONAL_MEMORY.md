@@ -17,6 +17,8 @@ to recover context quickly and accurately.
 - What validation provider was used and what confidence boundary it proves.
 - How future contributors should reason, decide, document, and report in this
   repository.
+- How task-level questions, decisions, uncertainty, confidence, and lessons are
+  preserved in the engineering knowledge framework.
 - How the repository should evolve over time without accumulating avoidable
   architectural drift.
 - How governance batches and documentation-ownership rules should be preserved
@@ -36,6 +38,8 @@ to recover context quickly and accurately.
 - Preserve governance frameworks and documentation-ownership rules in versioned
   docs so later work can build on the same decision model instead of recreating
   it.
+- Preserve the engineering knowledge framework in versioned docs so future work
+  can inherit the same question -> evidence -> decision -> lesson lifecycle.
 - Preserve repository-governance, debt, and interface-stability guidance in
   versioned docs so future evolution remains deliberate rather than accidental.
 - Preserve batch-level governance changes in status and roadmap docs so future

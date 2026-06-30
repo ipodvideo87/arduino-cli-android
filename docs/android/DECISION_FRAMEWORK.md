@@ -10,6 +10,7 @@ Every meaningful decision should consider:
 - user intent
 - current mission and status
 - canonical architecture docs
+- the engineering knowledge framework
 - validation policy and diagnostic reporting rules
 - existing code and interfaces
 - project history and prior evidence
@@ -18,26 +19,11 @@ Every meaningful decision should consider:
 - validation cost
 - future extension points
 
-## Decision Confidence Levels
+## Decision Confidence
 
-- Low confidence
-  - evidence is incomplete or mostly inferred
-  - do not implement a hard contract from this state
-
-- Medium confidence
-  - docs and code point in the same direction, but the target environment or
-    tradeoff still needs confirmation
-
-- High confidence
-  - the repository evidence strongly supports a direction
-  - implementation can proceed with care, but target validation may still be
-    pending
-
-- Confirmed
-  - the relevant behavior has been validated in the environment that matters
-    for the claim being made
-
-Confidence should be stated explicitly when a decision is reported.
+Decision confidence is defined in [CONFIDENCE_MODEL.md](CONFIDENCE_MODEL.md).
+Use that document as the canonical source for confidence terminology and
+confidence-change rules.
 
 ## Decision Flow
 
@@ -175,3 +161,6 @@ A good decision record should say:
 - what confidence level applies
 - what remains to be validated
 - what docs need to be updated
+
+For task-level provenance, also record the question and uncertainty in the
+engineering knowledge framework.

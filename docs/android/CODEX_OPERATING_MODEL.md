@@ -5,6 +5,8 @@ This document defines how Codex should operate in this repository.
 It is an execution model, not a product policy. It complements
 [AGENTS.md](/root/arduino-cli-android/AGENTS.md), the engineering principles,
 the decision framework, and the diagnostic validation standard.
+The Engineering Laws at the top of `AGENTS.md` are the highest-priority
+guidance for this model.
 
 ## Default Starting Sequence
 
@@ -31,6 +33,10 @@ Then:
    unclear.
 7. Plan before acting when the task is multi-step or spans subsystems.
 
+For the operational day-to-day sequence, use
+[DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md) as the front door and treat
+the rest of the governance stack as supporting reference material.
+
 ## What To Read First
 
 The exact reading order depends on the task, but the usual first pass is:
@@ -38,12 +44,14 @@ The exact reading order depends on the task, but the usual first pass is:
 1. `MISSION.md`
 2. `STATUS.md`
 3. `AGENTS.md`
-4. `docs/android/ENGINEERING_PRINCIPLES.md`
-5. `docs/android/DECISION_FRAMEWORK.md`
-6. `docs/android/DOCUMENTATION_ARCHITECTURE.md`
-7. `docs/android/VALIDATION_POLICY.md`
-8. `docs/android/DIAGNOSTIC_VALIDATION_STANDARD.md`
-9. The most relevant subsystem docs for the task
+4. `docs/android/DEVELOPMENT_WORKFLOW.md`
+5. `docs/android/ENGINEERING_PRINCIPLES.md`
+6. `docs/android/DECISION_FRAMEWORK.md`
+7. `docs/android/DOCUMENTATION_ARCHITECTURE.md`
+8. `docs/android/VALIDATION_POLICY.md`
+9. `docs/android/DIAGNOSTIC_VALIDATION_STANDARD.md`
+10. `docs/android/ENGINEERING_KNOWLEDGE_FRAMEWORK.md`
+11. The most relevant subsystem docs for the task
 
 For Android-specific or architecture-level work, also inspect the relevant code
 paths before deciding on a direction.

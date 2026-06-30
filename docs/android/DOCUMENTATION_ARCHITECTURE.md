@@ -30,6 +30,7 @@ Examples:
 - diagnostic validation standard
 - architecture contracts
 - engineering decisions
+- engineering knowledge framework documents
 
 ### Operational
 
@@ -111,6 +112,17 @@ Examples:
 
 Those documents may summarize each other where helpful, but they should not
 duplicate ownership of another document's responsibility.
+
+The engineering knowledge framework documents are canonical as a set:
+
+- `ENGINEERING_KNOWLEDGE_FRAMEWORK.md`
+- `ENGINEERING_LIFECYCLE.md`
+- `DECISION_LOG.md`
+- `UNCERTAINTY_REGISTER.md`
+- `CONFIDENCE_MODEL.md`
+- `LESSONS_LEARNED.md`
+
+Each has a distinct owner and should not be merged into a single catch-all doc.
 
 ## Classifying New Documents
 

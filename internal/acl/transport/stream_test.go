@@ -81,6 +81,42 @@ func TestBoundedTransportStreamTracksLifecycleAndBytes(t *testing.T) {
 	require.True(t, rwc.closed)
 }
 
+func TestBoundedTransportStreamEnforcesReadAndWriteBounds(t *testing.T) {
+	rwc := &scriptedRWC{readData: []byte("abcdef")}
+	stream := NewBoundedTransportStream(rwc, TransportStreamDiagnosticsReport{
+		SchemaVersion: "1",
+		Status:        diagnostics.StatusWarning,
+		Beginner:      "bounded stream boundary test",
+	}, TransportStreamOptions{
+		State:  TransportStreamStateExperimental,
+		Bounds: TransportStreamBounds{MaxReadBytes: 2, MaxWriteBytes: 3},
+	})
+	require.NotNil(t, stream)
+
+	buf := make([]byte, 8)
+	n, err := stream.Read(buf)
+	require.NoError(t, err)
+	require.Equal(t, 2, n)
+
+	n, err = stream.Read(buf)
+	require.ErrorIs(t, err, io.EOF)
+	require.Equal(t, 0, n)
+
+	n, err = stream.Write([]byte("abcd"))
+	require.NoError(t, err)
+	require.Equal(t, 3, n)
+
+	n, err = stream.Write([]byte("zz"))
+	require.ErrorIs(t, err, io.ErrShortWrite)
+	require.Equal(t, 0, n)
+
+	report := stream.Diagnostics()
+	require.Equal(t, TransportStreamStateClosed, report.State)
+	require.Equal(t, "write limit reached", report.CloseReason)
+	require.Equal(t, int64(2), report.BytesRead)
+	require.Equal(t, int64(3), report.BytesWritten)
+}
+
 func TestBoundedTransportStreamMarksEOFAndDisconnect(t *testing.T) {
 	rwc := &scriptedRWC{readData: []byte("x")}
 	stream := NewBoundedTransportStream(rwc, TransportStreamDiagnosticsReport{

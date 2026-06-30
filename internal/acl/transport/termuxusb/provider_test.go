@@ -229,6 +229,15 @@ func TestSessionStreamWrapsFileDescriptorExperimentally(t *testing.T) {
 	require.True(t, stream.Capabilities().Write)
 }
 
+func TestSessionStreamRequiresFileDescriptorEndpoint(t *testing.T) {
+	session := &Session{}
+
+	stream, err := session.Stream()
+	require.Error(t, err)
+	require.Nil(t, stream)
+	require.Contains(t, err.Error(), "byte-stream export is unavailable")
+}
+
 func TestProviderProbeReportsMissingFD(t *testing.T) {
 	require.NoError(t, os.Unsetenv("TERMUX_USB_FD"))
 
