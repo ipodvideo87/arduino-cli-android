@@ -105,6 +105,12 @@ This file is a logbook of tested findings from the project history.
 - Confidence: high
 - Notes: this is host validation only; native Termux byte-stream readiness remains unproven
 
+- Environment: repository unit-test environment
+- Command/evidence: `go test ./internal/cli/acl/...`
+- Result: `acl transport stream-validate` now exists as a diagnostic-only CLI surface that wraps the live Termux USB stream in the bounded transport contract and can exercise one-byte read/write probes against a scripted stream fixture
+- Confidence: high
+- Notes: this validates the CLI wiring and report shape only; native Termux validation is still required before any byte-stream readiness claim
+
 - Environment: native Termux validation planning
 - Command/evidence: `docs/android/MILESTONE_TERMUX_USB_PROVIDER.md`
 - Result: a native-Termux checklist now exists for `acl transport list`,

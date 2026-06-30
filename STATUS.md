@@ -66,6 +66,9 @@ Current validation posture:
 - The Termux USB provider now also exposes a bounded `acl transport probe-fd`
   / `probe-fd-helper` stream-diagnostics path that records `TERMUX_USB_FD`
   evidence without claiming a usable byte stream.
+- The Termux USB provider now also exposes `acl transport stream-validate`, a
+  bounded stream wrapper diagnostic that can optionally exercise a one-byte
+  read/write probe without claiming byte-stream readiness.
 - The transport stream foundation now exists as a reusable bounded stream
   wrapper and report model; the stream state is still experimental until native
   Termux byte-stream validation proves read/write behavior.

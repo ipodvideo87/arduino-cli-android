@@ -55,6 +55,7 @@ Run these on the Android device in native Termux:
 ./arduino-cli acl transport acquire --device <device-path>
 ./arduino-cli acl transport probe-fd --device <device-path> --details
 ./arduino-cli acl transport stream-status --device <device-path> --details
+./arduino-cli acl transport stream-validate --device <device-path> --details
 ```
 
 Optional JSON forms, if you want machine-readable output:
@@ -263,6 +264,9 @@ Observed on the Samsung A17 / Android 16 / native Termux environment:
   - JSON output is validated
 - `./arduino-cli acl transport stream-status --device /dev/bus/usb/001/002 --details`
   - generic alias for the same stream-state report
+- `./arduino-cli acl transport stream-validate --device /dev/bus/usb/001/002 --details`
+  - wraps the live stream in the bounded transport contract and can optionally
+    exercise a one-byte read/write probe
 
 Validated conclusion:
 

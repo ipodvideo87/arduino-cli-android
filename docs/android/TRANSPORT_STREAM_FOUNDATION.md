@@ -135,7 +135,12 @@ Diagnostic commands:
 
 - `arduino-cli acl transport probe-fd --device <path>`
 - `arduino-cli acl transport stream-status --device <path>`
+- `arduino-cli acl transport stream-validate --device <path>`
 - `arduino-cli acl transport probe-fd-helper --json`
+
+`stream-validate` wraps the live session stream in the bounded transport
+contract and can optionally exercise a one-byte read/write probe without
+claiming upload, flashing, or protocol framing.
 
 ## Diagnostics
 

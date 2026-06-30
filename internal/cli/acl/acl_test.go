@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -695,6 +696,87 @@ func TestACLTransportStreamStatusCommandText(t *testing.T) {
 	require.NotContains(t, output, "flash")
 }
 
+func TestACLTransportStreamValidateCommandJSON(t *testing.T) {
+	oldFactory := newTransportProvider
+	newTransportProvider = func() transportProvider {
+		return fakeCLITransportProvider{
+			desc: transport.TransportDescriptor{
+				Kind:      transport.KindAndroidUSBFD,
+				Name:      "termux-usb",
+				Provider:  "termuxusb",
+				Available: true,
+			},
+			openFn: func(_ context.Context, _ transport.OpenRequest) (transport.TransportSession, error) {
+				return newTestStreamSession("abc"), nil
+			},
+		}
+	}
+	t.Cleanup(func() { newTransportProvider = oldFactory })
+
+	root := newTestRoot()
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{
+		"acl", "transport", "stream-validate",
+		"--json",
+		"--device", "/dev/bus/usb/001/002",
+		"--validate-read",
+		"--validate-write",
+	})
+
+	require.NoError(t, root.Execute())
+
+	var report transportStreamValidateReport
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &report))
+	require.Equal(t, acldiagnostics.StatusWarning, report.Status)
+	require.True(t, report.ValidateRead)
+	require.True(t, report.ValidateWrite)
+	require.Equal(t, int64(1), report.ReadBytes)
+	require.Equal(t, int64(1), report.WriteBytes)
+	require.Equal(t, int64(1), report.Diagnostics.StreamProbe.BytesRead)
+	require.Equal(t, int64(1), report.Diagnostics.StreamProbe.BytesWritten)
+	require.Equal(t, transport.TransportStreamStateClosed, report.StreamState)
+	require.Equal(t, "closed by caller", report.CloseReason)
+}
+
+func TestACLTransportStreamValidateCommandText(t *testing.T) {
+	oldFactory := newTransportProvider
+	newTransportProvider = func() transportProvider {
+		return fakeCLITransportProvider{
+			desc: transport.TransportDescriptor{
+				Kind:      transport.KindAndroidUSBFD,
+				Name:      "termux-usb",
+				Provider:  "termuxusb",
+				Available: true,
+			},
+			openFn: func(_ context.Context, _ transport.OpenRequest) (transport.TransportSession, error) {
+				return newTestStreamSession("abc"), nil
+			},
+		}
+	}
+	t.Cleanup(func() { newTransportProvider = oldFactory })
+
+	root := newTestRoot()
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{
+		"acl", "transport", "stream-validate",
+		"--device", "/dev/bus/usb/001/002",
+		"--validate-read",
+		"--validate-write",
+	})
+
+	require.NoError(t, root.Execute())
+
+	output := buf.String()
+	require.Contains(t, output, "ACL Transport Stream Validate")
+	require.Contains(t, output, "Validate read: requested")
+	require.Contains(t, output, "Validate write: requested")
+	require.Contains(t, output, "Bytes: read=1 written=1")
+}
+
 func TestACLTransportProbeFDHelperCommandJSON(t *testing.T) {
 	file, err := os.CreateTemp(t.TempDir(), "termux-usb-fd-*")
 	require.NoError(t, err)
@@ -748,6 +830,7 @@ type fakeCLITransportProvider struct {
 	permission transport.PermissionResult
 	devices    []transport.DiscoveredDevice
 	probe      transport.TransportStreamDiagnosticsReport
+	openFn     func(context.Context, transport.OpenRequest) (transport.TransportSession, error)
 }
 
 func (f fakeCLITransportProvider) Descriptor() transport.TransportDescriptor { return f.desc }
@@ -763,8 +846,11 @@ func (f fakeCLITransportProvider) RequestPermission(context.Context, transport.P
 	return f.permission, nil
 }
 
-func (f fakeCLITransportProvider) Open(context.Context, transport.OpenRequest) (transport.TransportSession, error) {
-	return nil, nil
+func (f fakeCLITransportProvider) Open(ctx context.Context, req transport.OpenRequest) (transport.TransportSession, error) {
+	if f.openFn != nil {
+		return f.openFn(ctx, req)
+	}
+	return nil, fmt.Errorf("open not implemented")
 }
 
 func (f fakeCLITransportProvider) Diagnostics(context.Context, transport.DiagnosticsRequest) (transport.TransportDiagnosticsReport, error) {
@@ -781,6 +867,116 @@ func (f fakeCLITransportProvider) Probe(context.Context, transport.StreamProbeRe
 		}, nil
 	}
 	return f.probe, nil
+}
+
+type testStreamSession struct {
+	stream transport.TransportStream
+}
+
+func newTestStreamSession(data string) transport.TransportSession {
+	return testStreamSession{
+		stream: &testTransportStream{
+			reader: strings.NewReader(data),
+			report: transport.TransportStreamDiagnosticsReport{
+				SchemaVersion: "1",
+				Status:        acldiagnostics.StatusWarning,
+				Provider:      "termuxusb",
+				ProviderKind:  transport.KindAndroidUSBFD,
+				State:         transport.TransportStreamStateExperimental,
+				Beginner:      "stream boundary fixture",
+			},
+		},
+	}
+}
+
+func (s testStreamSession) Close() error { return nil }
+
+func (s testStreamSession) Capabilities() transport.TransportCapabilities {
+	return transport.CapabilitiesFromList(
+		transport.CapabilityDiscovery,
+		transport.CapabilityPermission,
+		transport.CapabilityUSBHandle,
+		transport.CapabilityDescriptorDiscovery,
+		transport.CapabilityBulkTransfer,
+		transport.CapabilityInterruptTransfer,
+		transport.CapabilityControlTransfer,
+	)
+}
+
+func (s testStreamSession) Diagnostics() transport.TransportDiagnosticsReport {
+	report := transport.TransportDiagnosticsReport{
+		SchemaVersion:    "1",
+		Status:           acldiagnostics.StatusWarning,
+		Provider:         "termuxusb",
+		ProviderKind:     transport.KindAndroidUSBFD,
+		DiscoveryStatus:  acldiagnostics.StatusPassed,
+		PermissionStatus: acldiagnostics.StatusPassed,
+		ConnectionStatus: acldiagnostics.StatusWarning,
+		Beginner:         "test stream session",
+	}
+	report.StreamProbe = s.stream.Diagnostics()
+	report.StreamStatus = report.StreamProbe.Status
+	return report
+}
+
+func (s testStreamSession) Stream() (transport.TransportStream, error) {
+	return s.stream, nil
+}
+
+type testTransportStream struct {
+	reader *strings.Reader
+	writer bytes.Buffer
+	report transport.TransportStreamDiagnosticsReport
+	closed bool
+}
+
+func (s *testTransportStream) Read(p []byte) (int, error) {
+	if s.reader == nil {
+		return 0, io.EOF
+	}
+	return s.reader.Read(p)
+}
+
+func (s *testTransportStream) Write(p []byte) (int, error) {
+	return s.writer.Write(p)
+}
+
+func (s *testTransportStream) Close() error {
+	s.closed = true
+	return nil
+}
+
+func (s *testTransportStream) Capabilities() transport.TransportStreamCapabilities {
+	return transport.TransportStreamCapabilities{
+		Read:         true,
+		Write:        true,
+		Close:        true,
+		Timeouts:     true,
+		Cancellation: true,
+		LastActivity: true,
+		CloseReason:  true,
+		EOF:          true,
+		Disconnect:   true,
+		Experimental: true,
+	}
+}
+
+func (s *testTransportStream) Diagnostics() transport.TransportStreamDiagnosticsReport {
+	report := s.report
+	if report.SchemaVersion == "" {
+		report.SchemaVersion = "1"
+	}
+	if report.Status == "" {
+		report.Status = acldiagnostics.StatusWarning
+	}
+	if report.State == "" {
+		report.State = transport.TransportStreamStateExperimental
+	}
+	if s.closed {
+		report.State = transport.TransportStreamStateClosed
+		report.CloseReason = "closed by caller"
+	}
+	return report
 }
 
 type testBootstrapExecutor struct {
