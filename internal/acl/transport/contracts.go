@@ -667,6 +667,94 @@ type StreamValidator interface {
 	Validate(context.Context, StreamValidationRequest) (TransportStreamValidationReport, error)
 }
 
+type InterfaceClaimReleaseRequest struct {
+	Selection       SelectionRequest  `json:"selection,omitempty"`
+	Device          DiscoveredDevice  `json:"device,omitempty"`
+	InterfaceNumber int               `json:"interface_number,omitempty"`
+	HelperCommand   string            `json:"helper_command,omitempty"`
+	HandoffMode     string            `json:"handoff_mode,omitempty"`
+	Metadata        map[string]string `json:"metadata,omitempty"`
+}
+
+type InterfaceClaimReleaseReport struct {
+	SchemaVersion    string             `json:"schema_version,omitempty"`
+	Status           diagnostics.Status `json:"status,omitempty"`
+	Provider         string             `json:"provider,omitempty"`
+	ProviderKind     Kind               `json:"provider_kind,omitempty"`
+	Device           DiscoveredDevice   `json:"device,omitempty"`
+	InterfaceNumber  int                `json:"interface_number,omitempty"`
+	TermuxUSBCommand string             `json:"termux_usb_command,omitempty"`
+	ClaimState       string             `json:"claim_state,omitempty"`
+	ReleaseState     string             `json:"release_state,omitempty"`
+	ClaimError       string             `json:"claim_error,omitempty"`
+	ReleaseError     string             `json:"release_error,omitempty"`
+	Warnings         []string           `json:"warnings,omitempty"`
+	Limitations      []string           `json:"limitations,omitempty"`
+	Traces           []CommandTrace     `json:"traces,omitempty"`
+	Beginner         string             `json:"beginner_summary,omitempty"`
+	Professional     []string           `json:"professional_details,omitempty"`
+	NextStep         string             `json:"next_step,omitempty"`
+	Metadata         map[string]string  `json:"metadata,omitempty"`
+}
+
+func (r InterfaceClaimReleaseReport) BeginnerSummary() string {
+	if strings.TrimSpace(r.Beginner) != "" {
+		return r.Beginner
+	}
+	switch r.Status {
+	case diagnostics.StatusPassed:
+		return "interface claim/release completed"
+	case diagnostics.StatusWarning:
+		return "interface claim/release completed with warnings"
+	case diagnostics.StatusFailed:
+		return "interface claim/release failed"
+	case diagnostics.StatusSkipped:
+		return "interface claim/release skipped"
+	default:
+		return "interface claim/release pending"
+	}
+}
+
+func (r InterfaceClaimReleaseReport) ProfessionalDetails() []string {
+	details := append([]string(nil), r.Professional...)
+	if r.Provider != "" {
+		details = append(details, "provider: "+r.Provider)
+	}
+	if r.ProviderKind != "" {
+		details = append(details, "provider kind: "+string(r.ProviderKind))
+	}
+	details = append(details, fmt.Sprintf("interface number: %d", r.InterfaceNumber))
+	if r.TermuxUSBCommand != "" {
+		details = append(details, "termux-usb command: "+r.TermuxUSBCommand)
+	}
+	if r.ClaimState != "" {
+		details = append(details, "claim state: "+r.ClaimState)
+	}
+	if r.ReleaseState != "" {
+		details = append(details, "release state: "+r.ReleaseState)
+	}
+	if r.ClaimError != "" {
+		details = append(details, "claim error: "+r.ClaimError)
+	}
+	if r.ReleaseError != "" {
+		details = append(details, "release error: "+r.ReleaseError)
+	}
+	if len(r.Warnings) > 0 {
+		details = append(details, "warnings: "+strings.Join(r.Warnings, "; "))
+	}
+	if len(r.Limitations) > 0 {
+		details = append(details, "limitations: "+strings.Join(r.Limitations, "; "))
+	}
+	if r.NextStep != "" {
+		details = append(details, "next step: "+r.NextStep)
+	}
+	return details
+}
+
+type InterfaceClaimReleaser interface {
+	ClaimRelease(context.Context, InterfaceClaimReleaseRequest) (InterfaceClaimReleaseReport, error)
+}
+
 func (r TransportStreamDiagnosticsReport) HasContent() bool {
 	return strings.TrimSpace(r.SchemaVersion) != "" ||
 		r.Status != "" ||

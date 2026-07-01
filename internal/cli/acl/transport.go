@@ -19,6 +19,7 @@ type transportProvider interface {
 	transport.SessionOpener
 	transport.StreamProber
 	transport.StreamValidator
+	transport.InterfaceClaimReleaser
 }
 
 var newTransportProvider = func() transportProvider {
@@ -53,9 +54,11 @@ func newTransportCommand() *cobra.Command {
 	cmd.AddCommand(newTransportProbeFDCommand())
 	cmd.AddCommand(newTransportStreamStatusCommand())
 	cmd.AddCommand(newTransportStreamValidateCommand())
+	cmd.AddCommand(newTransportClaimReleaseCommand())
 	cmd.AddCommand(newTransportUSBTopologyHelperCommand())
 	cmd.AddCommand(newTransportProbeFDHelperCommand())
 	cmd.AddCommand(newTransportStreamValidateHelperCommand())
+	cmd.AddCommand(newTransportClaimReleaseHelperCommand())
 	return cmd
 }
 
@@ -219,6 +222,43 @@ func newTransportStreamValidateCommand() *cobra.Command {
 	return cmd
 }
 
+func newTransportClaimReleaseCommand() *cobra.Command {
+	opts := transportCommandOptions{}
+	var devicePath string
+	var interfaceNumber int
+	cmd := &cobra.Command{
+		Use:   "claim-release",
+		Short: "Validate diagnostic interface claim/release behavior for a Termux USB device",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			provider := newTransportProvider()
+			report, err := provider.ClaimRelease(cmd.Context(), transport.InterfaceClaimReleaseRequest{
+				Device: transport.DiscoveredDevice{
+					StableID:        devicePath,
+					DisplayName:     devicePath,
+					TransportFamily: transport.TransportFamilyUSBSerial,
+				},
+				InterfaceNumber: interfaceNumber,
+				Metadata: map[string]string{
+					"device_path":      devicePath,
+					"interface_number": fmt.Sprintf("%d", interfaceNumber),
+				},
+			})
+			if err != nil && strings.TrimSpace(report.Beginner) == "" {
+				report.Beginner = err.Error()
+			}
+			if isJSON(cmd) {
+				return writeJSON(cmd, report)
+			}
+			return writeTransportClaimReleaseReport(cmd, report, opts.details)
+		},
+	}
+	cmd.Flags().BoolVar(&opts.details, "details", false, "Show professional-level details")
+	cmd.Flags().StringVar(&devicePath, "device", "", "USB device path to validate")
+	cmd.Flags().IntVar(&interfaceNumber, "interface", 0, "USB interface number to claim and release")
+	_ = cmd.MarkFlagRequired("device")
+	return cmd
+}
+
 func newTransportStreamProbeCommand(use, short string) *cobra.Command {
 	opts := transportCommandOptions{}
 	var devicePath string
@@ -284,6 +324,21 @@ func newTransportStreamValidateHelperCommand() *cobra.Command {
 	return cmd
 }
 
+func newTransportClaimReleaseHelperCommand() *cobra.Command {
+	opts := transportClaimReleaseOptions{}
+	cmd := &cobra.Command{
+		Use:    "claim-release-helper",
+		Hidden: true,
+		Short:  "Internal helper for diagnostic TERMUX_USB_FD interface claim/release validation",
+		Args:   cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return writeJSON(cmd, termuxusb.HelperClaimReleaseReportFromInvocation(args, opts.interfaceNumber))
+		},
+	}
+	cmd.Flags().IntVar(&opts.interfaceNumber, "interface", 0, "USB interface number to claim and release")
+	return cmd
+}
+
 func newTransportUSBTopologyHelperCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    "usb-topology-helper",
@@ -306,6 +361,10 @@ type transportStreamValidateOptions struct {
 	validateRead  bool
 	validateWrite bool
 	timeout       time.Duration
+}
+
+type transportClaimReleaseOptions struct {
+	interfaceNumber int
 }
 
 func permissionStateToStatus(state transport.PermissionState) acldiagnostics.Status {
@@ -472,6 +531,32 @@ func writeTransportStreamValidateReport(cmd *cobra.Command, report transport.Tra
 	if report.ValidateWrite {
 		fmt.Fprintf(cmd.OutOrStdout(), "Validate write: requested\n")
 	}
+	if details {
+		for _, detail := range report.ProfessionalDetails() {
+			fmt.Fprintln(cmd.OutOrStdout(), detail)
+		}
+		for _, trace := range report.Traces {
+			fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", trace.Command, strings.Join(trace.Args, " "))
+			if trace.Stdout != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "stdout: %s\n", trace.Stdout)
+			}
+			if trace.Stderr != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "stderr: %s\n", trace.Stderr)
+			}
+			if trace.Interpretation != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "interpretation: %s\n", trace.Interpretation)
+			}
+		}
+	}
+	return nil
+}
+
+func writeTransportClaimReleaseReport(cmd *cobra.Command, report transport.InterfaceClaimReleaseReport, details bool) error {
+	fmt.Fprintln(cmd.OutOrStdout(), "ACL Transport Claim Release")
+	fmt.Fprintln(cmd.OutOrStdout(), report.BeginnerSummary())
+	fmt.Fprintf(cmd.OutOrStdout(), "Status: %s\n", report.Status)
+	fmt.Fprintf(cmd.OutOrStdout(), "Device: %s\n", report.Device.StableID)
+	fmt.Fprintf(cmd.OutOrStdout(), "Interface: %d\n", report.InterfaceNumber)
 	if details {
 		for _, detail := range report.ProfessionalDetails() {
 			fmt.Fprintln(cmd.OutOrStdout(), detail)

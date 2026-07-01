@@ -24,6 +24,7 @@
 - Transport provider skeleton, diagnostics models, and fake-provider tests
 - Termux USB transport provider, command traces, and safe CLI diagnostics
 - Termux USB fd-handoff probe and transport-stream diagnostics foundation
+- Termux USB topology bridge foundation
 - Transport Stream Foundation
 - Transport API Stabilization
 - Upload Engine foundation and prepare-only executor
@@ -40,7 +41,8 @@
 
 - Finish full-flash bootloader package validation on native Termux
 - Add emulated ARM64 / Termux-like smoke tests
-- Validate the diagnostic-only USB topology bridge foundation on native Termux
+- Validate diagnostic-only interface claim/release on native Termux, starting
+  with interface 0
 - Build a generic Android USB transport bridge
 - Validate the native Termux transport stream boundary
 - Validate the Termux USB provider and file-descriptor handoff path on native Termux

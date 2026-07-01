@@ -353,6 +353,140 @@ func (p *Provider) Validate(ctx context.Context, req transport.StreamValidationR
 	return report, nil
 }
 
+func (p *Provider) ClaimRelease(ctx context.Context, req transport.InterfaceClaimReleaseRequest) (transport.InterfaceClaimReleaseReport, error) {
+	devicePath := requestDevicePath(req.Device, req.Metadata)
+	if strings.TrimSpace(devicePath) == "" {
+		return transport.InterfaceClaimReleaseReport{
+			SchemaVersion: "1",
+			Status:        diagnostics.StatusFailed,
+			Provider:      defaultProviderID,
+			ProviderKind:  transport.KindAndroidUSBFD,
+			Beginner:      "interface claim/release requires a device path",
+			Limitations:   []string{"missing device path"},
+			NextStep:      "run claim-release with a concrete USB device path",
+			Metadata:      map[string]string{},
+		}, errors.New("device path is required")
+	}
+	helperCommand := strings.TrimSpace(req.HelperCommand)
+	if helperCommand == "" {
+		helperCommand = defaultClaimReleaseHelperCommand(req)
+	}
+	report := transport.InterfaceClaimReleaseReport{
+		SchemaVersion:   "1",
+		Status:          diagnostics.StatusWarning,
+		Provider:        defaultProviderID,
+		ProviderKind:    transport.KindAndroidUSBFD,
+		Device:          req.Device,
+		InterfaceNumber: req.InterfaceNumber,
+		ClaimState:      "not_attempted",
+		ReleaseState:    "not_attempted",
+		Limitations: []string{
+			"claim/release diagnostics are experimental",
+			"no payload transfers were attempted",
+		},
+		Beginner: "interface claim/release validation is experimental",
+		Professional: []string{
+			"claim/release is diagnostics-only and does not send payload data",
+		},
+		NextStep: "run the helper through termux-usb -r -E to inspect TERMUX_USB_FD and claim/release behavior",
+		Metadata: map[string]string{},
+	}
+	report.Device.StableID = devicePath
+	if report.Device.DisplayName == "" {
+		report.Device.DisplayName = devicePath
+	}
+	report.Metadata["device_path"] = devicePath
+	report.Metadata["helper_command"] = helperCommand
+	report.Metadata["handoff_mode"] = "env"
+
+	if !p.available() {
+		report.Status = diagnostics.StatusFailed
+		report.ClaimState = "unavailable"
+		report.ReleaseState = "unavailable"
+		report.Beginner = "termux-usb is unavailable on this host"
+		report.Limitations = append(report.Limitations, "termux-usb is not present")
+		report.NextStep = "install termux-usb and retry claim/release validation on native Termux"
+		return report, nil
+	}
+
+	args := []string{"-r", "-E", "-e", helperCommand, devicePath}
+	report.TermuxUSBCommand = formatCommand(p.commandName(), args)
+	report.Metadata["termux_usb_command"] = report.TermuxUSBCommand
+	result := p.runner.Run(ctx, p.commandName(), args...)
+	trace := transport.CommandTrace{
+		Command:        p.commandName(),
+		Args:           append([]string(nil), args...),
+		Stdout:         result.Stdout,
+		Stderr:         result.Stderr,
+		ExitCode:       result.ExitCode,
+		Interpretation: "termux-usb interface claim/release",
+	}
+	if result.Err != nil {
+		trace.Err = result.Err.Error()
+	}
+
+	parsed, parseErr := parseUSBClaimReleaseReport(result.Stdout)
+	if parseErr != nil {
+		report.Traces = []transport.CommandTrace{trace}
+		report.Warnings = append(report.Warnings, parseErr.Error())
+		if result.Err != nil {
+			report.Warnings = append(report.Warnings, result.Err.Error())
+		}
+		if trimmed := strings.TrimSpace(result.Stderr); trimmed != "" {
+			report.Professional = append(report.Professional, "helper stderr: "+trimmed)
+		}
+		if trimmed := strings.TrimSpace(result.Stdout); trimmed != "" {
+			report.Professional = append(report.Professional, "helper stdout: "+trimmed)
+		}
+		report.Status = diagnostics.StatusFailed
+		report.ClaimState = "failed"
+		report.ReleaseState = "not_attempted"
+		if result.Err != nil || result.ExitCode != 0 {
+			report.Beginner = "termux-usb handoff failed before claim/release JSON was produced"
+			report.Limitations = append(report.Limitations, "termux-usb did not hand off execution to the helper")
+			report.NextStep = "run claim-release through termux-usb -r -E to receive TERMUX_USB_FD"
+			return report, nil
+		}
+		report.Beginner = "claim/release helper output could not be parsed"
+		report.Limitations = append(report.Limitations, "helper JSON output was malformed")
+		report.NextStep = "fix the helper output parser before attempting interface claim/release validation"
+		return report, nil
+	}
+
+	report = claimReleaseReportFromHelper(parsed)
+	report.Provider = defaultProviderID
+	report.ProviderKind = transport.KindAndroidUSBFD
+	report.Device.StableID = devicePath
+	if report.Device.DisplayName == "" {
+		report.Device.DisplayName = devicePath
+	}
+	if report.Metadata == nil {
+		report.Metadata = map[string]string{}
+	}
+	report.Metadata["device_path"] = devicePath
+	report.Metadata["helper_command"] = helperCommand
+	report.Metadata["handoff_mode"] = "env"
+	report.TermuxUSBCommand = formatCommand(p.commandName(), args)
+	report.Metadata["termux_usb_command"] = report.TermuxUSBCommand
+	report.Traces = append([]transport.CommandTrace{trace}, report.Traces...)
+	if result.Err != nil {
+		report.Warnings = append(report.Warnings, result.Err.Error())
+	}
+	if result.ExitCode != 0 && report.Status == "" {
+		report.Status = diagnostics.StatusFailed
+	}
+	if report.ClaimState == "" {
+		report.ClaimState = "not_attempted"
+	}
+	if report.ReleaseState == "" {
+		report.ReleaseState = "not_attempted"
+	}
+	if report.NextStep == "" {
+		report.NextStep = "use the claim/release result to decide whether later transfer diagnostics are safe"
+	}
+	return report, nil
+}
+
 func (p *Provider) Probe(ctx context.Context, req transport.StreamProbeRequest) (transport.TransportStreamDiagnosticsReport, error) {
 	devicePath := requestDevicePath(req.Device, req.Metadata)
 	if strings.TrimSpace(devicePath) == "" {
@@ -838,6 +972,11 @@ func defaultStreamValidateHelperCommand(req transport.StreamValidationRequest) s
 	if req.Timeout > 0 {
 		args = append(args, "--timeout", req.Timeout.String())
 	}
+	return fmt.Sprintf("%s %s", os.Args[0], strings.Join(args, " "))
+}
+
+func defaultClaimReleaseHelperCommand(req transport.InterfaceClaimReleaseRequest) string {
+	args := []string{"acl", "transport", "claim-release-helper", "--json", "--interface", strconv.Itoa(req.InterfaceNumber)}
 	return fmt.Sprintf("%s %s", os.Args[0], strings.Join(args, " "))
 }
 

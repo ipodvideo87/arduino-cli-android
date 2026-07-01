@@ -143,6 +143,16 @@ Repository cleanup:
 - The Termux USB transport provider now exists as a diagnostic-only implementation with discovery, permission, session, endpoint-export, and bounded fd-probe contracts, plus `arduino-cli acl transport list|diagnose|acquire|probe-fd|stream-status` CLI surfaces.
 - The Termux USB transport provider now also exposes `stream-status` as a
   diagnostic alias for the same stream state report.
+- The diagnostic-only USB topology bridge foundation is now native-Termux
+  validated and reports descriptors, interfaces, endpoints, and topology source
+  evidence without payload transfers.
+- Native Termux has validated the USB topology bridge foundation on the target
+  device: descriptors, interfaces, endpoints, vendor/product identity, serial
+  identity, and the `libusb` topology source are visible without payload
+  transfers.
+- The Termux USB transport provider now also exposes diagnostic-only interface
+  claim/release validation for the native helper handoff path, starting with
+  interface 0.
 - The ACL firmware package foundation now exists, including the build manifest, flash plan, firmware package wrapper, and binary validator.
 - The firmware package now also emits `analysis.json` and `README_FLASHING.txt`, and the ACL compile path uses metadata-first bootloader detection with an app-only fallback warning when the bootloader artifacts are incomplete.
 - The ACL upload engine foundation now exists as a transport-neutral prepare-only planner/executor stack that consumes firmware packages and flash plans without opening real transport streams or sending bytes.
@@ -203,7 +213,8 @@ Repository cleanup:
 - Validate the ACL upload prepare-only executor in native Termux before wiring real transport execution, and keep the report surface aligned with the GUI contract.
 - Implement the first real transport provider runtime after the contract layer is proven stable.
 - Validate the Termux USB transport provider on native Termux and confirm the exact discovery, permission, and file-descriptor handoff behavior on-device.
-- Validate the diagnostic-only USB topology bridge foundation on native Termux.
+- Validate diagnostic-only interface claim/release on native Termux, starting
+  with interface 0.
 - Probe `TERMUX_USB_FD` handoff and build the byte-stream bridge foundation for the Termux USB provider.
 - Validate the transport stream foundation on native Termux before claiming any
   byte-stream support.

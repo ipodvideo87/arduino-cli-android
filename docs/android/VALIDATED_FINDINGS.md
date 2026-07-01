@@ -10,6 +10,20 @@ This file is a logbook of tested findings from the project history.
 - Confidence: high
 - Notes: this validates the code path and report shape only; it does not validate real upload, flashing, or transport execution
 
+## 2026-06-30
+
+- Environment: repository unit-test environment
+- Command/evidence: `go test ./internal/acl/transport/termuxusb ./internal/cli/acl` and `go build -o arduino-cli .`
+- Result: the diagnostic-only interface claim/release command surface compiles and the Termux USB provider helper boundary passes focused unit tests
+- Confidence: high
+- Notes: this validates the CLI and helper contract only; it does not validate native Termux claim/release behavior
+
+- Environment: native Termux on Samsung A17 / Android 16
+- Command/evidence: `./arduino-cli acl transport diagnose --device /dev/bus/usb/001/002 --details` and `./arduino-cli --json acl transport diagnose --device /dev/bus/usb/001/002`
+- Result: the diagnostic-only USB topology bridge foundation reports `vid=0x303a pid=0x1001`, manufacturer `Espressif`, product `USB JTAG/serial debug unit`, serial identity, `interfaces=3`, `endpoints=5`, CDC bulk endpoints `0x01/0x81`, vendor-specific bulk endpoints `0x02/0x83`, and `topology_source=libusb` without payload transfers; `claim_release_state` remains `not_attempted`
+- Confidence: high
+- Notes: this proves the topology bridge works on-device, but it does not yet prove interface claim/release or any byte-stream behavior
+
 - Environment: native Termux on Samsung A17 / Android 16
 - Command/evidence: `./arduino-cli acl workflow upload --help`
 - Result: the upload workflow is positional and dry-run only; the help text

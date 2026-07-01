@@ -526,6 +526,32 @@ func TestProviderValidateUsesExpectedCommandShape(t *testing.T) {
 	require.Equal(t, 2*time.Second, report.Timeout)
 }
 
+func TestProviderClaimReleaseUsesExpectedCommandShape(t *testing.T) {
+	runner := &scriptedRunner{
+		results: map[string]CommandResult{
+			defaultCommandName + " -r -E -e helper /dev/bus/usb/001/002": {
+				Stdout:   `{"schema_version":"1","status":"warning","provider":"termuxusb","provider_kind":"android-usb-fd","device":{"stable_id":"/dev/bus/usb/001/002","display_name":"/dev/bus/usb/001/002"},"interface_number":0,"claim_state":"claimed","release_state":"released","termux_usb_command":"termux-usb -r -E -e helper /dev/bus/usb/001/002","beginner_summary":"TERMUX_USB_FD observed via environment; interface claim/release remains experimental","professional_details":["TERMUX_USB_FD was observed and the interface could be claimed and released","no payload transfers were attempted"],"next_step":"use the claim/release evidence to decide whether later transfer diagnostics are safe","metadata":{"device_path":"/dev/bus/usb/001/002","helper_command":"helper","handoff_mode":"env","termux_usb_command":"termux-usb -r -E -e helper /dev/bus/usb/001/002"}}`,
+				ExitCode: 0,
+			},
+		},
+	}
+	provider := NewProviderWithRunner(runner)
+
+	report, err := provider.ClaimRelease(context.Background(), transport.InterfaceClaimReleaseRequest{
+		Device: transport.DiscoveredDevice{
+			StableID: "/dev/bus/usb/001/002",
+		},
+		InterfaceNumber: 0,
+		HelperCommand:   "helper",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "termux-usb -r -E -e helper /dev/bus/usb/001/002", report.TermuxUSBCommand)
+	require.Equal(t, "claimed", report.ClaimState)
+	require.Equal(t, "released", report.ReleaseState)
+	require.NotEmpty(t, runner.calls)
+	require.Equal(t, defaultCommandName+" -r -E -e helper /dev/bus/usb/001/002", runner.calls[0])
+}
+
 func TestHelperStreamValidationReportsMissingFD(t *testing.T) {
 	require.NoError(t, os.Unsetenv("TERMUX_USB_FD"))
 
@@ -553,6 +579,16 @@ func TestHelperStreamValidationRunsWriteBeforeRead(t *testing.T) {
 	require.Equal(t, transport.TransportStreamStateClosed, report.StreamProbe.State)
 	require.Equal(t, transport.StreamObservationPassed, report.StreamProbe.WriteState)
 	require.Equal(t, transport.StreamObservationFailed, report.StreamProbe.ReadState)
+}
+
+func TestHelperClaimReleaseReportsMissingFD(t *testing.T) {
+	require.NoError(t, os.Unsetenv("TERMUX_USB_FD"))
+
+	report := HelperClaimReleaseReportFromInvocation(nil, 0)
+	require.Equal(t, diagnostics.StatusWarning, report.Status)
+	require.Equal(t, "unavailable", report.ClaimState)
+	require.Equal(t, "unavailable", report.ReleaseState)
+	require.Contains(t, report.Beginner, "TERMUX_USB_FD is not set")
 }
 
 func TestClassifyWriteProbeState(t *testing.T) {

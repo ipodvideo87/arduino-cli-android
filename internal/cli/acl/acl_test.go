@@ -851,13 +851,113 @@ func TestACLTransportProbeFDHelperCommandArgumentJSON(t *testing.T) {
 	require.Equal(t, "argv", report.HandoffMode)
 }
 
+func TestACLTransportClaimReleaseCommandJSON(t *testing.T) {
+	oldFactory := newTransportProvider
+	var captured transport.InterfaceClaimReleaseRequest
+	newTransportProvider = func() transportProvider {
+		return fakeCLITransportProvider{
+			desc: transport.TransportDescriptor{
+				Kind:      transport.KindAndroidUSBFD,
+				Name:      "termux-usb",
+				Provider:  "termuxusb",
+				Available: true,
+			},
+			claimReleaseFn: func(_ context.Context, req transport.InterfaceClaimReleaseRequest) (transport.InterfaceClaimReleaseReport, error) {
+				captured = req
+				return transport.InterfaceClaimReleaseReport{
+					SchemaVersion:    "1",
+					Status:           acldiagnostics.StatusWarning,
+					Provider:         "termuxusb",
+					ProviderKind:     transport.KindAndroidUSBFD,
+					Device:           req.Device,
+					InterfaceNumber:  req.InterfaceNumber,
+					ClaimState:       "claimed",
+					ReleaseState:     "released",
+					TermuxUSBCommand: "termux-usb -r -E -e ./arduino-cli acl transport claim-release-helper --json --interface 0 /dev/bus/usb/001/002",
+					Beginner:         "interface claim/release validation is experimental",
+					Professional:     []string{"TERMUX_USB_FD was observed and the interface could be claimed and released", "no payload transfers were attempted"},
+					NextStep:         "use the claim/release evidence to decide whether later transfer diagnostics are safe",
+					Metadata:         map[string]string{"helper_command": "./arduino-cli acl transport claim-release-helper --json --interface 0"},
+				}, nil
+			},
+		}
+	}
+	t.Cleanup(func() { newTransportProvider = oldFactory })
+
+	root := newTestRoot()
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"acl", "transport", "claim-release", "--json", "--device", "/dev/bus/usb/001/002", "--interface", "0"})
+
+	require.NoError(t, root.Execute())
+
+	var report transport.InterfaceClaimReleaseReport
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &report))
+	require.Equal(t, acldiagnostics.StatusWarning, report.Status)
+	require.Equal(t, "claimed", report.ClaimState)
+	require.Equal(t, "released", report.ReleaseState)
+	require.Equal(t, "/dev/bus/usb/001/002", captured.Device.StableID)
+	require.Equal(t, 0, captured.InterfaceNumber)
+	require.Equal(t, "termux-usb -r -E -e ./arduino-cli acl transport claim-release-helper --json --interface 0 /dev/bus/usb/001/002", report.TermuxUSBCommand)
+}
+
+func TestACLTransportClaimReleaseCommandText(t *testing.T) {
+	oldFactory := newTransportProvider
+	var captured transport.InterfaceClaimReleaseRequest
+	newTransportProvider = func() transportProvider {
+		return fakeCLITransportProvider{
+			desc: transport.TransportDescriptor{
+				Kind:      transport.KindAndroidUSBFD,
+				Name:      "termux-usb",
+				Provider:  "termuxusb",
+				Available: true,
+			},
+			claimReleaseFn: func(_ context.Context, req transport.InterfaceClaimReleaseRequest) (transport.InterfaceClaimReleaseReport, error) {
+				captured = req
+				return transport.InterfaceClaimReleaseReport{
+					SchemaVersion:   "1",
+					Status:          acldiagnostics.StatusWarning,
+					Provider:        "termuxusb",
+					ProviderKind:    transport.KindAndroidUSBFD,
+					Device:          req.Device,
+					InterfaceNumber: req.InterfaceNumber,
+					ClaimState:      "claimed",
+					ReleaseState:    "released",
+					Beginner:        "interface claim/release validation is experimental",
+					Professional:    []string{"TERMUX_USB_FD was observed and the interface could be claimed and released", "no payload transfers were attempted"},
+					NextStep:        "use the claim/release evidence to decide whether later transfer diagnostics are safe",
+				}, nil
+			},
+		}
+	}
+	t.Cleanup(func() { newTransportProvider = oldFactory })
+
+	root := newTestRoot()
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"acl", "transport", "claim-release", "--device", "/dev/bus/usb/001/002", "--interface", "0", "--details"})
+
+	require.NoError(t, root.Execute())
+
+	output := buf.String()
+	require.Contains(t, output, "ACL Transport Claim Release")
+	require.Contains(t, output, "interface claim/release validation is experimental")
+	require.NotContains(t, output, "upload")
+	require.NotContains(t, output, "flash")
+	require.Equal(t, "/dev/bus/usb/001/002", captured.Device.StableID)
+	require.Equal(t, 0, captured.InterfaceNumber)
+}
+
 type fakeCLITransportProvider struct {
-	desc       transport.TransportDescriptor
-	report     transport.TransportDiagnosticsReport
-	permission transport.PermissionResult
-	devices    []transport.DiscoveredDevice
-	probe      transport.TransportStreamDiagnosticsReport
-	validateFn func(context.Context, transport.StreamValidationRequest) (transport.TransportStreamValidationReport, error)
+	desc           transport.TransportDescriptor
+	report         transport.TransportDiagnosticsReport
+	permission     transport.PermissionResult
+	devices        []transport.DiscoveredDevice
+	probe          transport.TransportStreamDiagnosticsReport
+	claimReleaseFn func(context.Context, transport.InterfaceClaimReleaseRequest) (transport.InterfaceClaimReleaseReport, error)
+	validateFn     func(context.Context, transport.StreamValidationRequest) (transport.TransportStreamValidationReport, error)
 }
 
 func (f fakeCLITransportProvider) Descriptor() transport.TransportDescriptor { return f.desc }
@@ -886,6 +986,18 @@ func (f fakeCLITransportProvider) Validate(ctx context.Context, req transport.St
 		Status:        acldiagnostics.StatusWarning,
 		Beginner:      "stream validation is unavailable",
 		Limitations:   []string{"validate not implemented in fake"},
+	}, nil
+}
+
+func (f fakeCLITransportProvider) ClaimRelease(ctx context.Context, req transport.InterfaceClaimReleaseRequest) (transport.InterfaceClaimReleaseReport, error) {
+	if f.claimReleaseFn != nil {
+		return f.claimReleaseFn(ctx, req)
+	}
+	return transport.InterfaceClaimReleaseReport{
+		SchemaVersion: "1",
+		Status:        acldiagnostics.StatusWarning,
+		Beginner:      "interface claim/release is unavailable",
+		Limitations:   []string{"claim/release not implemented in fake"},
 	}, nil
 }
 

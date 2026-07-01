@@ -18,6 +18,7 @@ Validated behaviors:
 - TERMUX_USB_FD handoff
 - fd observation
 - fd inspection
+- USB topology bridge foundation
 
 Not validated by this milestone:
 
@@ -26,6 +27,7 @@ Not validated by this milestone:
 - serial monitor
 - usable byte-stream endpoint
 - byte-stream read/write
+- interface claim/release
 
 ## Scope
 
@@ -244,6 +246,101 @@ Expected behavior:
 - `stream-status` and `stream-validate` should remain experimental and should
   not overclaim byte-stream readiness
 
+## Diagnostic-Only Interface Claim/Release Validation
+
+The next smallest native-Termux question is whether the Termux USB provider can
+diagnostically claim and release a single interface without payload transfers.
+
+Why native validation is required:
+
+- libusb claim/release is a live device operation
+- Android USB behavior can differ from host builds
+- the repository must not claim interface lifecycle support without native
+  evidence
+
+Target interface:
+
+- start with interface `0`
+- interface `0` is the narrowest non-destructive probe because it exposes only
+  the interrupt IN side of the detected topology
+
+Safe diagnostic order:
+
+1. `./arduino-cli acl transport claim-release --device /dev/bus/usb/001/002 --interface 0 --details`
+2. `./arduino-cli --json acl transport claim-release --device /dev/bus/usb/001/002 --interface 0`
+3. only if the interface 0 result leaves the question unresolved, repeat with
+   `--interface 1`
+4. only if necessary after interface 1, repeat with `--interface 2`
+
+Expected proof from each command:
+
+- the provider can wrap `TERMUX_USB_FD` through the helper handoff path
+- the selected interface is present in the reported topology
+- claim/release is attempted without sending payload data
+- claim success or failure is reported separately from release success or
+  failure
+- the provider remains experimental regardless of outcome
+
+Expected successful outcomes:
+
+- `claim_state=claimed` and `release_state=released`
+- the helper trace shows the native `termux-usb -r -E -e` handoff
+- no payload transfers were attempted
+
+Expected failure outcomes:
+
+- `claim_state=failed` with a libusb or device-access error
+- `release_state=not_attempted` when claim fails
+- `release_state=failed` if claim succeeds but release does not
+- `TERMUX_USB_FD is not set` means the command was not run through the native
+  handoff shape and the evidence is incomplete
+
+Technical interpretation:
+
+- claim and release success means the device can support diagnostic interface
+  lifecycle management on native Termux, but it still does not prove byte-stream
+  support, upload, or monitor behavior
+- claim failure means the interface lifecycle question remains open and the next
+  milestone should be chosen from the claim error, not from assumptions
+- release failure after claim success means the provider must distinguish claim
+  support from release support before any later milestone can be promoted
+
+Confidence and validation changes:
+
+- success on interface 0 increases confidence that the provider can safely
+  manage interface lifecycle diagnostics on-device
+- any failure keeps the provider experimental and keeps claim/release support
+  unproven
+- none of the outcomes promote stream readiness
+
+Decision matrix:
+
+- if interface 0 claims and releases successfully, the next milestone becomes a
+  narrower comparative claim/release check only if the architecture still needs
+  it
+- if interface 0 fails to claim, stop and record the error before considering
+  any later interface
+- if interface 0 claims but does not release, stop and treat release semantics
+  as the next architecture question
+- if the handoff is missing, rerun through `termux-usb -r -E -e` before making
+  any claim about interface support
+
+Exact output to paste back:
+
+- the full stdout from the `--details` command
+- the JSON output if the `--json` form is also run
+- the full `termux-usb` trace line from the report
+
+Completion criteria:
+
+- the command output is captured from native Termux
+- the exact interface number is recorded
+- claim and release states are reported separately
+- the helper trace shows the native handoff shape
+- the result is written to `docs/android/VALIDATED_FINDINGS.md`
+- `STATUS.md` and `ROADMAP.md` are updated only if the result changes the
+  current milestone order or validation state
+
 ## Native-Termux Validation Result
 
 Observed on the Samsung A17 / Android 16 / native Termux environment:
@@ -292,15 +389,18 @@ Validated conclusion:
 - TERMUX_USB_FD handoff is native-Termux validated
 - fd observation is native-Termux validated
 - fd inspection is native-Termux validated
+- USB topology evidence collection is native-Termux validated
 - stream-state reporting is now modeled in code, but native byte-stream
   behavior remains unvalidated
+- interface claim/release remains unvalidated
 - upload, flashing, and serial monitor remain unvalidated
 
 Next recommended milestone:
 
-- native validation of the USB topology bridge foundation
-- bounded byte-stream bridge foundation after the topology evidence has been
-  recorded and the bridge boundary is understood
+- native validation of interface claim/release on the detected USB topology,
+  starting with interface 0
+- bounded byte-stream bridge foundation after the interface lifecycle evidence
+  has been recorded and the bridge boundary is understood
 
 ## What Success Means
 
