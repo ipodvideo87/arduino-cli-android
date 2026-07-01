@@ -26,6 +26,10 @@ preview, and the later stages are usually captured as an engineering review.
 Those are lightweight wrappers around the same lifecycle, not additional
 approval gates.
 
+Interrupted work should also carry a live snapshot in
+`docs/android/TASK_RECOVERY.md`. That file is the first place to resume from
+after a pause, before any new planning or re-derivation.
+
 ## Stage Guidance
 
 ### Frame the question

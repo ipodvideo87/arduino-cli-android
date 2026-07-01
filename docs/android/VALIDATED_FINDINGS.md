@@ -18,6 +18,14 @@ This file is a logbook of tested findings from the project history.
 - Confidence: high
 - Notes: this validates the CLI and helper contract only; it does not validate native Termux claim/release behavior
 
+## 2026-07-01
+
+- Environment: native Termux on Samsung A17 / Android 16
+- Command/evidence: `./arduino-cli acl transport claim-release --device /dev/bus/usb/001/002 --interface 0 --details`, `./arduino-cli acl transport claim-release --device /dev/bus/usb/001/002 --interface 1 --details`, and `./arduino-cli acl transport claim-release --device /dev/bus/usb/001/002 --interface 2 --details`
+- Result: interface 0 claim failed with `LIBUSB_ERROR_BUSY`; interface 1 claim failed with `LIBUSB_ERROR_BUSY`; interface 2 claim succeeded and release succeeded; interface 2 is vendor-specific with bulk OUT `0x02` and bulk IN `0x83`; no payload transfers were attempted
+- Confidence: high
+- Notes: this is diagnostic-only interface lifecycle evidence. It does not validate byte-stream readiness, upload, flashing, serial monitor, or any transfer-diagnostic behavior. Zero-length or other bulk-transfer probes remain unproven and should not be treated as a safe generic next step.
+
 - Environment: native Termux on Samsung A17 / Android 16
 - Command/evidence: `./arduino-cli acl transport diagnose --device /dev/bus/usb/001/002 --details` and `./arduino-cli --json acl transport diagnose --device /dev/bus/usb/001/002`
 - Result: the diagnostic-only USB topology bridge foundation reports `vid=0x303a pid=0x1001`, manufacturer `Espressif`, product `USB JTAG/serial debug unit`, serial identity, `interfaces=3`, `endpoints=5`, CDC bulk endpoints `0x01/0x81`, vendor-specific bulk endpoints `0x02/0x83`, and `topology_source=libusb` without payload transfers; `claim_release_state` remains `not_attempted`

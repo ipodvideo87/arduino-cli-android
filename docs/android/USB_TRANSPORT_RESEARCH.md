@@ -65,6 +65,28 @@ Primary sources:
 - Diagnostics must preserve the selected device, interface, endpoint, and
   permission source.
 
+### Bulk Transfer Diagnostics
+
+Bulk transfers are live device I/O, not a neutral metadata probe.
+
+Primary sources:
+
+- libusb synchronous I/O:
+  <https://libusb.sourceforge.io/api-1.0/group__libusb__syncio.html>
+- libusb asynchronous I/O:
+  <https://libusb.sourceforge.io/api-1.0/group__libusb__asyncio.html>
+
+Research conclusion:
+
+- a zero-length or other no-payload bulk transfer is still a transfer, not a
+  descriptor-only query
+- libusb describes zero-length packets as a protocol termination mechanism for
+  transfers that already need it, not as a generic safety probe
+- without a protocol-specific safety case, interface-2 work should stop at
+  claim/release and descriptor/endpoint inspection
+- transfer diagnostics should not be introduced yet unless the device protocol
+  itself justifies a bounded, explicitly opt-in probe
+
 ## 2. Termux USB
 
 Termux remains the most practical Android-native acquisition surface for this
@@ -290,4 +312,3 @@ This is the foundation for future upload, monitor, diagnostics, and device
 interaction work.
 
 It is not yet implementation.
-

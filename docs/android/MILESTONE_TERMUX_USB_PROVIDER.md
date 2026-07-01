@@ -27,7 +27,7 @@ Not validated by this milestone:
 - serial monitor
 - usable byte-stream endpoint
 - byte-stream read/write
-- interface claim/release
+- transfer diagnostics
 
 ## Scope
 
@@ -382,6 +382,30 @@ Observed on the Samsung A17 / Android 16 / native Termux environment:
   - wraps the live stream in the bounded transport contract and can optionally
     exercise a one-byte read/write probe
 
+## Native-Termux Claim/Release Result
+
+Observed on the Samsung A17 / Android 16 / native Termux environment:
+
+- `./arduino-cli acl transport claim-release --device /dev/bus/usb/001/002 --interface 0 --details`
+  - `claim_state: failed`
+  - `claim_error: LIBUSB_ERROR_BUSY`
+- `./arduino-cli acl transport claim-release --device /dev/bus/usb/001/002 --interface 1 --details`
+  - `claim_state: failed`
+  - `claim_error: LIBUSB_ERROR_BUSY`
+- `./arduino-cli acl transport claim-release --device /dev/bus/usb/001/002 --interface 2 --details`
+  - `claim_state: claimed`
+  - `release_state: released`
+  - interface 2 is vendor-specific with bulk OUT `0x02` and bulk IN `0x83`
+  - no payload transfers were attempted
+
+Claim/Release conclusion:
+
+- interface 0 and interface 1 are busy on this device
+- interface 2 can be claimed and released successfully on native Termux
+- the device still does not have a proven byte-stream path
+- upload, flashing, serial monitor, and any transfer-diagnostic behavior remain unvalidated
+- zero-length or other bulk-transfer diagnostics are not justified yet because they would still be live device I/O and are protocol-specific rather than transport-neutral
+
 Validated conclusion:
 
 - discovery is native-Termux validated
@@ -392,15 +416,16 @@ Validated conclusion:
 - USB topology evidence collection is native-Termux validated
 - stream-state reporting is now modeled in code, but native byte-stream
   behavior remains unvalidated
-- interface claim/release remains unvalidated
+- interface claim/release is partially validated on interface 2, but transfer
+  diagnostics remain unvalidated
 - upload, flashing, and serial monitor remain unvalidated
 
 Next recommended milestone:
 
-- native validation of interface claim/release on the detected USB topology,
-  starting with interface 0
-- bounded byte-stream bridge foundation after the interface lifecycle evidence
-  has been recorded and the bridge boundary is understood
+- do not implement transfer diagnostics yet
+- if further evidence is needed, keep the next step interface-2-scoped and
+  research-only until a protocol-specific safety case exists for any live
+  transfer probe
 
 ## What Success Means
 

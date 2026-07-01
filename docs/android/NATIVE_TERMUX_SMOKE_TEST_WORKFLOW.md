@@ -12,6 +12,9 @@ It is documentation and validation guidance, not a claim that upload is done.
 - verify the Android post-install pipeline still repairs installed executables
 - avoid claiming upload success until a real USB bridge exists
 
+For the package-completeness question that is now the next product milestone,
+use [Native Full-Flash Bootloader Package Validation](MILESTONE_NATIVE_FULL_FLASH_BOOTLOADER_PACKAGE_VALIDATION.md).
+
 ## Workflow
 
 1. Clean the relevant Arduino and ACL caches if needed.

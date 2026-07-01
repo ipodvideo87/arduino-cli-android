@@ -61,6 +61,7 @@ Current validation posture:
 - Native Termux remains the source of truth for Android behavior.
 - Unit tests and CLI/build verification are useful, but not sufficient for Android claims.
 - Emulated ARM64 smoke tests are useful preflight checks only and do not prove Android success.
+- The next product milestone now has a dedicated native-Termux package-validation doc at `docs/android/MILESTONE_NATIVE_FULL_FLASH_BOOTLOADER_PACKAGE_VALIDATION.md`.
 - The Termux USB provider now has a native-Termux validation checklist documenting expected outputs for discovery, permission, stale-path handling, and fd handoff evidence.
 - Discovery and permission acquisition for the Termux USB provider are now native-Termux validated on Samsung A17 / Android 16; byte-stream and upload behavior remain unvalidated.
 - The Termux USB provider now also exposes a bounded `acl transport probe-fd`
@@ -146,13 +147,18 @@ Repository cleanup:
 - The diagnostic-only USB topology bridge foundation is now native-Termux
   validated and reports descriptors, interfaces, endpoints, and topology source
   evidence without payload transfers.
+- Native Termux claim/release evidence now shows interface 0 and interface 1
+  returning `LIBUSB_ERROR_BUSY` while interface 2 can be claimed and released
+  successfully on the detected Espressif device; interface 2 exposes vendor-
+  specific bulk OUT `0x02` and bulk IN `0x83`, and no payload transfers were
+  attempted.
 - Native Termux has validated the USB topology bridge foundation on the target
   device: descriptors, interfaces, endpoints, vendor/product identity, serial
   identity, and the `libusb` topology source are visible without payload
   transfers.
 - The Termux USB transport provider now also exposes diagnostic-only interface
-  claim/release validation for the native helper handoff path, starting with
-  interface 0.
+  claim/release validation for the native helper handoff path; native Termux
+  evidence now shows interface 2 succeeding while interfaces 0 and 1 are busy.
 - The ACL firmware package foundation now exists, including the build manifest, flash plan, firmware package wrapper, and binary validator.
 - The firmware package now also emits `analysis.json` and `README_FLASHING.txt`, and the ACL compile path uses metadata-first bootloader detection with an app-only fallback warning when the bootloader artifacts are incomplete.
 - The ACL upload engine foundation now exists as a transport-neutral prepare-only planner/executor stack that consumes firmware packages and flash plans without opening real transport streams or sending bytes.
@@ -213,8 +219,8 @@ Repository cleanup:
 - Validate the ACL upload prepare-only executor in native Termux before wiring real transport execution, and keep the report surface aligned with the GUI contract.
 - Implement the first real transport provider runtime after the contract layer is proven stable.
 - Validate the Termux USB transport provider on native Termux and confirm the exact discovery, permission, and file-descriptor handoff behavior on-device.
-- Validate diagnostic-only interface claim/release on native Termux, starting
-  with interface 0.
+- Research whether any interface-2 transfer diagnostic is safe and meaningful
+  before adding live bulk I/O.
 - Probe `TERMUX_USB_FD` handoff and build the byte-stream bridge foundation for the Termux USB provider.
 - Validate the transport stream foundation on native Termux before claiming any
   byte-stream support.

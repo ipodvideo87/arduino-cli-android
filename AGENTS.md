@@ -263,6 +263,8 @@ Do not claim a milestone is complete until it has been verified through real-wor
   archives of record.
 - Keep `STATUS.md` and the Android docs aligned with the current branch and
   cleanup posture.
+- Push after a completion so the remote branch reflects the current validated
+  state.
 
 ## Proof Before Claims
 - Document functionality as complete only after it has been demonstrated through reproducible validation.

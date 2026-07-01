@@ -41,8 +41,8 @@
 
 - Finish full-flash bootloader package validation on native Termux
 - Add emulated ARM64 / Termux-like smoke tests
-- Validate diagnostic-only interface claim/release on native Termux, starting
-  with interface 0
+- Research whether any interface-2 transfer diagnostic is safe and meaningful
+  before adding live bulk I/O
 - Build a generic Android USB transport bridge
 - Validate the native Termux transport stream boundary
 - Validate the Termux USB provider and file-descriptor handoff path on native Termux

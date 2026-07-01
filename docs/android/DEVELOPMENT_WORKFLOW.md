@@ -26,6 +26,8 @@ Then state the objective in plain terms.
 Use the smallest set of canonical docs that owns the problem:
 
 - `AGENTS.md`
+- `docs/android/TASK_RECOVERY.md` if the task was interrupted or you are
+  resuming existing work
 - `docs/android/CODEX_OPERATING_MODEL.md`
 - `docs/android/ENGINEERING_PRINCIPLES.md`
 - `docs/android/DECISION_FRAMEWORK.md`
@@ -56,6 +58,10 @@ Before working, write down the preview:
 - documentation impact
 - expected risks
 
+If you are resuming interrupted work, refresh `docs/android/TASK_RECOVERY.md`
+first, then use it as the working snapshot before you revise the preview. The
+recovery file should carry the full current task plan, not a short summary.
+
 ### Native Validation Package
 
 If native Android/Termux validation is required, expand the preview into a
@@ -84,6 +90,32 @@ Do not start native validation until this package exists.
 
 If the task is architecture-heavy, validation-heavy, or spans subsystems, do the
 architecture review before implementation.
+
+### Task Recovery Protocol
+
+Keep a live recovery snapshot at `docs/android/TASK_RECOVERY.md` for any task
+that may be interrupted.
+
+The recovery file must contain:
+
+- the full objective and scope currently being worked
+- constraints and explicit non-goals
+- the intended step sequence
+- progress made so far
+- files touched or intended to be touched
+- validation status and evidence collected so far
+- remaining work
+- the safest next action
+
+Update the recovery file whenever the task meaningfully changes or reaches a
+new checkpoint.
+
+If the task is interrupted, the next session should read the recovery file
+first and continue from there without guessing.
+
+When the task is fully completed, validated, committed, and pushed, clear the
+contents of the recovery file but keep the file itself in place for the next
+task.
 
 ## 4. Research When Required
 
