@@ -75,12 +75,12 @@ How to use:
     snapshot package-generation paths
   - added regression tests for both propagation paths
   - recorded the root cause and host validation evidence in canonical docs
+  - committed and pushed the fix to `origin/android-runtime-v2`
 - In progress:
   - awaiting any additional native Termux confirmation the user wants to run
 - Remaining:
   - native Termux revalidation of the firmware-package milestone if the user
     wants on-device confirmation
-  - commit and push after the task is fully closed
 
 ## Files
 
@@ -99,8 +99,8 @@ How to use:
 
 ## Validation
 
-- Status: implementation complete, host validation complete, native Termux
-  confirmation still pending
+- Status: implementation complete, host validation complete, pushed, native
+  Termux confirmation still pending
 - Evidence collected:
   - `BuildManifest`, `FlashPlan`, `ValidationReport`, and `UploadPlan` all
     carry `target_chip`
