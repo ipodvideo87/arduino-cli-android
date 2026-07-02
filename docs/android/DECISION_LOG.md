@@ -18,6 +18,33 @@ Examples:
 - narrowing a transport boundary
 - resolving an uncertainty that shaped implementation
 
+## 2026-07-01 - propagate target-chip metadata from compile properties
+
+- Question: why did firmware-package validation report `target chip metadata is
+  not set` after the full-flash package milestone had already completed?
+- Evidence: `internal/acl/firmware/package.go` warns only when both manifest and
+  flash-plan target-chip fields are empty; `commands/service_compile.go` and
+  `internal/acl/engine/compile.go` previously built `FirmwarePackage` input
+  without populating `TargetChip`; the compile properties already contain
+  `build.mcu`; host tests now show `build.mcu` propagates into
+  `FirmwarePackage` generation and the validator no longer emits the warning
+  when metadata is present.
+- Decision: resolve target-chip metadata at compile-input construction time by
+  reading `build.mcu` first and falling back to the known board identifier, and
+  keep the package validator unchanged.
+- Alternatives: suppress the warning; document it as expected behavior; teach
+  the validator to infer missing metadata; add a separate metadata schema.
+- Confidence: medium -> high
+- Uncertainty removed: the warning came from missing propagation, not from a
+  validator bug.
+- Uncertainty remaining: native Termux package output should be rerun to
+  confirm the on-device package now reports target-chip metadata without the
+  warning.
+- Docs updated: `VALIDATED_FINDINGS.md`, `STATUS.md`, `TASK_RECOVERY.md`
+- Roadmap impact: none
+- Follow-up: rerun the native Termux package milestone output and record the
+  updated on-device finding if it still matches the host validation
+
 ## What A Log Entry Must Answer
 
 Every entry should make the following obvious:
@@ -69,4 +96,3 @@ The decision log connects those records but does not replace them.
 
 When a task is closed, the decision log entry should explain why the remaining
 uncertainty is acceptable, or where it was moved if it is still active.
-

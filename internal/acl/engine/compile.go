@@ -212,6 +212,7 @@ func (b BuilderResultSnapshot) BuildInput(req CompileRequest) (firmware.BuildInp
 		PlatformVersion:    firstNonEmptyStrings(b.BoardPlatformVersion, b.BuildPlatformVersion),
 		CoreVersion:        buildPlatformVersion,
 		ToolchainVersion:   toolchainVersion,
+		TargetChip:         firmware.ResolveTargetChip(props, boardName),
 		Libraries:          append([]firmware.LibraryRef(nil), b.UsedLibraries...),
 		MemoryUsage:        b.BuildMemoryUsage(),
 		ExecutableSections: sectionUsageFromSnapshot(b.ExecutableSections),

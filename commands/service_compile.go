@@ -502,6 +502,7 @@ func buildFirmwarePackageForCompile(
 		PlatformVersion:    platformVersion,
 		CoreVersion:        coreVersion,
 		ToolchainVersion:   toolchainVersion,
+		TargetChip:         firmware.ResolveTargetChip(buildProperties, boardName),
 		Libraries:          libraryRefsFromImported(importedLibs),
 		MemoryUsage:        memoryUsageFromSections(sections),
 		ExecutableSections: sectionUsageFromBuilderSections(sections),

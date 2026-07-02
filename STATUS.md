@@ -164,7 +164,7 @@ Repository cleanup:
 - The ACL upload engine foundation now exists as a transport-neutral prepare-only planner/executor stack that consumes firmware packages and flash plans without opening real transport streams or sending bytes.
 - The ACL workflow upload command is now documented and validated as a positional prepare-only command (`acl workflow upload <firmware-package>`); `--dry-run` and `--package` are not part of the contract.
 - The upload execution report surface now keeps the canonical package, plan, diagnostics, result, and progress data in one place and de-duplicates repeated professional details.
-- Native Termux dry-run validation currently reports three upload steps for the existing package metadata (`partitions`, `boot_app0`, `application`); the bootloader remains package-dependent and target-chip metadata is still a warning.
+- Target-chip metadata now propagates from `build.mcu` through compile and workflow snapshot package generation, so the earlier `target chip metadata is not set` warning no longer appears when the metadata is present. Native Termux should rerun the package milestone to confirm the on-device output matches the host validation.
 - The ACL compatibility layer now exists as a rule-based decision layer for runtime, library, firmware, and transport compatibility.
 - The ACL diagnostics workflow now exists as a shared pending/running/passed/warning/failed/skipped status model.
 - The Android install patch pipeline now has a formal status-tracking foundation for download, extract, patch, runtime-fix, validation, register, self-test, and ready stages.

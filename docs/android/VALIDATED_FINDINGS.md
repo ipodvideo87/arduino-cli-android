@@ -52,6 +52,20 @@ This file is a logbook of tested findings from the project history.
   package-dependent
 
 - Environment: repository unit-test environment
+- Command/evidence: `go test ./commands`, `go test ./internal/acl/engine`, and
+  `go test ./internal/acl/firmware`
+- Result: target-chip metadata now propagates from `build.mcu` through the
+  compile service and workflow snapshot into `FirmwarePackage` generation, so
+  manifest and flash-plan metadata are populated before validation; the binary
+  validator no longer emits `target chip metadata is not set` when the metadata
+  is present
+- Confidence: high
+- Notes: this confirms the warning was caused by missing propagation in the
+  compile/package construction path, not by the validator needing to be
+  suppressed. Native Termux should still rerun the package milestone to confirm
+  the on-device output matches the host evidence
+
+- Environment: repository unit-test environment
 - Command/evidence: upload report unit tests and workflow tests
 - Result: the upload dry-run report now keeps a canonical package/plan/
   diagnostics/result/progress surface and de-duplicates repeated professional

@@ -27,26 +27,25 @@ How to use:
 
 ## Active Task
 
-- Objective: finish full-flash bootloader package validation on native Termux
-  and leave the repo with a reusable native-validation package for the next
-  session.
+- Objective: investigate and fix the recurring `target chip metadata is not
+  set` warning at the smallest architecturally correct layer.
 - Scope:
-  - firmware package correctness
-  - full-flash vs app-only package mode behavior
-  - bootloader, partition table, boot_app0, and application artifact detection
-  - manifest and flash-plan validation
-  - prepare-only upload consumption if already supported
+  - compile pipeline metadata flow
+  - firmware package generation
+  - manifest generation
+  - flash-plan generation
+  - validation-report generation
+  - prepare-only upload consumption
+  - workflow reporting and diagnostics that surface target-chip metadata
 - Constraints:
-  - do not implement real upload
-  - do not implement flashing
-  - do not implement USB transfer work
-  - do not implement serial monitor
-  - do not widen scope beyond package validation
-  - keep the change docs-only unless validation uncovers a doc gap that must be
-    closed
+  - do not implement upload, flashing, serial monitor, or USB transfer work
+  - do not add broad refactors or parallel metadata systems
+  - preserve existing package contracts and deterministic behavior
+  - preserve existing validation behavior except where the root cause requires
+    correction
 - Non-goals:
-  - USB transport implementation
-  - byte-stream readiness
+  - live USB transfer work
+  - stream readiness promotion
   - ESP32 protocol framing
   - upload execution
   - flashing execution
@@ -54,69 +53,79 @@ How to use:
 
 ## Intended Plan
 
-- Step 1: create or update the milestone doc for native full-flash package
-  validation so the next session has one canonical place for the validation
-  package, success criteria, and decision matrix.
-- Step 2: keep the recovery snapshot current with the full live task/plan, not
-  a short summary.
-- Step 3: expose the exact native Termux command sequence needed to validate a
-  full-flash package, confirm artifact presence, and optionally exercise the
-  existing prepare-only upload consumer.
+- Step 1: trace target-chip metadata from compile inputs through firmware
+  package generation, validation, upload planning, and workflow reporting.
+- Step 2: identify the smallest layer where the metadata is dropped or not
+  propagated.
+- Step 3: implement the narrowest production-quality fix that makes the
+  package carry the correct target-chip metadata.
+- Step 4: add tests that prove the propagation path and the warning behavior.
+- Step 5: record the root cause and validation evidence in the canonical docs.
 
 ## Progress
 
 - Completed:
-  - read AGENTS.md, STATUS.md, ROADMAP.md, VALIDATED_FINDINGS.md, and the
-    existing milestone docs
-  - confirmed firmware-package and prepare-only upload support already exist
-  - confirmed there is no existing dedicated full-flash bootloader validation
-    milestone doc
-  - created the dedicated native full-flash bootloader package validation doc
+  - read AGENTS.md, STATUS.md, ROADMAP.md, TASK_RECOVERY.md, and the canonical
+    firmware-package / validation / workflow docs
+  - located the warning source in `internal/acl/firmware/package.go`
+  - traced the compile path through `commands/service_compile.go`
+  - traced the workflow snapshot path through `internal/acl/engine/compile.go`
+  - added a shared target-chip resolver in `internal/acl/firmware/metadata.go`
+  - propagated target-chip metadata through the compile service and workflow
+    snapshot package-generation paths
+  - added regression tests for both propagation paths
+  - recorded the root cause and host validation evidence in canonical docs
 - In progress:
-  - updating the recovery snapshot
+  - awaiting any additional native Termux confirmation the user wants to run
 - Remaining:
-  - provide the exact native validation package commands
-  - keep the milestone narrow and docs-only
-  - ensure the new doc points at canonical evidence destinations for the
-    eventual validation result
+  - native Termux revalidation of the firmware-package milestone if the user
+    wants on-device confirmation
+  - commit and push after the task is fully closed
 
 ## Files
 
 - Touched:
   - `docs/android/TASK_RECOVERY.md`
-  - `docs/android/MILESTONE_NATIVE_FULL_FLASH_BOOTLOADER_PACKAGE_VALIDATION.md`
   - `STATUS.md`
+  - `docs/android/VALIDATED_FINDINGS.md`
+  - `docs/android/DECISION_LOG.md`
+  - `commands/service_compile.go`
+  - `commands/service_compile_test.go`
+  - `internal/acl/engine/compile.go`
+  - `internal/acl/engine/compile_test.go`
+  - `internal/acl/firmware/metadata.go`
 - Intended:
-  - `docs/android/NATIVE_TERMUX_SMOKE_TEST_WORKFLOW.md`
+  - none
 
 ## Validation
 
-- Status: planning and docs update only
+- Status: implementation complete, host validation complete, native Termux
+  confirmation still pending
 - Evidence collected:
-  - firmware package code already supports `full-flash` vs `app-only`
-  - prepare-only upload already validates package, flash plan, artifacts, and
-    readiness without opening a transport stream
+  - `BuildManifest`, `FlashPlan`, `ValidationReport`, and `UploadPlan` all
+    carry `target_chip`
+  - `firmware.NewBinaryValidator()` warns only when both manifest and flash
+    plan target chip fields are empty
+  - `BuilderResultSnapshot.BuildInput` now populates `TargetChip` from
+    `build.mcu`
+  - `commands/service_compile.go` now also populates `TargetChip` when
+    constructing the firmware package input
+  - focused `go test` runs for `commands`, `internal/acl/engine`, and
+    `internal/acl/firmware` passed
 - Evidence still needed:
-  - native Termux confirmation that a chosen sketch/core combination produces a
-    `full-flash` package
-  - confirmation that `manifest.json`, `flash-plan.json`,
-    `validation-report.json`, `analysis.json`, and `README_FLASHING.txt` are
-    present
-  - confirmation that bootloader, partition, boot_app0, and application
-    artifacts are present when metadata supports full-flash packaging
-  - confirmation that prepare-only upload consumption accepts the package
-    without widening scope
+  - native Termux confirmation that the package output now matches the host
+    result, if the user wants on-device verification
 
 ## Safest Next Action
 
-- Next action: finish the native Termux validation package in the dedicated
-  milestone doc and then pause for user confirmation before running any device
-  commands.
+- Next action: if native confirmation is desired, rerun the package milestone on
+  native Termux and record the updated output; otherwise the current repo state
+  is ready to be committed and pushed.
 
 ## Canonical Follow-Through
 
-- `VALIDATED_FINDINGS.md`:
-- `DECISION_LOG.md`:
+- `VALIDATED_FINDINGS.md`: updated
+- `DECISION_LOG.md`: updated
 - `LESSONS_LEARNED.md`:
 - `UNCERTAINTY_REGISTER.md`:
 
