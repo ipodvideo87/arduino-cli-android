@@ -12,6 +12,10 @@ Native Termux on Android is the production target and final validation environme
 Ubuntu inside `proot-distro` is used for development tooling and repository work, but it
 does not replace native Android validation.
 
+Project Zero is now the first EOS adoption pilot for this repository. It is
+used to validate the EOS project adoption model against a production-scale
+engineering codebase.
+
 ## STATUS Versus ROADMAP
 
 `STATUS.md` is authoritative for the current snapshot:
@@ -55,6 +59,7 @@ snapshot and `ROADMAP.md` wins for future ordering.
 - Upload Workflow Preview: [docs/android/UPLOAD_WORKFLOW_PREVIEW.md](docs/android/UPLOAD_WORKFLOW_PREVIEW.md)
 - Serial Monitor Preview: [docs/android/SERIAL_MONITOR_PREVIEW.md](docs/android/SERIAL_MONITOR_PREVIEW.md)
 - Firmware Package Spec: [docs/specifications/FIRMWARE_PACKAGE_SPEC.md](docs/specifications/FIRMWARE_PACKAGE_SPEC.md)
+- EOS Project Zero: [docs/android/MILESTONE_EOS_PROJECT_ZERO.md](docs/android/MILESTONE_EOS_PROJECT_ZERO.md)
 - Validated Findings: [docs/android/VALIDATED_FINDINGS.md](docs/android/VALIDATED_FINDINGS.md)
 
 Current validation posture:
@@ -62,6 +67,12 @@ Current validation posture:
 - Unit tests and CLI/build verification are useful, but not sufficient for Android claims.
 - Emulated ARM64 smoke tests are useful preflight checks only and do not prove Android success.
 - The next product milestone now has a dedicated native-Termux package-validation doc at `docs/android/MILESTONE_NATIVE_FULL_FLASH_BOOTLOADER_PACKAGE_VALIDATION.md`.
+- Native Termux package-validation evidence now confirms the ESP32-S3 sketch
+  package is `full-flash`, all required package artifacts exist, and the
+  prepare-only upload consumer accepts the package in dry-run mode.
+- The package dry-run still reports `target chip metadata is not set`; that
+  warning is now documented as a non-blocking follow-up item for this
+  milestone.
 - The Termux USB provider now has a native-Termux validation checklist documenting expected outputs for discovery, permission, stale-path handling, and fd handoff evidence.
 - Discovery and permission acquisition for the Termux USB provider are now native-Termux validated on Samsung A17 / Android 16; byte-stream and upload behavior remain unvalidated.
 - The Termux USB provider now also exposes a bounded `acl transport probe-fd`
@@ -161,10 +172,16 @@ Repository cleanup:
   evidence now shows interface 2 succeeding while interfaces 0 and 1 are busy.
 - The ACL firmware package foundation now exists, including the build manifest, flash plan, firmware package wrapper, and binary validator.
 - The firmware package now also emits `analysis.json` and `README_FLASHING.txt`, and the ACL compile path uses metadata-first bootloader detection with an app-only fallback warning when the bootloader artifacts are incomplete.
+- Native full-flash bootloader package validation is complete on native
+  Termux, and the remaining target-chip metadata warning is documented as a
+  non-blocking follow-up for the milestone.
 - The ACL upload engine foundation now exists as a transport-neutral prepare-only planner/executor stack that consumes firmware packages and flash plans without opening real transport streams or sending bytes.
 - The ACL workflow upload command is now documented and validated as a positional prepare-only command (`acl workflow upload <firmware-package>`); `--dry-run` and `--package` are not part of the contract.
 - The upload execution report surface now keeps the canonical package, plan, diagnostics, result, and progress data in one place and de-duplicates repeated professional details.
-- Target-chip metadata now propagates from `build.mcu` through compile and workflow snapshot package generation, so the earlier `target chip metadata is not set` warning no longer appears when the metadata is present. Native Termux should rerun the package milestone to confirm the on-device output matches the host validation.
+- Target-chip metadata propagation remains a documented non-blocking follow-up
+  item for the package-validation milestone: the latest package report still warns
+  that `target chip metadata is not set`, so the warning remains a
+  documented non-blocking follow-up item rather than a resolved baseline claim.
 - The ACL compatibility layer now exists as a rule-based decision layer for runtime, library, firmware, and transport compatibility.
 - The ACL diagnostics workflow now exists as a shared pending/running/passed/warning/failed/skipped status model.
 - The Android install patch pipeline now has a formal status-tracking foundation for download, extract, patch, runtime-fix, validation, register, self-test, and ready stages.
@@ -213,10 +230,15 @@ Repository cleanup:
 
 ## Work In Progress
 
+- Project Zero EOS adoption pilot:
+  - canonical project adoption manifest
+  - overlay-only `AGENTS.md` boundary
+  - ownership classification and compatibility assessment
+  - adoption milestone documentation
 - Design a reusable native Android USB transport framework inside the existing Termux ecosystem.
 - Define a generic Android upload and monitor bridge that stays board-agnostic, descriptor-driven, and provider-based.
 - Validate firmware upload and serial monitor behavior through the new transport implementation on real hardware.
-- Validate the ACL upload prepare-only executor in native Termux before wiring real transport execution, and keep the report surface aligned with the GUI contract.
+- Keep the ACL upload prepare-only executor aligned with the GUI contract.
 - Implement the first real transport provider runtime after the contract layer is proven stable.
 - Validate the Termux USB transport provider on native Termux and confirm the exact discovery, permission, and file-descriptor handoff behavior on-device.
 - Research whether any interface-2 transfer diagnostic is safe and meaningful
@@ -273,7 +295,11 @@ Repository cleanup:
 - Successful proot execution does not prove Android-native compatibility.
 - Firmware upload on real hardware has not yet been demonstrated.
 - The Android USB transport bridge is not yet implemented, so end-to-end upload remains unproven.
+- Native full-flash bootloader package validation is complete on native
+  Termux, with a documented non-blocking target-chip metadata warning.
 
 ## Next Engineering Milestone
 
-Validate the native Termux transport stream boundary, including fd/session/stream diagnostics and bounded stream state reporting, before any real upload or monitor execution work. Keep the transport runtime generic and the diagnostics safe, diagnostic-only, and board-agnostic.
+Complete the Project Zero adoption pilot by validating the manifest-first EOS
+boundary, recording the adoption findings, and deciding whether the repository
+should reduce more local methodology into EOS canon.

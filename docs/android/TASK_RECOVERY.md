@@ -27,105 +27,92 @@ How to use:
 
 ## Active Task
 
-- Objective: investigate and fix the recurring `target chip metadata is not
-  set` warning at the smallest architecturally correct layer.
+- Objective: close the package-validation milestone for the ESP32-S3 sketch
+  package and preserve the evidence boundary between package generation and
+  any future transport or flashing work.
 - Scope:
-  - compile pipeline metadata flow
-  - firmware package generation
-  - manifest generation
-  - flash-plan generation
-  - validation-report generation
-  - prepare-only upload consumption
-  - workflow reporting and diagnostics that surface target-chip metadata
+  - validate that the generated package is `full-flash`
+  - confirm the manifest, flash-plan, validation-report, analysis, and
+    README_FLASHING artifacts exist
+  - confirm bootloader, partitions, boot_app0, and application artifacts exist
+  - exercise prepare-only upload consumption only if it is already supported
+    and safe
 - Constraints:
-  - do not implement upload, flashing, serial monitor, or USB transfer work
-  - do not add broad refactors or parallel metadata systems
-  - preserve existing package contracts and deterministic behavior
-  - preserve existing validation behavior except where the root cause requires
-    correction
+  - do not patch sketch code
+  - do not patch third-party libraries
+  - do not change board/core/FQBN
+  - do not broaden into upload execution, flashing execution, USB transport,
+    serial monitor, ESP32 protocol framing, EEL, or EOS adoption work
+  - do not claim native-Termux success from host or proot evidence
 - Non-goals:
-  - live USB transfer work
-  - stream readiness promotion
-  - ESP32 protocol framing
   - upload execution
   - flashing execution
-  - monitor execution
+  - transport-stream validation
+  - byte-stream readiness
+  - EOS canon changes unless package evidence requires them
 
 ## Intended Plan
 
-- Step 1: trace target-chip metadata from compile inputs through firmware
-  package generation, validation, upload planning, and workflow reporting.
-- Step 2: identify the smallest layer where the metadata is dropped or not
-  propagated.
-- Step 3: implement the narrowest production-quality fix that makes the
-  package carry the correct target-chip metadata.
-- Step 4: add tests that prove the propagation path and the warning behavior.
-- Step 5: record the root cause and validation evidence in the canonical docs.
+- Step 1: keep the recovery snapshot aligned with the completed closeout.
+- Step 2: record the compile result, package validation result, and
+  prepare-only dry-run result in canonical docs.
+- Step 3: preserve the warning as a documented non-blocking follow-up.
+- Step 4: leave the recovery snapshot ready for commit/push without
+  broadening scope into transport or flashing work.
 
 ## Progress
 
 - Completed:
-  - read AGENTS.md, STATUS.md, ROADMAP.md, TASK_RECOVERY.md, and the canonical
-    firmware-package / validation / workflow docs
-  - located the warning source in `internal/acl/firmware/package.go`
-  - traced the compile path through `commands/service_compile.go`
-  - traced the workflow snapshot path through `internal/acl/engine/compile.go`
-  - added a shared target-chip resolver in `internal/acl/firmware/metadata.go`
-  - propagated target-chip metadata through the compile service and workflow
-    snapshot package-generation paths
-  - added regression tests for both propagation paths
-  - recorded the root cause and host validation evidence in canonical docs
-  - committed and pushed the fix to `origin/android-runtime-v2`
+  - reviewed the current repository state, `STATUS.md`, `ROADMAP.md`,
+    `VALIDATED_FINDINGS.md`, `ENGINEERING_DECISIONS.md`, `DECISION_LOG.md`,
+    and the package-validation milestone doc
+  - confirmed the package milestone scope is package-only and explicitly
+    excludes real upload, flashing, USB transport, serial monitor, ESP32
+    protocol framing, EEL, and EOS adoption work
+  - confirmed the current shell is native Termux for the latest validation
+    evidence
+  - confirmed package validation now passes and prepare-only upload dry-run
+    succeeds without opening a real transport stream
+  - noted the jq-loop artifact check failure as a diagnostic-script
+    portability issue rather than a package evidence failure
 - In progress:
-  - awaiting any additional native Termux confirmation the user wants to run
+  - none
 - Remaining:
-  - native Termux revalidation of the firmware-package milestone if the user
-    wants on-device confirmation
+  - commit and push the closeout if requested
+  - clear this file after the closeout is committed and pushed
 
 ## Files
 
 - Touched:
   - `docs/android/TASK_RECOVERY.md`
-  - `STATUS.md`
-  - `docs/android/VALIDATED_FINDINGS.md`
-  - `docs/android/DECISION_LOG.md`
-  - `commands/service_compile.go`
-  - `commands/service_compile_test.go`
-  - `internal/acl/engine/compile.go`
-  - `internal/acl/engine/compile_test.go`
-  - `internal/acl/firmware/metadata.go`
 - Intended:
   - none
 
 ## Validation
 
-- Status: implementation complete, host validation complete, pushed, native
-  Termux confirmation still pending
+- Status: package validation evidence collected in native Termux
 - Evidence collected:
-  - `BuildManifest`, `FlashPlan`, `ValidationReport`, and `UploadPlan` all
-    carry `target_chip`
-  - `firmware.NewBinaryValidator()` warns only when both manifest and flash
-    plan target chip fields are empty
-  - `BuilderResultSnapshot.BuildInput` now populates `TargetChip` from
-    `build.mcu`
-  - `commands/service_compile.go` now also populates `TargetChip` when
-    constructing the firmware package input
-  - focused `go test` runs for `commands`, `internal/acl/engine`, and
-    `internal/acl/firmware` passed
+  - the milestone doc defines exact package-only checks and out-of-scope areas
+  - the repository already has the package-validation milestone documented in
+    `STATUS.md` and `ROADMAP.md`
+  - package validation now produces a `full-flash` package with the required
+    artifacts
+  - prepare-only upload dry-run accepts the package and reports `dry-run: true`
+    and `prepare-only: true`
+  - the jq-loop check failure was a shell portability issue, not a package
+    failure
 - Evidence still needed:
-  - native Termux confirmation that the package output now matches the host
-    result, if the user wants on-device verification
+  - none for this milestone
 
 ## Safest Next Action
 
-- Next action: if native confirmation is desired, rerun the package milestone on
-  native Termux and record the updated output; otherwise the current repo state
-  is ready to be committed and pushed.
+- Next action: commit and push the closeout if requested, then clear this file
+  after the repository state is published.
 
 ## Canonical Follow-Through
 
 - `VALIDATED_FINDINGS.md`: updated
-- `DECISION_LOG.md`: updated
+- `DECISION_LOG.md`:
 - `LESSONS_LEARNED.md`:
 - `UNCERTAINTY_REGISTER.md`:
 

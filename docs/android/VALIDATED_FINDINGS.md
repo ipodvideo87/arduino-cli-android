@@ -2,6 +2,58 @@
 
 This file is a logbook of tested findings from the project history.
 
+## 2026-07-04
+
+- Environment: native Termux on the target Android device
+- Command/evidence: package validation checks followed by
+  `./arduino-cli acl workflow upload /data/data/com.termux/files/home/Development/Sketches/esp32ultimate/build/esp32.esp32.esp32s3/firmware-package --details`
+- Result: the validated `full-flash` package is accepted by the prepare-only
+  upload consumer with `dry-run=true`, `prepare-only=true`, `operations=4`,
+  `ordered=true`, and `complete=true`; the consumer reports `stream required:
+  false` and keeps the run read-only; the remaining warning is
+  `target chip metadata is not set`
+- Confidence: high
+- Notes: the earlier jq loop failure was a diagnostic-script portability issue,
+  not a package validation failure. The remaining target-chip warning is a
+  documented non-blocking follow-up for this milestone. Future native-Termux
+  command blocks should prefer direct file checks, consistent quoting, and
+  simpler shell forms when verifying artifact existence. Any later fix should
+  inspect target-chip propagation before implementation, not after
+
+## 2026-07-03
+
+- Environment: repository documentation review
+- Command/evidence: `AGENTS.md`, `STATUS.md`, `ROADMAP.md`,
+  `DECISION_LOG.md`, `ENGINEERING_DECISIONS.md`,
+  `docs/android/MILESTONE_EOS_PROJECT_ZERO.md`, and `eos.project.json`
+- Result: the repository now states the EOS adoption boundary as a
+  manifest-first contract with a thin `AGENTS.md` overlay, the canonical
+  ownership split is documented, and Project Zero is visible in the current
+  status and roadmap as the next adoption milestone
+- Confidence: medium-high
+- Notes: this is static review evidence only. It confirms the adoption docs are
+  aligned, but it does not answer the remaining EOS schema or constraints
+  question
+
+## 2026-07-03
+
+- Environment: repository workspace in a PRoot-based Termux toolchain shell,
+  not native Android Termux
+- Command/evidence: compile of `esp32ultimate` with the resolved Arduino
+  libraries, package inspection under
+  `/data/data/com.termux/files/home/Development/Sketches/esp32ultimate/build/esp32.esp32.esp32s3/firmware-package`,
+  and `./arduino-cli acl workflow upload "$PKG_DIR" --details`
+- Result: compile now produces a `full-flash` firmware package with
+  `manifest.json`, `flash-plan.json`, `validation-report.json`, `analysis.json`,
+  and `README_FLASHING.txt`; the manifest records bootloader, partition table,
+  boot_app0, and application artifacts; the prepare-only upload consumer
+  accepts the package in dry-run mode; the validation report still warns that
+  `target chip metadata is not set`
+- Confidence: medium-high
+- Notes: this is strong package-boundary evidence, but it is not native-Termux
+  evidence and it does not resolve whether the target-chip warning reflects a
+  metadata propagation gap or the current package state
+
 ## 2026-06-27
 
 - Environment: repository unit-test environment
@@ -217,3 +269,19 @@ This file is a logbook of tested findings from the project history.
   not yet proven practical here because `/dev/kvm` is absent
 - Confidence: medium
 - Notes: this is a host-environment finding, not an Android-device claim
+
+## 2026-07-02
+
+- Environment: repository architecture review
+- Command/evidence: `AGENTS.md`, `STATUS.md`, `ROADMAP.md`, `TASK_RECOVERY.md`,
+  `docs/android/ENGINEERING_KNOWLEDGE_FRAMEWORK.md`, and the EOS adoption docs
+- Result: `AGENTS.md` currently mixes universal methodology with project-local
+  Android guidance, while the repository already has distinct homes for current
+  state, future sequencing, recovery, evidence, and decision history; the EOS
+  adoption boundary is cleaner when represented as `eos.project.json` plus a
+  thin overlay
+- Confidence: medium-high
+- Notes: this is a static architecture finding, not a runtime or native-device
+  validation result. It supports manifest-first EOS adoption and suggests that
+  any future AGENTS reduction should preserve local Android guidance without
+  duplicating EOS canon

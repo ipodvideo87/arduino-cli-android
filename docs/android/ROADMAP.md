@@ -28,6 +28,7 @@
 - Transport Stream Foundation
 - Transport API Stabilization
 - Upload Engine foundation and prepare-only executor
+- Native full-flash bootloader package validation on native Termux
 - Governance framework batch 1: Codex operating model, engineering principles,
   decision framework, and documentation architecture
 - Governance framework batch 1.5: repository governance, engineering
@@ -39,7 +40,8 @@
 
 ## Next Milestones
 
-- Finish full-flash bootloader package validation on native Termux
+- Complete Project Zero EOS adoption pilot and validate the manifest-first
+  boundary
 - Add emulated ARM64 / Termux-like smoke tests
 - Research whether any interface-2 transfer diagnostic is safe and meaningful
   before adding live bulk I/O
