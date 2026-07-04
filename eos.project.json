@@ -1,0 +1,44 @@
+{
+  "schema_version": "1",
+  "project_name": "arduino-cli-android",
+  "eos_version": "0.1.0",
+  "compatibility": {
+    "core_contracts": [
+      "decision-framework",
+      "evidence-model",
+      "confidence-model",
+      "uncertainty-register",
+      "validation-standard",
+      "recovery-protocol",
+      "engineering-lifecycle",
+      "engineering-knowledge-framework",
+      "quality-model",
+      "execution-model",
+      "project-adoption-model"
+    ],
+    "model_adapters": [],
+    "execution_adapters": [],
+    "status": "compatible"
+  },
+  "project_extensions": [
+    "android-first engineering",
+    "native Termux is the source of truth for Android claims",
+    "real hardware is required for upload, flash, and runtime claims",
+    "transport and upload architecture remain board-agnostic and descriptor-driven",
+    "project-local operational memory remains in STATUS.md, ROADMAP.md, TASK_RECOVERY.md, and VALIDATED_FINDINGS.md"
+  ],
+  "overlay": {
+    "agents_md": "AGENTS.md",
+    "status": "present"
+  },
+  "validation": {
+    "required_checks": [
+      "schema validation",
+      "canonical ownership review",
+      "documentation boundary review",
+      "native Termux validation for Android claims",
+      "real hardware validation for upload, flash, and runtime claims"
+    ],
+    "native_validation_required": true
+  }
+}

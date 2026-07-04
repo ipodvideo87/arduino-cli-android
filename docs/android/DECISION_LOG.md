@@ -96,3 +96,28 @@ The decision log connects those records but does not replace them.
 
 When a task is closed, the decision log entry should explain why the remaining
 uncertainty is acceptable, or where it was moved if it is still active.
+
+## 2026-07-02 - adopt EOS through a manifest-first boundary
+
+- Question: what is the cleanest long-term contract between EOS and
+  `arduino-cli-android` for the first real adoption pilot?
+- Evidence: repository review showed `AGENTS.md` currently mixes universal
+  methodology with Android-specific repository guidance; EOS already has a
+  canonical project adoption model; the repo had no pre-existing adoption
+  manifest; `STATUS.md` and `ROADMAP.md` already separate current state from
+  future sequencing.
+- Decision: implement the adoption boundary as `eos.project.json` plus a thin
+  `AGENTS.md` overlay, and treat the manifest as the canonical adoption
+  contract.
+- Alternatives: keep AGENTS canonical; add a separate adoption lock file; leave
+  adoption implicit in prose.
+- Confidence: medium -> medium-high
+- Uncertainty removed: the project needs an explicit manifest boundary more than
+  another prose policy layer.
+- Uncertainty remaining: whether the manifest should gain a dedicated
+  safety/constraints section before EOS Foundation v0.1.0.
+- Docs updated: `MILESTONE_EOS_PROJECT_ZERO.md`, `ENGINEERING_DECISIONS.md`,
+  `VALIDATED_FINDINGS.md`, `STATUS.md`, `ROADMAP.md`, `TASK_RECOVERY.md`
+- Roadmap impact: Project Zero becomes the next repo-level EOS adoption step
+- Follow-up: validate the manifest shape against EOS schema and decide whether
+  any additional AGENTS reduction is justified

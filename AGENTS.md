@@ -45,6 +45,17 @@ These laws govern every future engineering task, decision, implementation,
 review, validation, and documentation update. If another repository document
 conflicts with them, the laws win.
 
+## EOS Project Zero
+
+This repository is the first real EOS adoption pilot.
+
+- `eos.project.json` is the canonical project adoption manifest.
+- `AGENTS.md` is a project-local overlay, not the canonical EOS contract.
+- Universal engineering methodology should defer to the EOS canon when EOS has
+  a canonical home for the concept.
+- Android-specific implementation guidance, workflow guidance, and repository
+  hygiene still belong here when they are project-specific.
+
 ## Mission
 This repository aims to become a production-quality Arduino CLI that runs natively on Android without chroots, PRoot, Docker, virtual machines, or a traditional Linux distribution. It is also the flagship implementation of the Android Compatibility Layer (ACL), a reusable framework for running Linux developer tools reliably on Android.
 

@@ -189,6 +189,23 @@ These decisions use an ADR-style format.
 - Validation/evidence if available: native Termux help output and dry-run
   validation from the current milestone.
 
+## EOS adoption should be manifest-first and AGENTS should be overlay-only
+
+- Status: accepted
+- Context: The first real EOS adoption pilot showed that a repository can state
+  its EOS relationship more cleanly through a project manifest than by
+  duplicating EOS doctrine in `AGENTS.md`.
+- Decision: adopt EOS through `eos.project.json` as the canonical contract and
+  keep `AGENTS.md` as a project-local overlay that points back to EOS canon.
+- Alternatives considered: treating `AGENTS.md` as the canonical adoption
+  contract; adding a separate lock file; encoding the adoption boundary only in
+  prose.
+- Consequences: version pinning, compatibility, and project extensions become
+  explicit and machine-readable, while local guidance stays readable without
+  becoming a second constitution.
+- Validation/evidence if available: repository review of `AGENTS.md`, `STATUS.md`,
+  `ROADMAP.md`, `TASK_RECOVERY.md`, and the EOS adoption docs.
+
 ## Engineering Knowledge Framework is the repository knowledge spine
 
 - Status: accepted
