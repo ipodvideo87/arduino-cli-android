@@ -2,6 +2,17 @@
 
 This file is a logbook of tested findings from the project history.
 
+## 2026-07-05
+
+- Environment: native Termux on the target Android device
+- Command/evidence:
+  `./arduino-cli acl transport probe-fd --json --device /dev/bus/usb/001/002`,
+  `./arduino-cli acl transport stream-validate --json --device /dev/bus/usb/001/002 --details --validate-read --validate-write`, and
+  `termux-usb -r -E -e "./arduino-cli acl transport stream-validate-helper --json --validate-read --validate-write --timeout 2s" /dev/bus/usb/001/002`
+- Result: native Termux fd handoff is proven and inspectable with `fd_source=environment`, `handoff_mode=env`, `fd_valid=true`, and `fd_inspectable=true`; permission and handoff are not the blocker; raw byte-stream write is unsupported on this path; read remains unproven because it was skipped after write failure; the current transport boundary is diagnostic-only, not stream-capable
+- Confidence: high
+- Notes: no upload, flashing, serial monitor, or source changes were attempted. The next safe step, if more evidence is needed, is a read-only fresh-helper probe that does not attempt write first
+
 ## 2026-07-04
 
 - Environment: native Termux on the target Android device

@@ -108,6 +108,14 @@ Current validation posture:
   `EOF` on the read probe, and `write TERMUX_USB_FD: invalid argument` on the
   write probe; that is evidence against treating the fd as a normal generic
   byte-stream endpoint.
+- Native Termux transport stream validation now classifies the current Termux
+  USB fd path as diagnostic-only, not stream-capable: `fd_source=environment`,
+  `handoff_mode=env`, `fd_valid=true`, `fd_inspectable=true`, raw byte-stream
+  write is unsupported on this path, and read remains unproven because it was
+  skipped after write failure.
+- The current blocker is not permission or fd handoff; the next safe evidence
+  step, if more proof is needed, is a read-only fresh-helper probe that does
+  not attempt write first.
 - USB flashing is still unimplemented and must not be claimed as complete.
 
 Repository cleanup:
@@ -302,6 +310,6 @@ Repository cleanup:
 
 ## Next Engineering Milestone
 
-Complete the Project Zero adoption pilot by validating the manifest-first EOS
-boundary, recording the adoption findings, and deciding whether the repository
-should reduce more local methodology into EOS canon.
+Validate the native Termux transport stream boundary with a fresh read-only
+helper probe if more evidence is needed, while keeping upload, flashing, and
+serial monitor out of scope.

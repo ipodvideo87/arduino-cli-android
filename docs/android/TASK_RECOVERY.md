@@ -27,57 +27,54 @@ How to use:
 
 ## Active Task
 
-- Objective: close the package-validation milestone for the ESP32-S3 sketch
-  package and preserve the evidence boundary between package generation and
-  any future transport or flashing work.
+- Objective: record the native Termux transport stream boundary finding and
+  preserve the evidence boundary between diagnostic fd handoff and any future
+  transport implementation work.
 - Scope:
-  - validate that the generated package is `full-flash`
-  - confirm the manifest, flash-plan, validation-report, analysis, and
-    README_FLASHING artifacts exist
-  - confirm bootloader, partitions, boot_app0, and application artifacts exist
-  - exercise prepare-only upload consumption only if it is already supported
-    and safe
+  - record the native Termux fd-handoff evidence
+  - preserve the diagnostic-only classification for the current fd path
+  - capture the read/write probe result boundary without expanding into upload
+    or flashing
+  - keep the next safe evidence step available if a fresh read-only helper probe
+    is needed later
 - Constraints:
   - do not patch sketch code
   - do not patch third-party libraries
   - do not change board/core/FQBN
-  - do not broaden into upload execution, flashing execution, USB transport,
-    serial monitor, ESP32 protocol framing, EEL, or EOS adoption work
+  - do not broaden into upload execution, flashing execution, serial monitor,
+    ESP32 protocol framing, EEL, EOS adoption work, or source changes
   - do not claim native-Termux success from host or proot evidence
 - Non-goals:
   - upload execution
   - flashing execution
-  - transport-stream validation
+  - serial monitor
   - byte-stream readiness
-  - EOS canon changes unless package evidence requires them
+  - EOS canon changes unless transport evidence requires them
 
 ## Intended Plan
 
-- Step 1: keep the recovery snapshot aligned with the completed closeout.
-- Step 2: record the compile result, package validation result, and
-  prepare-only dry-run result in canonical docs.
-- Step 3: preserve the warning as a documented non-blocking follow-up.
-- Step 4: leave the recovery snapshot ready for commit/push without
-  broadening scope into transport or flashing work.
+- Step 1: keep the recovery snapshot aligned with the current transport
+  boundary finding.
+- Step 2: record the fd-handoff proof, the unsupported write result, and the
+  diagnostic-only classification in canonical docs.
+- Step 3: preserve the next safe evidence step as a read-only fresh-helper
+  probe only if more detail is needed later.
+- Step 4: leave the recovery snapshot ready for commit/push without broadening
+  scope into upload, flashing, or serial-monitor work.
 
 ## Progress
 
 - Completed:
-  - reviewed the current repository state, `STATUS.md`, `ROADMAP.md`,
-    `VALIDATED_FINDINGS.md`, `ENGINEERING_DECISIONS.md`, `DECISION_LOG.md`,
-    and the package-validation milestone doc
-  - confirmed the package milestone scope is package-only and explicitly
-    excludes real upload, flashing, USB transport, serial monitor, ESP32
-    protocol framing, EEL, and EOS adoption work
-  - confirmed the current shell is native Termux for the latest validation
-    evidence
-  - confirmed package validation now passes and prepare-only upload dry-run
-    succeeds without opening a real transport stream
-  - confirmed the target-chip warning was resolved by rebuilding the repo-local
-    `arduino-cli` binary with `go build -o arduino-cli .` and regenerating the
-    package
-  - noted the jq-loop artifact check failure as a diagnostic-script
-    portability issue rather than a package evidence failure
+  - reviewed the current repository state and the transport-related canonical
+    docs before recording the new finding
+  - confirmed the native Termux fd handoff is proven through `probe-fd` and
+    `stream-validate`
+  - confirmed `fd_source=environment`, `handoff_mode=env`, `fd_valid=true`,
+    and `fd_inspectable=true`
+  - confirmed raw byte-stream write is unsupported on this path and that read
+    remains unproven because it was skipped after write failure
+  - confirmed the evidence supports a diagnostic-only, not stream-capable,
+    classification for the current Termux USB fd path
 - In progress:
   - none
 - Remaining:
@@ -93,27 +90,23 @@ How to use:
 
 ## Validation
 
-- Status: package validation evidence collected in native Termux
+- Status: native Termux transport boundary evidence collected
 - Evidence collected:
-  - the milestone doc defines exact package-only checks and out-of-scope areas
-  - the repository already has the package-validation milestone documented in
-    `STATUS.md` and `ROADMAP.md`
-  - package validation now produces a `full-flash` package with the required
-    artifacts
-  - prepare-only upload dry-run accepts the package and reports `dry-run: true`
-    and `prepare-only: true`
-  - rebuilding the repo-local `arduino-cli` binary with `go build -o arduino-cli .`
-    and regenerating the package yielded `target_chip = esp32s3` in manifest,
-    flash plan, and validation report, with validation warnings now `null`
-  - the jq-loop check failure was a shell portability issue, not a package
-    failure
+  - the transport docs define the diagnostic-only boundary and the next safe
+    evidence step
+  - native Termux `probe-fd` proves fd handoff and inspection
+  - native Termux `stream-validate` proves the current path is not stream-capable
+    because write returns `invalid argument`
+  - the same result shape reproduces through `termux-usb -r -E -e`
+  - no upload, flashing, serial monitor, or source changes were attempted
 - Evidence still needed:
   - none for this milestone
 
 ## Safest Next Action
 
-- Next action: commit and push the closeout if requested, then clear this file
-  after the repository state is published.
+- Next action: if more detail is needed, run a fresh helper read probe without
+  write first; otherwise commit and push this documentation update if requested
+  and then clear this file after the repository state is published.
 
 ## Canonical Follow-Through
 
