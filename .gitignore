@@ -16,6 +16,7 @@ venv
 /node_modules/
 __debug_bin*
 .vscode
+/.acl/evidence/*.json
 
 # gRPC client example folder
 /rpc/internal/client_example/client_example
