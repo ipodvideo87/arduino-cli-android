@@ -73,12 +73,15 @@ How to use:
     evidence
   - confirmed package validation now passes and prepare-only upload dry-run
     succeeds without opening a real transport stream
+  - confirmed the target-chip warning was resolved by rebuilding the repo-local
+    `arduino-cli` binary with `go build -o arduino-cli .` and regenerating the
+    package
   - noted the jq-loop artifact check failure as a diagnostic-script
     portability issue rather than a package evidence failure
 - In progress:
   - none
 - Remaining:
-  - commit and push the closeout if requested
+  - commit and push the documentation update if requested
   - clear this file after the closeout is committed and pushed
 
 ## Files
@@ -99,6 +102,9 @@ How to use:
     artifacts
   - prepare-only upload dry-run accepts the package and reports `dry-run: true`
     and `prepare-only: true`
+  - rebuilding the repo-local `arduino-cli` binary with `go build -o arduino-cli .`
+    and regenerating the package yielded `target_chip = esp32s3` in manifest,
+    flash plan, and validation report, with validation warnings now `null`
   - the jq-loop check failure was a shell portability issue, not a package
     failure
 - Evidence still needed:

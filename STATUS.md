@@ -70,9 +70,11 @@ Current validation posture:
 - Native Termux package-validation evidence now confirms the ESP32-S3 sketch
   package is `full-flash`, all required package artifacts exist, and the
   prepare-only upload consumer accepts the package in dry-run mode.
-- The package dry-run still reports `target chip metadata is not set`; that
-  warning is now documented as a non-blocking follow-up item for this
-  milestone.
+- The package warning was resolved by rebuilding the repo-local `arduino-cli`
+  binary with `go build -o arduino-cli .` and regenerating the package; the
+  regenerated package now reports `target_chip = esp32s3` in the manifest,
+  flash plan, and validation report, and the validation warnings are now
+  `null`.
 - The Termux USB provider now has a native-Termux validation checklist documenting expected outputs for discovery, permission, stale-path handling, and fd handoff evidence.
 - Discovery and permission acquisition for the Termux USB provider are now native-Termux validated on Samsung A17 / Android 16; byte-stream and upload behavior remain unvalidated.
 - The Termux USB provider now also exposes a bounded `acl transport probe-fd`

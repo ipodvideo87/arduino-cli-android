@@ -10,15 +10,18 @@ This file is a logbook of tested findings from the project history.
 - Result: the validated `full-flash` package is accepted by the prepare-only
   upload consumer with `dry-run=true`, `prepare-only=true`, `operations=4`,
   `ordered=true`, and `complete=true`; the consumer reports `stream required:
-  false` and keeps the run read-only; the remaining warning is
-  `target chip metadata is not set`
+  false` and keeps the run read-only; after rebuilding the repo-local
+  `arduino-cli` binary with `go build -o arduino-cli .` and regenerating the
+  package, the regenerated package now reports `target_chip = esp32s3` in the
+  manifest, flash plan, and validation report, and the validation warnings are
+  now `null`
 - Confidence: high
 - Notes: the earlier jq loop failure was a diagnostic-script portability issue,
-  not a package validation failure. The remaining target-chip warning is a
-  documented non-blocking follow-up for this milestone. Future native-Termux
-  command blocks should prefer direct file checks, consistent quoting, and
-  simpler shell forms when verifying artifact existence. Any later fix should
-  inspect target-chip propagation before implementation, not after
+  not a package validation failure. The previous target-chip warning came from
+  stale binary / stale package state. Future native-Termux command blocks
+  should prefer direct file checks, consistent quoting, and simpler shell forms
+  when verifying artifact existence. Future recurrence should check binary
+  freshness before patching source
 
 ## 2026-07-03
 

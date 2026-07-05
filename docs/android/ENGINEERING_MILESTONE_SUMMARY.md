@@ -61,6 +61,9 @@ that the upload planner could consume the generated package safely.
 - flash-plan required entries were present
 - artifact existence checks passed for the generated package contents
 - prepare-only upload dry-run passed
+- rebuilding the repo-local `arduino-cli` binary with `go build -o arduino-cli .`
+  and regenerating the package produced `target_chip = esp32s3` in the
+  manifest, flash plan, and validation report, with validation warnings `null`
 - no real upload or flashing was attempted
 
 ## What Was Proven
@@ -85,13 +88,12 @@ that the upload planner could consume the generated package safely.
 - target device runtime behavior
 
 ## Remaining Limitations
-The package validation still reports `target chip metadata is not set`.
+No package-level target-chip limitation remains after rebuild/regeneration.
 
-- Severity: low
-- Impact: non-blocking for this milestone because package correctness,
-  prepare-only planning, and artifact validation all passed
-- Recommended follow-up: inspect target-chip propagation before implementing a
-  fix, and keep the warning documented until the propagation path is verified
+- Severity: none for the package milestone
+- Impact: none for the package milestone after binary rebuild and regeneration
+- Recommended follow-up: if the warning ever returns, check binary freshness
+  before patching source
 
 ## Lessons Learned
 - dependency failures should be classified at the missing-include or library
@@ -102,6 +104,8 @@ The package validation still reports `target chip metadata is not set`.
 - safer shell forms reduce false negatives in validation scripts
 - package correctness and transport correctness should stay separate milestones
 - warning handling should remain evidence-driven rather than speculative
+- binary freshness can matter as much as source correctness when validating
+  regenerated package outputs
 
 ## Repository Impact
 Documentation updated:
