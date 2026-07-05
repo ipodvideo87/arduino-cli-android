@@ -13,6 +13,12 @@ This file is a logbook of tested findings from the project history.
 - Confidence: high
 - Notes: no upload, flashing, serial monitor, or source changes were attempted. The next safe step, if more evidence is needed, is a read-only fresh-helper probe that does not attempt write first
 
+- Environment: native Termux on the target Android device
+- Command/evidence: `./arduino-cli acl evidence collect --device /dev/bus/usb/001/002 --output-dir .acl/evidence` and inspection of `.acl/evidence/evidence-20260705T231207Z-867257893921.json`
+- Result: the collector writes a nested evidence schema with fields under `repository.*`, `environment.*`, `binary.*`, and `device_path`; a correct jq summary example is `jq -r '{repo: .repository.root, branch: .repository.branch, commit: .repository.commit, native_termux: .environment.native_termux, binary: .binary.path, device: .device_path}'`; the earlier flat-field jq query was a query mismatch rather than a collector failure
+- Confidence: high
+- Notes: the collector validation remains successful on native Termux, and the warning-level transport details inside the evidence bundle are expected for the current diagnostic-only transport boundary
+
 ## 2026-07-04
 
 - Environment: native Termux on the target Android device

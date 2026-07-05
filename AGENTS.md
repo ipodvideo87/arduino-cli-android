@@ -214,6 +214,27 @@ Do not claim a milestone is complete until it has been verified through real-wor
 - Never fabricate APIs, functionality, or test results.
 - Clearly mark experimental behavior.
 
+## Standing Workflow
+- Canonical working repository:
+  `/data/data/com.termux/files/home/Development/GitHub/arduino-cli-android`.
+  When the task is "work on arduino-cli-android", use this repository only
+  unless you explicitly ask for a different copy.
+- Before implementation or asking the user to run commands, verify the working
+  directory, confirm the expected source files exist, rebuild the local binary
+  with `go build -o arduino-cli .`, and verify the rebuilt binary exposes the
+  expected functionality.
+- For Android-specific features, validate on native Termux whenever practical.
+- If validation fails, stop and determine the root cause before trying another
+  solution.
+- Before adding new code, ask whether the existing architecture can solve the
+  problem. Avoid over-engineering.
+- When a problem recurs or creates significant friction, identify the class of
+  problem and make the smallest evidence-based improvement that prevents
+  recurrence.
+- Normal build or dependency installs are fine when needed. Installs that would
+  change Termux itself or the native Android/Termux runtime should be discussed
+  before proceeding.
+
 ## Documentation Policy
 - Documentation is part of the codebase, not a separate cleanup task.
 - Whenever functionality changes, review and update the relevant documentation as part of the same change.

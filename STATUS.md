@@ -66,6 +66,10 @@ Current validation posture:
 - Native Termux remains the source of truth for Android behavior.
 - Unit tests and CLI/build verification are useful, but not sufficient for Android claims.
 - Emulated ARM64 smoke tests are useful preflight checks only and do not prove Android success.
+- Canonical working repository for active work is
+  `/data/data/com.termux/files/home/Development/GitHub/arduino-cli-android`;
+  repo-local binaries should be rebuilt from that tree before asking for new
+  validation.
 - The next product milestone now has a dedicated native-Termux package-validation doc at `docs/android/MILESTONE_NATIVE_FULL_FLASH_BOOTLOADER_PACKAGE_VALIDATION.md`.
 - Native Termux package-validation evidence now confirms the ESP32-S3 sketch
   package is `full-flash`, all required package artifacts exist, and the

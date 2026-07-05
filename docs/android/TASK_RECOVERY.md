@@ -27,92 +27,84 @@ How to use:
 
 ## Active Task
 
-- Objective: record the native Termux transport stream boundary finding and
-  preserve the evidence boundary between diagnostic fd handoff and any future
-  transport implementation work.
+- Objective: record the standing repository workflow and canonical worktree
+  path, so future implementation work starts from the same synced repository
+  and the same Definition of Done.
 - Scope:
-  - record the native Termux fd-handoff evidence
-  - preserve the diagnostic-only classification for the current fd path
-  - capture the read/write probe result boundary without expanding into upload
-    or flashing
-  - keep the next safe evidence step available if a fresh read-only helper probe
-    is needed later
+  - document the canonical repository path and working-tree rule
+  - document the binary rebuild / validation requirement before asking the user
+    to run new commands
+  - record the recurring-friction principle in reusable lessons
 - Constraints:
-  - do not patch sketch code
-  - do not patch third-party libraries
-  - do not change board/core/FQBN
+  - do not change implementation code
   - do not broaden into upload execution, flashing execution, serial monitor,
-    ESP32 protocol framing, EEL, EOS adoption work, or source changes
-  - do not claim native-Termux success from host or proot evidence
+    or EOS adoption work
+  - keep the docs update limited to workflow, status, and reusable lesson
+    records
 - Non-goals:
+  - new source behavior
+  - transport changes
   - upload execution
   - flashing execution
   - serial monitor
-  - byte-stream readiness
-  - EOS canon changes unless transport evidence requires them
+  - EOS canon changes
 
 ## Intended Plan
 
-- Step 1: keep the recovery snapshot aligned with the current transport
-  boundary finding.
-- Step 2: record the fd-handoff proof, the unsupported write result, and the
-  diagnostic-only classification in canonical docs.
-- Step 3: preserve the next safe evidence step as a read-only fresh-helper
-  probe only if more detail is needed later.
-- Step 4: leave the recovery snapshot ready for commit/push without broadening
-  scope into upload, flashing, or serial-monitor work.
+- Step 1: keep the recovery snapshot aligned with the standing workflow update.
+- Step 2: record the canonical worktree rule and Definition of Done in the
+  repository guidance docs.
+- Step 3: record the recurring-friction principle in the lessons doc.
+- Step 4: leave the recovery snapshot ready for validation and commit without
+  broadening scope into implementation work.
 
 ## Progress
 
 - Completed:
-  - reviewed the current repository state and the transport-related canonical
-    docs before recording the new finding
-  - confirmed the native Termux fd handoff is proven through `probe-fd` and
-    `stream-validate`
-  - confirmed `fd_source=environment`, `handoff_mode=env`, `fd_valid=true`,
-    and `fd_inspectable=true`
-  - confirmed raw byte-stream write is unsupported on this path and that read
-    remains unproven because it was skipped after write failure
-  - confirmed the evidence supports a diagnostic-only, not stream-capable,
-    classification for the current Termux USB fd path
+  - reviewed the current repository state and the canonical workflow docs
+  - identified the standing repository workflow updates that needed to be
+    captured in `AGENTS.md`, `STATUS.md`, and `LESSONS_LEARNED.md`
 - In progress:
-  - none
+  - patching the docs
 - Remaining:
-  - commit and push the documentation update if requested
+  - validate the docs-only change set
+  - commit the documentation update if requested
   - clear this file after the closeout is committed and pushed
 
 ## Files
 
 - Touched:
+  - `AGENTS.md`
+  - `STATUS.md`
+  - `docs/android/LESSONS_LEARNED.md`
   - `docs/android/TASK_RECOVERY.md`
 - Intended:
   - none
 
 ## Validation
 
-- Status: native Termux transport boundary evidence collected
+- Status: standing workflow documentation update in progress
 - Evidence collected:
-  - the transport docs define the diagnostic-only boundary and the next safe
-    evidence step
-  - native Termux `probe-fd` proves fd handoff and inspection
-  - native Termux `stream-validate` proves the current path is not stream-capable
-    because write returns `invalid argument`
-  - the same result shape reproduces through `termux-usb -r -E -e`
-  - no upload, flashing, serial monitor, or source changes were attempted
+  - the current repository state was checked before editing
+  - the standing workflow now has a canonical repo path and rebuild/validation
+    requirement in `AGENTS.md`
+  - the current status now points future work at the canonical Termux clone
+  - the reusable lesson about recurring friction now lives in
+    `docs/android/LESSONS_LEARNED.md`
 - Evidence still needed:
-  - none for this milestone
+  - `git diff --check`
+  - a final status review before commit
 
 ## Safest Next Action
 
-- Next action: if more detail is needed, run a fresh helper read probe without
-  write first; otherwise commit and push this documentation update if requested
-  and then clear this file after the repository state is published.
+- Next action: validate the docs-only diff, then commit the workflow update if
+  requested and clear this file after the repository state is published.
 
 ## Canonical Follow-Through
 
-- `VALIDATED_FINDINGS.md`: updated
+- `VALIDATED_FINDINGS.md`:
 - `DECISION_LOG.md`:
-- `LESSONS_LEARNED.md`:
+- `LESSONS_LEARNED.md`: updated
 - `UNCERTAINTY_REGISTER.md`:
 
 ## Reset State

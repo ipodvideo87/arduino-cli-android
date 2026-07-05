@@ -18,6 +18,20 @@ Good lessons are:
 - specific enough to be actionable
 - broad enough to matter again
 
+## Solve Recurring Friction at the Class Level
+
+- Lesson: when a problem recurs or creates significant friction, identify the
+  class of problem and make the smallest evidence-based improvement that
+  prevents the same class of problem from wasting time again.
+- Why it matters: repeated manual fixes and repeated diagnostic churn slow the
+  repository down more than the original bug does.
+- Evidence source: stale binary/source mismatch, the native evidence collector
+  bridge, `target_chip` freshness checks, and the canonical worktree rule.
+- When to apply it: when the same failure pattern, copy/paste burden, or sync
+  confusion shows up more than once.
+- What not to infer from it: this is not permission to automate everything or
+  add complexity without proof that the pain is real.
+
 ## Promotion Criteria
 
 Move an insight into this document when it:
@@ -56,4 +70,3 @@ Lessons should not become a second source of policy.
 
 If a lesson changes a rule, promote the rule to the appropriate canonical
 document and leave the lesson here as supporting context.
-
