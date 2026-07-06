@@ -32,6 +32,22 @@ Good lessons are:
 - What not to infer from it: this is not permission to automate everything or
   add complexity without proof that the pain is real.
 
+## Treat FD Handoff And Stream Validation As Separate Milestones
+
+- Lesson: a valid `TERMUX_USB_FD` handoff does not prove generic POSIX
+  byte-stream behavior. FD handoff validation and stream validation are
+  separate milestones.
+- Why it matters: Android USB transport work can look superficially ready after
+  the helper handoff succeeds, but read/write behavior still needs its own
+  evidence before any stream-capable claims are made.
+- Evidence source: native Termux stream-boundary validation where the fd
+  handoff remained valid and inspectable, read probing returned `EOF`, and
+  write probing returned `invalid argument`.
+- When to apply it: when planning or reviewing Android USB transport work that
+  uses `TERMUX_USB_FD`, helper handoff, or stream-boundary diagnostics.
+- What not to infer from it: do not assume read/write support, claim/release
+  readiness, or payload transfer capability from fd handoff alone.
+
 ## Promotion Criteria
 
 Move an insight into this document when it:

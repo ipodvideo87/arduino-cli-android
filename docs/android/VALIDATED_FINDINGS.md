@@ -11,6 +11,12 @@ This file is a logbook of tested findings from the project history.
 - Confidence: high
 - Notes: byte-stream read/write remains unproven; claim/release remains unproven; no upload, flashing, serial monitor, or payload transfer was attempted
 
+- Environment: native Termux on the target Android device
+- Command/evidence: `./arduino-cli acl transport stream-validate --device /dev/bus/usb/001/002 --details --validate-read` and `./arduino-cli acl transport stream-validate --device /dev/bus/usb/001/002 --details --validate-write`
+- Result: canonical repo preflight passed; read probing returned `EOF`; write probing returned `invalid argument`; fd handoff remains valid and inspectable; `TERMUX_USB_FD` should not be treated as a generic byte stream; current classification is that the stream boundary is not validated
+- Confidence: high
+- Notes: no upload, flashing, serial monitor, or payload transfer was attempted; the next milestone should be read-only claim/release diagnostics
+
 ## 2026-07-05
 
 - Environment: native Termux on the target Android device

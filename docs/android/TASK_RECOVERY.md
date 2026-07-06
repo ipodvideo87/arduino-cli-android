@@ -27,19 +27,19 @@ How to use:
 
 ## Active Task
 
-- Objective: record the standing repository workflow and canonical worktree
-  path, so future implementation work starts from the same synced repository
-  and the same Definition of Done.
+- Objective: record the native Termux stream-boundary closeout evidence as a
+  docs-only update and preserve the boundary between diagnostic helper evidence
+  and any future transport implementation work.
 - Scope:
-  - document the canonical repository path and working-tree rule
-  - document the binary rebuild / validation requirement before asking the user
-    to run new commands
-  - record the recurring-friction principle in reusable lessons
+  - record the canonical repo preflight and stream-boundary evidence
+  - preserve the diagnostic-only classification for the current fd path
+  - keep upload, flashing, serial monitor, and payload transfer out of scope
+  - keep the next milestone available for read-only claim/release diagnostics
 - Constraints:
   - do not change implementation code
   - do not broaden into upload execution, flashing execution, serial monitor,
     or EOS adoption work
-  - keep the docs update limited to workflow, status, and reusable lesson
+  - keep the docs update limited to workflow, status, and reusable evidence
     records
 - Non-goals:
   - new source behavior
@@ -51,10 +51,9 @@ How to use:
 
 ## Intended Plan
 
-- Step 1: keep the recovery snapshot aligned with the standing workflow update.
-- Step 2: record the canonical worktree rule and Definition of Done in the
-  repository guidance docs.
-- Step 3: record the recurring-friction principle in the lessons doc.
+- Step 1: keep the recovery snapshot aligned with the stream-boundary closeout.
+- Step 2: record the preflight and fd boundary in the canonical docs.
+- Step 3: preserve the next milestone as read-only claim/release diagnostics.
 - Step 4: leave the recovery snapshot ready for validation and commit without
   broadening scope into implementation work.
 
@@ -62,8 +61,13 @@ How to use:
 
 - Completed:
   - reviewed the current repository state and the canonical workflow docs
-  - identified the standing repository workflow updates that needed to be
-    captured in `AGENTS.md`, `STATUS.md`, and `LESSONS_LEARNED.md`
+  - confirmed canonical repo preflight passed
+  - confirmed read probing returned `EOF`
+  - confirmed write probing returned `invalid argument`
+  - confirmed fd handoff remains valid and inspectable
+  - confirmed `TERMUX_USB_FD` should not be treated as a generic byte stream
+  - confirmed the stream boundary is not validated and the next milestone is
+    read-only claim/release diagnostics
 - In progress:
   - patching the docs
 - Remaining:
@@ -74,37 +78,35 @@ How to use:
 ## Files
 
 - Touched:
-  - `AGENTS.md`
   - `STATUS.md`
-  - `docs/android/LESSONS_LEARNED.md`
+  - `docs/android/VALIDATED_FINDINGS.md`
   - `docs/android/TASK_RECOVERY.md`
 - Intended:
   - none
 
 ## Validation
 
-- Status: standing workflow documentation update in progress
+- Status: stream-boundary closeout documentation update in progress
 - Evidence collected:
-  - the current repository state was checked before editing
-  - the standing workflow now has a canonical repo path and rebuild/validation
-    requirement in `AGENTS.md`
-  - the current status now points future work at the canonical Termux clone
-  - the reusable lesson about recurring friction now lives in
-    `docs/android/LESSONS_LEARNED.md`
+  - canonical repo preflight passed
+  - the stream-boundary evidence is captured in canonical docs
+  - the next milestone is read-only claim/release diagnostics
 - Evidence still needed:
   - `git diff --check`
   - a final status review before commit
 
 ## Safest Next Action
 
-- Next action: validate the docs-only diff, then commit the workflow update if
-  requested and clear this file after the repository state is published.
+- Next action: validate the docs-only diff, then commit the stream-boundary
+  closeout if requested and clear this file after the repository state is
+  published.
 
 ## Canonical Follow-Through
 
-- `VALIDATED_FINDINGS.md`:
+- `STATUS.md`: updated
+- `VALIDATED_FINDINGS.md`: updated
 - `DECISION_LOG.md`:
-- `LESSONS_LEARNED.md`: updated
+- `LESSONS_LEARNED.md`:
 - `UNCERTAINTY_REGISTER.md`:
 
 ## Reset State

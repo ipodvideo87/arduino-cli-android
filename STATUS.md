@@ -270,6 +270,12 @@ Repository cleanup:
   3 interfaces and 5 endpoints, but it remains diagnostic-only because
   byte-stream read/write, claim/release, upload, flashing, serial monitor, and
   payload transfer were not attempted.
+- Native Termux stream-boundary closeout evidence now shows read probing
+  returned `EOF` and write probing returned `invalid argument`; the fd handoff
+  remains valid and inspectable, but `TERMUX_USB_FD` should not be treated as a
+  generic byte stream. The current classification is that the stream boundary
+  is not validated, and the next milestone should be read-only claim/release
+  diagnostics.
 - Re-run native Termux validation for both `-E` and argv fd handoff modes, then
   record the observed `fd_source` in `docs/android/VALIDATED_FINDINGS.md`.
 - Keep the `probe-fd` diagnostics aligned with the native `-E -e` handoff shape
