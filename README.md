@@ -5,6 +5,16 @@ An experimental fork of Arduino CLI with Android and Termux compatibility work.
 For the long-term project mission and intended end state, see [MISSION.md](MISSION.md).
 For the current progress snapshot, see [STATUS.md](STATUS.md).
 
+## Canonical Working Copy
+
+Active work should use the Termux-visible checkout:
+
+`/data/data/com.termux/files/home/Development/GitHub/arduino-cli-android`
+
+Keep this README aligned with `STATUS.md` and
+[docs/android/DEVELOPMENT_WORKFLOW.md](docs/android/DEVELOPMENT_WORKFLOW.md)
+when the current milestone or working rules change.
+
 ## Development Environments
 
 This repository is developed against two intentionally different Linux environments:
