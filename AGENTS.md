@@ -69,6 +69,26 @@ There are intentionally two Linux environments in this project:
 
 Native Termux validation always takes priority over container or desktop validation.
 
+## Canonical Repository Rule
+
+- The canonical repository for `arduino-cli-android` is
+  `/data/data/com.termux/files/home/Development/GitHub/arduino-cli-android`.
+- Codex must work only in that directory for `arduino-cli-android` unless I
+  explicitly authorize another path.
+- `/root/arduino-cli-android` is not an acceptable working copy for this
+  project unless I explicitly authorize it.
+- Before any implementation, commit, validation command, or closeout, Codex
+  must report:
+  - `pwd`
+  - `git rev-parse --show-toplevel`
+  - `git status -sb`
+  - current branch
+  - `HEAD` commit
+- If the working directory is not the canonical repo, stop immediately.
+- If changes were accidentally made elsewhere, do not continue product work
+  until the canonical repo is reconciled.
+- Any repo path shown in closeout must be the canonical repo path.
+
 ## Android Research Policy
 - Before starting any task that may change architecture, validation, reporting,
   or long-lived documentation, also read:
