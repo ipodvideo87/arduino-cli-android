@@ -168,7 +168,7 @@ func (c *Collector) Collect(ctx context.Context, opts CollectOptions) (EvidenceB
 		RunID:          runID,
 		CollectedAtUTC: c.now(),
 		Environment:    captureEnvironment(),
-		Binary:         captureBinaryIdentity(),
+		Binary:         captureBinaryIdentity(c.binaryPath),
 		DevicePath:     opts.DevicePath,
 		Status:         acldiagnostics.StatusPassed,
 		Warnings:       []string{},
@@ -388,9 +388,12 @@ func captureEnvironment() EnvironmentIdentity {
 	}
 }
 
-func captureBinaryIdentity() BinaryIdentity {
-	exe, _ := os.Executable()
-	exe = strings.TrimSpace(exe)
+func captureBinaryIdentity(path string) BinaryIdentity {
+	exe := strings.TrimSpace(path)
+	if exe == "" {
+		exe, _ = os.Executable()
+		exe = strings.TrimSpace(exe)
+	}
 	info := version.VersionInfo
 	identity := BinaryIdentity{
 		Path:       exe,

@@ -7,6 +7,11 @@ If you have a task, start here. Do not try to assemble the operating model from
 memory.
 This workflow operates under the Engineering Laws at the top of `AGENTS.md`.
 
+For this repository, the canonical working copy is
+`/data/data/com.termux/files/home/Development/GitHub/arduino-cli-android`.
+If you land in another checkout, switch there before reading, editing, or
+running repo commands.
+
 ## 1. Understand The Task
 
 First identify what kind of work it is:

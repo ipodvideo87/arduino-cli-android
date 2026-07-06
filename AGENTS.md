@@ -73,6 +73,9 @@ Native Termux validation always takes priority over container or desktop validat
 
 - The canonical repository for `arduino-cli-android` is
   `/data/data/com.termux/files/home/Development/GitHub/arduino-cli-android`.
+- Use that checkout for all repo work in this project. Treat
+  `/root/arduino-cli-android` as the wrong working copy unless I explicitly say
+  otherwise.
 - Codex must work only in that directory for `arduino-cli-android` unless I
   explicitly authorize another path.
 - `/root/arduino-cli-android` is not an acceptable working copy for this

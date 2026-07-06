@@ -74,6 +74,7 @@ func TestCollectorShapesEvidenceEnvelope(t *testing.T) {
 	require.Equal(t, tempDir, bundle.Repository.Root)
 	require.Equal(t, "android-runtime-v2", strings.TrimSpace(bundle.Repository.Branch))
 	require.Equal(t, "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef", strings.TrimSpace(bundle.Repository.Commit))
+	require.Equal(t, "/tmp/arduino-cli", bundle.Binary.Path)
 	require.Contains(t, bundle.Repository.Status, "ahead 4")
 	require.Equal(t, "/dev/bus/usb/001/002", bundle.DevicePath)
 	require.Equal(t, 7, len(bundle.Commands))
