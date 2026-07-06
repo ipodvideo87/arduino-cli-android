@@ -262,6 +262,14 @@ Repository cleanup:
   byte-stream support.
 - Validate the `acl transport probe-fd` surface on native Termux and only then
   consider byte-stream bridge work.
+- The ACL evidence collection command now exists with unit-test coverage; native Termux validation of its output remains pending.
+- Native Termux fd-handoff evidence is now recorded in a structured artifact:
+  `/data/data/com.termux/files/home/Development/GitHub/arduino-cli-android/.acl/evidence/evidence-20260706T023005Z-e701a4e8538b.json`; the run observed
+  `fd_source=environment`, `fd_observed=true`, `fd_valid=true`,
+  `fd_inspectable=true`, and `handoff_mode=env`, with visible topology of
+  3 interfaces and 5 endpoints, but it remains diagnostic-only because
+  byte-stream read/write, claim/release, upload, flashing, serial monitor, and
+  payload transfer were not attempted.
 - Re-run native Termux validation for both `-E` and argv fd handoff modes, then
   record the observed `fd_source` in `docs/android/VALIDATED_FINDINGS.md`.
 - Keep the `probe-fd` diagnostics aligned with the native `-E -e` handoff shape

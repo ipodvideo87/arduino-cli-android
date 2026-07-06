@@ -2,6 +2,15 @@
 
 This file is a logbook of tested findings from the project history.
 
+## 2026-07-06
+
+- Environment: native Termux on the target Android device
+- Command/evidence: `./arduino-cli acl evidence collect --device /dev/bus/usb/001/002`
+- Artifact: `/data/data/com.termux/files/home/Development/GitHub/arduino-cli-android/.acl/evidence/evidence-20260706T023005Z-e701a4e8538b.json`
+- Result: the committed evidence collector recorded native fd handoff with `fd_source=environment`, `fd_observed=true`, `fd_valid=true`, `fd_inspectable=true`, and `handoff_mode=env`; device topology was visible with 3 interfaces and 5 endpoints; status remains `warning` because the run is diagnostic-only
+- Confidence: high
+- Notes: byte-stream read/write remains unproven; claim/release remains unproven; no upload, flashing, serial monitor, or payload transfer was attempted
+
 ## 2026-07-05
 
 - Environment: native Termux on the target Android device
