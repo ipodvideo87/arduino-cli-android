@@ -45,6 +45,11 @@ These laws govern every future engineering task, decision, implementation,
 review, validation, and documentation update. If another repository document
 conflicts with them, the laws win.
 
+The canonical repository invariants are collected in
+[docs/android/ENGINEERING_INVARIANTS.md](docs/android/ENGINEERING_INVARIANTS.md).
+Use that document as the canonical reference for non-negotiable process
+invariants.
+
 ## EOS Project Zero
 
 This repository is the first real EOS adoption pilot.

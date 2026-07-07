@@ -12,6 +12,9 @@ For this repository, the canonical working copy is
 If you land in another checkout, switch there before reading, editing, or
 running repo commands.
 
+The non-negotiable process invariants are defined in
+[ENGINEERING_INVARIANTS.md](ENGINEERING_INVARIANTS.md).
+
 ## 1. Understand The Task
 
 First identify what kind of work it is:
@@ -121,6 +124,11 @@ first and continue from there without guessing.
 When the task is fully completed, validated, committed, and pushed, clear the
 contents of the recovery file but keep the file itself in place for the next
 task.
+
+Closeout must follow this chain:
+
+evidence -> validation -> documentation -> commit -> push -> recovery reset ->
+next milestone
 
 ## 4. Research When Required
 

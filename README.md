@@ -12,6 +12,8 @@ Android without depending on a desktop Linux machine.
 For the long-term mission and intended end state, see [MISSION.md](MISSION.md).
 For the current progress snapshot, see [STATUS.md](STATUS.md).
 For future milestone ordering, see [docs/android/ROADMAP.md](docs/android/ROADMAP.md).
+For the non-negotiable process invariants, see
+[docs/android/ENGINEERING_INVARIANTS.md](docs/android/ENGINEERING_INVARIANTS.md).
 
 ## Canonical Working Copy
 
@@ -66,57 +68,16 @@ When the two environments disagree, native Termux wins.
 
 ## Current Validated State
 
-The repository has already proven a substantial amount of Android-side work:
-
-- Arduino CLI builds successfully on Android/Termux.
-- ESP32 board indexes and core packages install successfully.
-- ACL can scan ELF files and report runtime metadata.
-- ACL can inventory installed Arduino package executables and produce
-  structured compatibility reports.
-- ACL can validate scanned tool compatibility data before compile or execution
-  work begins.
-- The Android patch pipeline exists for install-time repair and ELF handling.
-- The ACL compile workflow exists and can produce firmware packages.
-- Native Termux validation has established the Termux USB discovery and
-  permission boundary.
-- Native Termux validation has also established the fd handoff and stream
-  boundary diagnostics used for the Termux USB provider.
-- Full-flash bootloader package validation for the native-Termux package path
-  has been completed.
-
-Those claims are validated in the native Android/Termux target unless noted
-otherwise.
+Current project state belongs in [STATUS.md](STATUS.md). This README only gives
+the short front-door view and points to the canonical status and roadmap docs.
 
 ## What Is Still Experimental
 
-Some important parts are not finished yet and should still be treated as
-in-progress:
-
-- The ACL runtime is still experimental and carries Termux-origin assumptions.
-- ELF patching is still mostly a plan-first workflow; the full rewrite path is
-  not finished.
-- Runtime verification remains conservative and may fail until the runtime tree
-  is fully populated.
-- The transport stream foundation remains experimental until native Termux
-  proves read/write behavior.
-- USB flashing is still unimplemented as a validated Android-native workflow.
-- Serial monitor support is still a future milestone.
-- ACL should not be treated as production-ready or complete.
+See [STATUS.md](STATUS.md) for what is currently experimental or incomplete.
 
 ## Current Focus
 
-Current work centers on the next narrow milestone rather than broad feature
-expansion:
-
-- preserve the native-Termux evidence trail
-- keep the canonical repo path explicit in the workflow docs
-- keep the evidence collector and CLI diagnostics aligned with current Android
-  USB semantics
-- validate the read-only claim/release diagnostics boundary before moving into
-  any byte-stream or upload work
-
-The authoritative snapshot for current work, blockers, and immediate next steps
-is [STATUS.md](STATUS.md).
+Current work, blockers, and the next milestone belong in [STATUS.md](STATUS.md).
 
 ## Validation Workflow
 
@@ -150,35 +111,11 @@ upstream compatibility where practical.
 
 ## Recent Work
 
-Recent repository work has focused on these areas:
-
-- Android runtime compatibility and install-time patching
-- ACL scanner, verifier, bootstrap, and patch-preview commands
-- the ACL compile workflow and firmware package generation
-- the prepare-only upload engine foundation
-- Termux USB discovery, permission, fd-handoff, and stream diagnostics
-- native Termux evidence collection and stream-boundary closeout documentation
-- repository governance and workflow documentation
-- canonical working-copy cleanup so active work happens in the Termux-visible
-  checkout
+Recent repository work is summarized in [STATUS.md](STATUS.md).
 
 ## Future Work
 
-The roadmap continues toward the larger Android-native workflow:
-
-- validate the native Termux transport stream boundary
-- validate the Termux USB provider and fd-handoff path on native Termux
-- validate upload planning on native Termux while keeping the CLI/report
-  contract explicit
-- implement upload execution
-- implement the serial monitor workflow
-- add GUI/workspaces and project manager UX
-- improve firmware analysis
-- expand multi-board support
-- add desktop and GitHub Actions validation providers when useful
-
-See [docs/android/ROADMAP.md](docs/android/ROADMAP.md) for the full ordered
-list.
+Future work ordering belongs in [docs/android/ROADMAP.md](docs/android/ROADMAP.md).
 
 ## Why The Documentation Is Structured This Way
 
