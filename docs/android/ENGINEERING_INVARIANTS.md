@@ -69,14 +69,24 @@ canonical owner rather than duplicate it.
   ensure it matches the claim being made.
 - Failure action: downgrade the claim or continue validating.
 
-## 8. One Canonical Owner Per Engineering Claim Invariant
+## 8. Documentation Currency Invariant
+
+- Rule: when validated engineering knowledge changes, the canonical document
+  that owns that knowledge must be updated before task closeout unless an
+  explicit documented deferral exists.
+- Verification: confirm the changed knowledge was reflected in the owning
+  document, or confirm a deferral note explains why the update was postponed.
+- Failure action: update the owning document or stop the closeout until the
+  deferral is documented.
+
+## 9. One Canonical Owner Per Engineering Claim Invariant
 
 - Rule: each engineering claim must have one canonical owner document.
 - Verification: check document ownership before adding or repeating a rule.
 - Failure action: move the claim to the correct canonical document and leave
   other docs as short references.
 
-## 9. README Overview-Only Invariant
+## 10. README Overview-Only Invariant
 
 - Rule: `README.md` is a front-door overview and pointer document, not a
   competing source of current state or future ordering.
@@ -84,7 +94,7 @@ canonical owner rather than duplicate it.
   lives in `ROADMAP.md`.
 - Failure action: trim README back to a high-level overview and pointers.
 
-## 10. Closeout Chain Invariant
+## 11. Closeout Chain Invariant
 
 - Rule: the closeout sequence is `evidence -> validation -> documentation ->
   commit -> push -> recovery reset -> next milestone`.
@@ -93,7 +103,7 @@ canonical owner rather than duplicate it.
 - Failure action: do not close the task until the missing step is completed or
   the gap is explicitly documented.
 
-## 11. TASK_RECOVERY Reset Invariant
+## 12. TASK_RECOVERY Reset Invariant
 
 - Rule: after a task is fully completed, validated, committed, and pushed,
   clear `docs/android/TASK_RECOVERY.md` so the next task starts from a fresh
@@ -101,4 +111,3 @@ canonical owner rather than duplicate it.
 - Verification: confirm the recovery file contains the current task only and is
   blank or reset after closeout.
 - Failure action: reset the file immediately before starting the next task.
-

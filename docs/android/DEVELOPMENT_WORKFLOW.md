@@ -32,6 +32,8 @@ Before closing the task:
 - record the evidence collected
 - validate the claim at the highest supported level
 - update the canonical docs that own the result
+- confirm `STATUS.md` still owns current state and `docs/android/ROADMAP.md`
+  still owns future ordering, or record a documented deferral
 - commit the change set if requested
 - push the branch if requested
 - reset `docs/android/TASK_RECOVERY.md` after the task is fully complete

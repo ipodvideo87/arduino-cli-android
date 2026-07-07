@@ -90,6 +90,9 @@ Promote only durable lessons.
 
 If the insight is likely to matter again, move it into `LESSONS_LEARNED.md`.
 Otherwise keep it in the decision or findings log.
+If the insight has become repeatedly reusable, promote it through the knowledge
+ladder in `ENGINEERING_KNOWLEDGE_FRAMEWORK.md` rather than skipping straight to
+a broader invariant.
 
 ### Update docs
 
@@ -105,6 +108,10 @@ Close the task only when the repository can answer:
 - what remains uncertain
 - what changed in the docs
 - what future work this enables or blocks
+
+Before closeout, confirm the current-state snapshot still belongs in
+`STATUS.md` and future ordering still belongs in `docs/android/ROADMAP.md`, or
+record the reason for any explicit deferral.
 
 For native validation tasks, close the task only after the Native Validation
 Package completion criteria are satisfied or explicitly narrowed by the

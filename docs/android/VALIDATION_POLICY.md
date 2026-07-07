@@ -22,6 +22,22 @@ The validation hierarchy is also defined in [DIAGNOSTIC_VALIDATION_STANDARD.md](
 
 The repository's higher-level milestone claims should always refer to the highest validation level actually demonstrated.
 
+## Evidence Hierarchy
+
+When comparing evidence for the same engineering claim, prefer the strongest
+source that actually matches the claim:
+
+- Native Termux evidence for Android behavior claims
+- Real hardware evidence for upload, flash, and runtime claims
+- Structured evidence artifacts over ad hoc logs when both exist
+- Automated tests over manual validation for repeatable logic claims
+- Manual validation over unsupported reasoning when needed
+- Reasoning over assumption
+
+Native Termux and real hardware are not interchangeable; each is authoritative
+for its own claim class. If two sources conflict, prefer the evidence that is
+closer to the target environment and record the discrepancy explicitly.
+
 ## Validation Providers
 
 Use a layered provider model instead of one hardcoded smoke test.

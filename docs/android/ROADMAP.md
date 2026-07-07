@@ -47,10 +47,6 @@
   before adding live bulk I/O
 - Build a generic Android USB transport bridge
 - Validate the native Termux transport stream boundary
-- Validate the Termux USB provider and file-descriptor handoff path on native Termux
-- Validate the TERMUX_USB_FD probe surface on native Termux
-- Validate the transport stream foundation on native Termux
-- Validate upload prepare-only planning on native Termux and keep the CLI/report contract explicit
 - Implement the upload workflow
 - Implement the serial monitor workflow
 - Validate the transport API stabilization boundary before upload depends on it

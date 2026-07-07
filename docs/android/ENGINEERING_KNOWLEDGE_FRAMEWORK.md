@@ -88,6 +88,21 @@ Knowledge should move through the repository deliberately:
 
 Do not promote speculative reasoning directly into a canonical rule.
 
+## Knowledge Promotion Ladder
+
+Use the following path when engineering knowledge becomes more durable:
+
+1. Observation: raw evidence, command output, or local inspection.
+2. Validated Finding: evidence-backed conclusion in `VALIDATED_FINDINGS.md`.
+3. Lesson Learned: reusable guidance in `LESSONS_LEARNED.md`.
+4. Engineering Invariant: non-negotiable process rule in `ENGINEERING_INVARIANTS.md`.
+5. Automation: tooling or validation that enforces the rule repeatedly.
+
+The ladder is directional, not automatic. Promote only when the new layer is
+actually warranted by repeated evidence, future reuse, or recurring friction.
+Do not skip directly from a one-off observation to an invariant unless the
+pattern has already proven durable enough to justify the stronger rule.
+
 ## Operating Rule
 
 Every completed engineering task should leave the repository with:
@@ -99,4 +114,3 @@ Every completed engineering task should leave the repository with:
 - one updated doc trail
 
 That is the mechanism by which repository knowledge compounds over time.
-

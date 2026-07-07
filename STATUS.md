@@ -187,15 +187,10 @@ Repository cleanup:
 - The ACL firmware package foundation now exists, including the build manifest, flash plan, firmware package wrapper, and binary validator.
 - The firmware package now also emits `analysis.json` and `README_FLASHING.txt`, and the ACL compile path uses metadata-first bootloader detection with an app-only fallback warning when the bootloader artifacts are incomplete.
 - Native full-flash bootloader package validation is complete on native
-  Termux, and the remaining target-chip metadata warning is documented as a
-  non-blocking follow-up for the milestone.
+  Termux.
 - The ACL upload engine foundation now exists as a transport-neutral prepare-only planner/executor stack that consumes firmware packages and flash plans without opening real transport streams or sending bytes.
 - The ACL workflow upload command is now documented and validated as a positional prepare-only command (`acl workflow upload <firmware-package>`); `--dry-run` and `--package` are not part of the contract.
 - The upload execution report surface now keeps the canonical package, plan, diagnostics, result, and progress data in one place and de-duplicates repeated professional details.
-- Target-chip metadata propagation remains a documented non-blocking follow-up
-  item for the package-validation milestone: the latest package report still warns
-  that `target chip metadata is not set`, so the warning remains a
-  documented non-blocking follow-up item rather than a resolved baseline claim.
 - The ACL compatibility layer now exists as a rule-based decision layer for runtime, library, firmware, and transport compatibility.
 - The ACL diagnostics workflow now exists as a shared pending/running/passed/warning/failed/skipped status model.
 - The Android install patch pipeline now has a formal status-tracking foundation for download, extract, patch, runtime-fix, validation, register, self-test, and ready stages.
@@ -254,34 +249,10 @@ Repository cleanup:
 - Validate firmware upload and serial monitor behavior through the new transport implementation on real hardware.
 - Keep the ACL upload prepare-only executor aligned with the GUI contract.
 - Implement the first real transport provider runtime after the contract layer is proven stable.
-- Validate the Termux USB transport provider on native Termux and confirm the exact discovery, permission, and file-descriptor handoff behavior on-device.
-- Research whether any interface-2 transfer diagnostic is safe and meaningful
-  before adding live bulk I/O.
-- Probe `TERMUX_USB_FD` handoff and build the byte-stream bridge foundation for the Termux USB provider.
-- Validate the transport stream foundation on native Termux before claiming any
-  byte-stream support.
-- Validate the `acl transport probe-fd` surface on native Termux and only then
-  consider byte-stream bridge work.
+- Validate the native Termux transport stream boundary with a read-only fresh-helper probe if more evidence is needed.
+- Research whether any interface-2 transfer diagnostic is safe and meaningful before adding live bulk I/O.
+- Start bounded byte-stream bridge foundation work only after read/write probing has a concrete, native-Termux validation plan.
 - The ACL evidence collection command now exists with unit-test coverage; native Termux validation of its output remains pending.
-- Native Termux fd-handoff evidence is now recorded in a structured artifact:
-  `/data/data/com.termux/files/home/Development/GitHub/arduino-cli-android/.acl/evidence/evidence-20260706T023005Z-e701a4e8538b.json`; the run observed
-  `fd_source=environment`, `fd_observed=true`, `fd_valid=true`,
-  `fd_inspectable=true`, and `handoff_mode=env`, with visible topology of
-  3 interfaces and 5 endpoints, but it remains diagnostic-only because
-  byte-stream read/write, claim/release, upload, flashing, serial monitor, and
-  payload transfer were not attempted.
-- Native Termux stream-boundary closeout evidence now shows read probing
-  returned `EOF` and write probing returned `invalid argument`; the fd handoff
-  remains valid and inspectable, but `TERMUX_USB_FD` should not be treated as a
-  generic byte stream. The current classification is that the stream boundary
-  is not validated, and the next milestone should be read-only claim/release
-  diagnostics.
-- Re-run native Termux validation for both `-E` and argv fd handoff modes, then
-  record the observed `fd_source` in `docs/android/VALIDATED_FINDINGS.md`.
-- Keep the `probe-fd` diagnostics aligned with the native `-E -e` handoff shape
-  so helper JSON is only parsed after the helper has actually launched.
-- Start bounded byte-stream bridge foundation work only after read/write probing
-  has a concrete, native-Termux validation plan.
 - Finish the Android preflight and dry-run reporting surfaces so they can be consumed by future UI workspaces.
 - Keep the development workflow aligned with the two-environment model: native Termux as the source of truth, Ubuntu/proot as a tooling environment.
 - Polish the ACL CLI diagnostic surfaces and wire them into future workspace UI layers.
@@ -324,7 +295,7 @@ Repository cleanup:
 - Firmware upload on real hardware has not yet been demonstrated.
 - The Android USB transport bridge is not yet implemented, so end-to-end upload remains unproven.
 - Native full-flash bootloader package validation is complete on native
-  Termux, with a documented non-blocking target-chip metadata warning.
+  Termux.
 
 ## Next Engineering Milestone
 
