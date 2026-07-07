@@ -15,6 +15,27 @@ running repo commands.
 The non-negotiable process invariants are defined in
 [ENGINEERING_INVARIANTS.md](ENGINEERING_INVARIANTS.md).
 
+## Session Start Checklist
+
+Before doing new work:
+
+- confirm the canonical repo path and current branch
+- read `AGENTS.md`
+- read `docs/android/TASK_RECOVERY.md` if the task was interrupted or resumed
+- identify the task objective and expected validation level
+- decide whether native diagnostics will use the structured evidence collector
+
+## Session Closeout Checklist
+
+Before closing the task:
+
+- record the evidence collected
+- validate the claim at the highest supported level
+- update the canonical docs that own the result
+- commit the change set if requested
+- push the branch if requested
+- reset `docs/android/TASK_RECOVERY.md` after the task is fully complete
+
 ## 1. Understand The Task
 
 First identify what kind of work it is:
@@ -91,8 +112,13 @@ The package must answer:
 - how each outcome affects architecture
 - the remaining uncertainty after each outcome
 - the decision matrix for the next milestone
-- the exact output to paste back
+- the structured evidence artifact to collect when available
+- the exact output to paste back if manual copy is still required
 - the completion criteria for honest milestone closeout
+
+When the structured evidence collector is available, prefer it over manual
+copy/paste logs for native diagnostics. Use manual pasteback only when a
+structured artifact cannot be produced.
 
 Do not start native validation until this package exists.
 
