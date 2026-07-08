@@ -22,6 +22,9 @@ Before doing new work:
 - confirm the canonical repo path and current branch
 - read `AGENTS.md`
 - read `docs/android/TASK_RECOVERY.md` if the task was interrupted or resumed
+- if the task is likely to recur or may need deeper checks, read
+  `docs/android/SELF_IMPROVING_ENGINEERING_FRAMEWORK.md` and
+  `docs/android/GOVERNANCE_COVERAGE_MATRIX.md`
 - identify the task objective and expected validation level
 - decide whether native diagnostics will use the structured evidence collector
 
@@ -32,6 +35,8 @@ Before closing the task:
 - record the evidence collected
 - validate the claim at the highest supported level
 - update the canonical docs that own the result
+- if the same problem appeared twice, record the process bug in the debt
+  register or the knowledge docs before closing
 - confirm `STATUS.md` still owns current state and `docs/android/ROADMAP.md`
   still owns future ordering, or record a documented deferral
 - commit the change set if requested
@@ -59,6 +64,12 @@ Use the smallest set of canonical docs that owns the problem:
 - `AGENTS.md`
 - `docs/android/TASK_RECOVERY.md` if the task was interrupted or you are
   resuming existing work
+- `docs/android/SELF_IMPROVING_ENGINEERING_FRAMEWORK.md` when the task may
+  recur, needs a process-bug response, or should trigger deeper checks
+- `docs/android/GOVERNANCE_COVERAGE_MATRIX.md` when you need to see which rules
+  are already covered by policy, validation, or tooling
+- `docs/android/ENGINEERING_DEBT_REGISTER.md` when the task is accumulating
+  repeatable process debt that should be tracked explicitly
 - `docs/android/CODEX_OPERATING_MODEL.md`
 - `docs/android/ENGINEERING_PRINCIPLES.md`
 - `docs/android/DECISION_FRAMEWORK.md`
@@ -75,6 +86,10 @@ Use the smallest set of canonical docs that owns the problem:
 - `docs/android/ROADMAP.md`
 
 Read additional subsystem docs only when the task needs them.
+
+If a task has failed twice in the same way, or you are deciding whether to run
+an additional check, consult the self-improving engineering framework and the
+coverage matrix before choosing the next step.
 
 ## 3. Engineering Preview
 
@@ -212,6 +227,7 @@ Capture the result in the smallest canonical artifact that owns it:
 - durable architecture decision -> `docs/android/ENGINEERING_DECISIONS.md`
 - reusable lesson -> `docs/android/LESSONS_LEARNED.md`
 - confidence change -> `docs/android/CONFIDENCE_MODEL.md`
+- recurring process debt -> `docs/android/ENGINEERING_DEBT_REGISTER.md`
 
 ## 9. Update Docs And Status
 
