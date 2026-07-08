@@ -10,6 +10,7 @@ import (
 
 	acldiagnostics "github.com/arduino/arduino-cli/internal/acl/diagnostics"
 	aclengine "github.com/arduino/arduino-cli/internal/acl/engine"
+	aclgovernance "github.com/arduino/arduino-cli/internal/acl/governance"
 	aclinstall "github.com/arduino/arduino-cli/internal/acl/install"
 	aclpatcher "github.com/arduino/arduino-cli/internal/acl/patcher"
 	aclruntime "github.com/arduino/arduino-cli/internal/acl/runtime"
@@ -44,6 +45,7 @@ func NewCommand(srv rpc.ArduinoCoreServiceServer) *cobra.Command {
 	cmd.AddCommand(newPatchPreviewCommand())
 	cmd.AddCommand(newBootstrapCommand())
 	cmd.AddCommand(newEvidenceCommand())
+	cmd.AddCommand(newGovernanceCommand())
 	cmd.AddCommand(newTransportCommand())
 	cmd.AddCommand(newWorkflowCommand(srv))
 	return cmd
@@ -522,6 +524,10 @@ func writeWorkflowReport(cmd *cobra.Command, report aclengine.WorkflowReport, de
 func isJSON(cmd *cobra.Command) bool {
 	value, _ := cmd.Flags().GetBool("json")
 	return value
+}
+
+func canonicalRepoRoot() string {
+	return aclgovernance.CanonicalRepoRoot
 }
 
 func defaultRoot() string {

@@ -66,18 +66,13 @@ environments:
 
 When the two environments disagree, native Termux wins.
 
-## Current Validated State
+## Project Status And Roadmap
 
-Current project state belongs in [STATUS.md](STATUS.md). This README only gives
-the short front-door view and points to the canonical status and roadmap docs.
+Current state, active work, blockers, recent validated work, and the next
+engineering milestone belong in [STATUS.md](STATUS.md).
 
-## What Is Still Experimental
-
-See [STATUS.md](STATUS.md) for what is currently experimental or incomplete.
-
-## Current Focus
-
-Current work, blockers, and the next milestone belong in [STATUS.md](STATUS.md).
+Future milestone ordering belongs in
+[docs/android/ROADMAP.md](docs/android/ROADMAP.md).
 
 ## Validation Workflow
 
@@ -108,14 +103,6 @@ special-purpose scripts:
 
 The design goal is to keep Android-specific behavior isolated while preserving
 upstream compatibility where practical.
-
-## Recent Work
-
-Recent repository work is summarized in [STATUS.md](STATUS.md).
-
-## Future Work
-
-Future work ordering belongs in [docs/android/ROADMAP.md](docs/android/ROADMAP.md).
 
 ## Why The Documentation Is Structured This Way
 
