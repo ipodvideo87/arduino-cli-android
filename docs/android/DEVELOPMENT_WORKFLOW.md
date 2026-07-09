@@ -34,6 +34,13 @@ Before closing the task:
 
 - record the evidence collected
 - validate the claim at the highest supported level
+- prepare a closeout report that follows
+  `docs/android/CLOSEOUT_REPORTING_STANDARD.md`
+- ensure every consequential judgment in the closeout report follows
+  `docs/android/ENGINEERING_JUDGMENT_STANDARD.md`
+- if the same class of problem appeared twice, perform root-cause analysis,
+  classify the root cause, and record the smallest durable improvement before
+  closing
 - update the canonical docs that own the result
 - if the same problem appeared twice, record the process bug in the debt
   register or the knowledge docs before closing
@@ -257,6 +264,10 @@ Every completed task should answer:
 - Was confidence updated?
 - Were lessons captured?
 - Was documentation updated?
+- If the same class of problem recurred, was root-cause analysis performed and
+  the smallest durable improvement recorded?
+- If recurrence was external or one-off, was that boundary documented instead
+  of forcing automation?
 - Does `STATUS.md` require updating?
 - Does `ROADMAP.md` require updating?
 - Was technical debt introduced?

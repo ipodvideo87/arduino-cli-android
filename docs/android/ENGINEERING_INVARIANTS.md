@@ -111,3 +111,20 @@ canonical owner rather than duplicate it.
 - Verification: confirm the recovery file contains the current task only and is
   blank or reset after closeout.
 - Failure action: reset the file immediately before starting the next task.
+
+## 13. Recurring-Class Root-Cause Invariant
+
+- Rule: if the same class of engineering problem occurs twice, stop treating
+  the next occurrence as a one-off correction. Perform root-cause analysis,
+  classify the root cause as `process`, `documentation`, `workflow`,
+  `tooling`, `validation`, `architecture`, `external`, or `unknown`, choose the
+  smallest durable improvement that removes the recurrence path, implement and
+  validate that improvement, and record it in the canonical owner before
+  retiring any related engineering debt.
+- Verification: confirm the second occurrence shares the same underlying
+  failure mechanism or missing prevention path, not just the same surface
+  symptom.
+- Failure action: do not recommend another manual correction until the root
+  cause has been analyzed and the durable improvement recorded, unless the
+  cause is external or one-off and is explicitly documented instead of
+  automated.

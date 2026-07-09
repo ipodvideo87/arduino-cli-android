@@ -35,6 +35,42 @@ At that point, Codex should recommend one of the following:
 Do not keep applying the same one-off fix without recording why the system is
 still allowing the same class of issue to recur.
 
+When Codex detects the second occurrence of the same class of engineering
+problem, it should explicitly state:
+
+> This appears to be a recurring class of engineering problem.
+>
+> Per repository engineering law, I will first investigate the root cause and
+> determine the smallest durable improvement before recommending another
+> manual correction.
+
+## Recurrence Analysis
+
+Two issues belong to the same class only when the evidence shows they share the
+same underlying failure mechanism or missing prevention path.
+
+Use the following checks to avoid false positives:
+
+- the same violated invariant or missing guardrail is present
+- the same affected layer or prevention gap is present
+- the same durable improvement would prevent both problems
+- the same surface symptom alone is not sufficient
+
+If the evidence points to different mechanisms, different layers, different
+prevention paths, or a one-off external event, do not treat the issues as the
+same class.
+
+When recurrence is confirmed:
+
+- perform root-cause analysis before recommending another manual fix
+- classify the root cause as `process`, `documentation`, `workflow`,
+  `tooling`, `validation`, `architecture`, `external`, or `unknown`
+- determine the smallest durable improvement that removes the recurrence path
+- implement and validate the improvement
+- record the result in the canonical owner
+- retire related engineering debt only after recurrence is demonstrably
+  eliminated
+
 ## Trigger Catalog
 
 ### At Session Start
@@ -69,6 +105,8 @@ After a failed validation:
   assumption
 - if the failure is repeated or preventable, log it as debt or a recurring
   process issue
+- if the same class has occurred twice, move to root-cause analysis and the
+  smallest durable improvement instead of proposing another manual patch
 - do not expand the scope unless the evidence forces it
 
 ### When Docs And Evidence Disagree
@@ -87,6 +125,15 @@ If a rule is only being followed because someone remembers it:
 - prefer to move the rule into a document, coverage matrix, or validator
 - if it cannot be automated, label it as manual and explain why
 - if the same memory-dependent rule appears twice, treat it as debt
+
+### When Not To Automate
+
+If recurrence is caused by an external system, a one-off event, or a problem
+that cannot be reproduced or prevented locally:
+
+- document the issue instead of forcing automation
+- keep the boundary explicit in the debt register or the knowledge docs
+- record why the durable fix is manual, external, or deferred
 
 ### When A New Validator Or Tool Is Added
 

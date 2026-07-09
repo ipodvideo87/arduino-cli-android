@@ -23,9 +23,13 @@ Add an entry when a problem:
 ## D-0001 - short debt title
 
 - Class: architecture | validation | documentation | automation | process
+- Root cause class: process | documentation | workflow | tooling | validation |
+  architecture | external | unknown
 - Reason: why this debt exists
 - Impact: what it costs or risks
 - Evidence: links to validation, findings, or concrete examples
+- Smallest durable improvement: the specific prevention change that removes the
+  recurrence path
 - Exit criteria: what must be true before the debt can be retired
 - Owner: who is tracking it
 - Related docs: links to the relevant governance or knowledge docs
@@ -33,10 +37,28 @@ Add an entry when a problem:
 
 ## Register Status
 
-The register is currently empty.
+Current entries:
 
-That is intentional for Phase 6A. The file exists so the recurrence rule has a
-canonical place to land once a real process bug has been observed twice.
+## D-0001 - vague closeout reporting
+
+- Class: process
+- Root cause class: workflow
+- Reason: closeout reports can be technically complete but still too vague to
+  satisfy the repository's evidence-before-claims and auditability standards.
+- Impact: manual follow-up is needed after closeout, which slows review and
+  weakens traceability.
+- Evidence: repeated closeout reports that named completion without fully
+  surfacing repository path, file-level changes, validation detail, and final
+  verdict.
+- Smallest durable improvement: require `docs/android/CLOSEOUT_REPORTING_STANDARD.md`
+  in `docs/android/DEVELOPMENT_WORKFLOW.md` and use it as the required report
+  shape.
+- Exit criteria: closeout reports consistently follow
+  `docs/android/CLOSEOUT_REPORTING_STANDARD.md` and include the required
+  fields without manual prompting.
+- Owner: Codex closeout workflow
+- Related docs: `docs/android/DEVELOPMENT_WORKFLOW.md`,
+  `docs/android/CLOSEOUT_REPORTING_STANDARD.md`
 
 ## Guidance
 
