@@ -34,6 +34,10 @@ Before closing the task:
 
 - record the evidence collected
 - validate the claim at the highest supported level
+- determine whether validated repository state changed and record one of:
+  current-state synchronization required and completed, current-state
+  synchronization not required with reasoning, or current-state synchronization
+  required but deferred with an explicit documented blocker and uncertainty
 - prepare a closeout report that follows
   `docs/android/CLOSEOUT_REPORTING_STANDARD.md`
 - ensure every consequential judgment in the closeout report follows
@@ -49,6 +53,30 @@ Before closing the task:
 - commit the change set if requested
 - push the branch if requested
 - reset `docs/android/TASK_RECOVERY.md` after the task is fully complete
+
+### Canonical Document Change Review
+
+Before editing an important canonical document:
+
+- identify the target document
+- state the purpose of the change
+- name the document's current canonical role
+- list the validated engineering behaviors affected
+- list the dependent documents affected
+- cite the evidence authorizing the change
+- decide whether current-state synchronization may be required
+
+After editing an important canonical document:
+
+- classify the behavior change as preserved, strengthened, weakened, replaced,
+  removed, contradiction introduced, or contradiction resolved
+- note the routing or discoverability effect
+- note the ownership effect
+- state the current-state synchronization result
+- state the historical/current classification result
+- cite evidence authorizing any strengthening, weakening, replacement, or
+  removal
+- give a final compliance judgment
 
 ## 1. Understand The Task
 

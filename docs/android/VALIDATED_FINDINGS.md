@@ -11,6 +11,20 @@ This file is a logbook of tested findings from the project history.
 - Confidence: high
 - Notes: byte-stream read/write remains unproven; claim/release remains unproven; no upload, flashing, serial monitor, or payload transfer was attempted
 
+## 2026-07-09
+
+- Environment: repository documentation review after the Phase 6 kernel commit
+- Command/evidence: `./arduino-cli acl governance validate`, `STATUS.md`,
+  `docs/android/ENGINEERING_MILESTONE_SUMMARY.md`, and the Phase 6 after-state
+  audit
+- Result: governance validation passed while `STATUS.md` still reflected the
+  pre-Phase-6 snapshot; the current-state drift was a documentation-sync gap,
+  not a validator failure
+- Confidence: high
+- Notes: the stale current-state snapshot and the historical milestone summary
+  both required explicit contract updates so later reviews would not mistake
+  archival evidence for live status
+
 - Environment: native Termux on the target Android device
 - Command/evidence: `./arduino-cli acl transport stream-validate --device /dev/bus/usb/001/002 --details --validate-read` and `./arduino-cli acl transport stream-validate --device /dev/bus/usb/001/002 --details --validate-write`
 - Result: canonical repo preflight passed; read probing returned `EOF`; write probing returned `invalid argument`; fd handoff remains valid and inspectable; `TERMUX_USB_FD` should not be treated as a generic byte stream; current classification is that the stream boundary is not validated

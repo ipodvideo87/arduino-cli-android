@@ -113,6 +113,30 @@ Examples:
 Those documents may summarize each other where helpful, but they should not
 duplicate ownership of another document's responsibility.
 
+## Contract Categories
+
+The repository uses a small contract model for major canonical documents:
+
+- Current-state contract owner: `STATUS.md`
+- Future-ordering contract owner: `ROADMAP.md`
+- Workflow contract owner: `DEVELOPMENT_WORKFLOW.md`
+- Historical classification contract owner: this document
+
+Current-state documents own present validated repository state. They must be
+synchronized when validated state changes and must not present future milestone
+ordering as authoritative current state.
+
+Future-ordering documents own planned ordering. They must not claim present
+completion state and must distinguish authorized work from non-authorizing
+ideas.
+
+Workflow documents own operating sequence and review gates. They must not
+duplicate narrow standards unnecessarily.
+
+Historical documents preserve state and evidence from a specific time. They
+must be explicitly classified as historical, must route readers to `STATUS.md`,
+and may preserve old paths and old repository state when clearly contextualized.
+
 The engineering knowledge framework documents are canonical as a set:
 
 - `ENGINEERING_KNOWLEDGE_FRAMEWORK.md`

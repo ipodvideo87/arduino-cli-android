@@ -16,9 +16,19 @@ Project Zero is now the first EOS adoption pilot for this repository. It is
 used to validate the EOS project adoption model against a production-scale
 engineering codebase.
 
+## Phase 6 After-State
+
+- Phase 6 is complete and the engineering kernel was committed in
+  `a28e992070ac30a700129e90ccc6e61334ffef97`.
+- Engineering Kernel v1 is now the stable engineering baseline for the
+  repository.
+- Primary emphasis has returned to Project Zero product development.
+- The current transport and upload blockers remain the active product work.
+- The existing Project Zero/EOS relationship remains unchanged.
+
 ## STATUS Versus ROADMAP
 
-`STATUS.md` is authoritative for the current snapshot:
+STATUS.md is authoritative for the current snapshot:
 
 - current mission
 - completed milestones
@@ -26,7 +36,7 @@ engineering codebase.
 - known blockers
 - the next engineering milestone
 
-`docs/android/ROADMAP.md` is authoritative for future ordering:
+docs/android/ROADMAP.md is authoritative for future ordering:
 
 - long-range milestone sequence
 - planned follow-on work

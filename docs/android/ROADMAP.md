@@ -71,12 +71,12 @@
 `STATUS.md` is the authoritative snapshot of current work, blockers, and the
 next engineering milestone.
 
-`ROADMAP.md` is the authoritative list of future milestone ordering and long-
-range direction.
+`ROADMAP.md` is authoritative for future ordering and long-range direction.
+docs/android/ROADMAP.md is authoritative for future ordering.
 
-Update both documents when a validated change affects the current snapshot and
-the future milestone sequence. If they diverge, treat `STATUS.md` as the source
-of truth for the present state and `ROADMAP.md` as the source of truth for the
+Update both documents when a validated change affects current state and the
+future milestone sequence. If they diverge, treat `STATUS.md` as the source of
+truth for the present state and `ROADMAP.md` as the source of truth for the
 future order.
 
 ## Roadmap Notes

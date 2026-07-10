@@ -223,3 +223,25 @@ These decisions use an ADR-style format.
   -> decision -> confidence -> lesson -> roadmap impact.
 - Validation/evidence if available: documentation review and the current
   governance framework integration.
+
+## Canonical documentation changes should require intent review and current-state synchronization
+
+- Status: accepted
+- Context: The Phase 6 after-state audit showed that governance validation can
+  pass while `STATUS.md` remains stale and a historical milestone summary still
+  looks current unless the edit path explicitly checks behavior preservation and
+  current-state synchronization.
+- Decision: keep the existing canonical ownership model, require a concise
+  intent review for important canonical-document edits, require an explicit
+  current-state synchronization determination at closeout, and extend
+  governance validation only with bounded read-only checks for required
+  documents, routing, ownership declarations, historical labels, and stale-path
+  hygiene.
+- Alternatives considered: adding a new constitution; relying on manual review
+  only; letting the governance validator infer semantic equivalence; auto-editing
+  canonical documents.
+- Consequences: canonical docs remain the source of truth, but edits now have a
+  defined review gate and deterministic guardrail against the specific drift
+  class that occurred after Phase 6.
+- Validation/evidence if available: Phase 6 after-state audit, governance
+  validation output, and the current canonical docs set.

@@ -73,11 +73,16 @@ func Validate(opts Options) Report {
 
 	checks := []CheckResult{
 		checkCanonicalRepoRoot(expectedRepoRoot, workingDir),
+		checkRequiredDocumentsExist(repoRoot),
 		checkReadmeOverviewOnly(repoRoot),
+		checkRequiredRouting(repoRoot),
 		checkStatusStructure(repoRoot),
 		checkRoadmapStructure(repoRoot),
 		checkRoadmapFutureItems(repoRoot),
 		checkTaskRecoveryState(repoRoot),
+		checkHistoricalClassification(repoRoot),
+		checkStalePathHygiene(repoRoot),
+		checkWorkflowIntentReview(repoRoot),
 		checkStalePhrases(repoRoot),
 	}
 
@@ -138,6 +143,82 @@ func checkReadmeOverviewOnly(repoRoot string) CheckResult {
 	return check
 }
 
+func checkRequiredDocumentsExist(repoRoot string) CheckResult {
+	check := CheckResult{Name: "required documents exist"}
+	required := []string{
+		"AGENTS.md",
+		"STATUS.md",
+		"docs/android/ROADMAP.md",
+		"docs/android/DEVELOPMENT_WORKFLOW.md",
+		"docs/android/DOCUMENTATION_ARCHITECTURE.md",
+		"docs/android/ENGINEERING_MILESTONE_SUMMARY.md",
+		"docs/android/QUEUED_BRANCH_REVIEW.md",
+		"docs/android/CLOSEOUT_REPORTING_STANDARD.md",
+		"docs/android/ENGINEERING_JUDGMENT_STANDARD.md",
+		"docs/android/GOVERNANCE_COVERAGE_MATRIX.md",
+		"docs/android/ENGINEERING_DEBT_REGISTER.md",
+		"docs/android/ENGINEERING_KNOWLEDGE_FRAMEWORK.md",
+		"docs/android/TASK_RECOVERY.md",
+	}
+	for _, relPath := range required {
+		if _, err := os.Stat(filepath.Join(repoRoot, relPath)); err != nil {
+			check.Messages = append(check.Messages, fmt.Sprintf("required document %s is missing: %v", relPath, err))
+		}
+	}
+	if len(check.Messages) == 0 {
+		check.Passed = true
+	}
+	return check
+}
+
+func checkRequiredRouting(repoRoot string) CheckResult {
+	check := CheckResult{Name: "required routing"}
+	agents, err := readFile(repoRoot, "AGENTS.md")
+	if err != nil {
+		check.Messages = append(check.Messages, err.Error())
+		return check
+	}
+	workflow, err := readFile(repoRoot, "docs/android/DEVELOPMENT_WORKFLOW.md")
+	if err != nil {
+		check.Messages = append(check.Messages, err.Error())
+		return check
+	}
+	requiredPhrases := []struct {
+		content string
+		path    string
+		want    []string
+	}{
+		{
+			content: agents,
+			path:    "AGENTS.md",
+			want: []string{
+				"docs/android/DEVELOPMENT_WORKFLOW.md",
+				"operational front door",
+			},
+		},
+		{
+			content: workflow,
+			path:    "docs/android/DEVELOPMENT_WORKFLOW.md",
+			want: []string{
+				"docs/android/CLOSEOUT_REPORTING_STANDARD.md",
+				"docs/android/ENGINEERING_JUDGMENT_STANDARD.md",
+				"docs/android/ENGINEERING_KNOWLEDGE_FRAMEWORK.md",
+			},
+		},
+	}
+	for _, req := range requiredPhrases {
+		for _, want := range req.want {
+			if !strings.Contains(req.content, want) {
+				check.Messages = append(check.Messages, fmt.Sprintf("%s is missing required routing phrase %q", req.path, want))
+			}
+		}
+	}
+	if len(check.Messages) == 0 {
+		check.Passed = true
+	}
+	return check
+}
+
 func checkStatusStructure(repoRoot string) CheckResult {
 	check := CheckResult{Name: "STATUS structure"}
 	content, err := readFile(repoRoot, "STATUS.md")
@@ -154,6 +235,12 @@ func checkStatusStructure(repoRoot string) CheckResult {
 		if !containsExactLine(content, heading) {
 			check.Messages = append(check.Messages, fmt.Sprintf("STATUS.md is missing required heading %q", heading))
 		}
+	}
+	if !strings.Contains(content, "This document is the current snapshot of project progress.") {
+		check.Messages = append(check.Messages, "STATUS.md is missing current-state authority language")
+	}
+	if !strings.Contains(content, "STATUS.md is authoritative for the current snapshot") {
+		check.Messages = append(check.Messages, "STATUS.md is missing current-snapshot ownership language")
 	}
 	if strings.Contains(content, "target chip metadata is not set") {
 		check.Messages = append(check.Messages, "STATUS.md still contains resolved target-chip unresolved wording")
@@ -176,6 +263,12 @@ func checkRoadmapStructure(repoRoot string) CheckResult {
 	}
 	if !containsExactLine(content, "## STATUS Sync") {
 		check.Messages = append(check.Messages, "docs/android/ROADMAP.md is missing required heading \"## STATUS Sync\"")
+	}
+	if !strings.Contains(content, "docs/android/ROADMAP.md is authoritative for future ordering") {
+		check.Messages = append(check.Messages, "docs/android/ROADMAP.md is missing future-ordering ownership language")
+	}
+	if strings.Contains(content, "current snapshot") {
+		check.Messages = append(check.Messages, "docs/android/ROADMAP.md presents current-state language that belongs in STATUS.md")
 	}
 	if len(check.Messages) == 0 {
 		check.Passed = true
@@ -236,7 +329,8 @@ func checkTaskRecoveryState(repoRoot string) CheckResult {
 	}
 	idle := strings.Contains(content, "Status: idle") &&
 		strings.Contains(content, "- none") &&
-		!strings.Contains(content, "Objective:")
+		!strings.Contains(content, "Objective:") &&
+		strings.Contains(content, "This file is the live recovery snapshot")
 	for _, heading := range idleHeadings {
 		if !containsExactLine(content, heading) {
 			idle = false
@@ -245,7 +339,8 @@ func checkTaskRecoveryState(repoRoot string) CheckResult {
 	}
 	active := strings.Contains(content, "Objective:") &&
 		strings.Contains(content, "## Intended Plan") &&
-		!strings.Contains(content, "Status: idle")
+		!strings.Contains(content, "Status: idle") &&
+		strings.Contains(content, "This file is the live recovery snapshot")
 	if idle || active {
 		check.Messages = nil
 		check.Passed = true
@@ -256,6 +351,86 @@ func checkTaskRecoveryState(repoRoot string) CheckResult {
 		return check
 	}
 	check.Messages = append(check.Messages, "TASK_RECOVERY.md is neither idle nor explicitly active")
+	return check
+}
+
+func checkHistoricalClassification(repoRoot string) CheckResult {
+	check := CheckResult{Name: "historical classification"}
+	historicalDocs := []string{
+		"docs/android/ENGINEERING_MILESTONE_SUMMARY.md",
+		"docs/android/QUEUED_BRANCH_REVIEW.md",
+	}
+	for _, relPath := range historicalDocs {
+		content, err := readFile(repoRoot, relPath)
+		if err != nil {
+			check.Messages = append(check.Messages, err.Error())
+			continue
+		}
+		requiredPhrases := []string{
+			"## Historical Classification",
+			"This document is historical evidence.",
+			"It is not authoritative for current status.",
+			"STATUS.md",
+		}
+		for _, want := range requiredPhrases {
+			if !strings.Contains(content, want) {
+				check.Messages = append(check.Messages, fmt.Sprintf("%s is missing historical classification phrase %q", relPath, want))
+			}
+		}
+	}
+	if len(check.Messages) == 0 {
+		check.Passed = true
+	}
+	return check
+}
+
+func checkStalePathHygiene(repoRoot string) CheckResult {
+	check := CheckResult{Name: "stale path hygiene"}
+	currentStateDocs := []string{
+		"STATUS.md",
+		"docs/android/ROADMAP.md",
+		"docs/android/DEVELOPMENT_WORKFLOW.md",
+	}
+	stalePath := "/root/arduino-cli-android"
+	for _, relPath := range currentStateDocs {
+		content, err := readFile(repoRoot, relPath)
+		if err != nil {
+			check.Messages = append(check.Messages, err.Error())
+			continue
+		}
+		if strings.Contains(content, stalePath) {
+			check.Messages = append(check.Messages, fmt.Sprintf("%s still presents %s as the active canonical repository", relPath, stalePath))
+		}
+	}
+	if len(check.Messages) == 0 {
+		check.Passed = true
+	}
+	return check
+}
+
+func checkWorkflowIntentReview(repoRoot string) CheckResult {
+	check := CheckResult{Name: "workflow intent review"}
+	content, err := readFile(repoRoot, "docs/android/DEVELOPMENT_WORKFLOW.md")
+	if err != nil {
+		check.Messages = append(check.Messages, err.Error())
+		return check
+	}
+	required := []string{
+		"## Canonical Document Change Review",
+		"Before editing an important canonical document:",
+		"After editing an important canonical document:",
+		"current-state synchronization",
+		"historical/current classification result",
+		"final compliance judgment",
+	}
+	for _, want := range required {
+		if !strings.Contains(content, want) {
+			check.Messages = append(check.Messages, fmt.Sprintf("docs/android/DEVELOPMENT_WORKFLOW.md is missing required intent-review content %q", want))
+		}
+	}
+	if len(check.Messages) == 0 {
+		check.Passed = true
+	}
 	return check
 }
 

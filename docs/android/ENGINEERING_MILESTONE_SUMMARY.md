@@ -1,5 +1,12 @@
 # Engineering Milestone Summary
 
+## Historical Classification
+
+This document is historical evidence.
+It preserves repository state at the time of the milestone.
+It is not authoritative for current status.
+For the current snapshot, see [STATUS.md](../../STATUS.md).
+
 ## Milestone
 Native Full-Flash Bootloader Package Validation
 

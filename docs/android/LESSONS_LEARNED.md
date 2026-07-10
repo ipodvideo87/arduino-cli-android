@@ -48,6 +48,22 @@ Good lessons are:
 - What not to infer from it: do not assume read/write support, claim/release
   readiness, or payload transfer capability from fd handoff alone.
 
+## Canonical Docs Need Synchronization And Review Enforcement
+
+- Lesson: canonical ownership rules are necessary but not sufficient; when
+  validated repository state changes, the owning current-state documents must
+  be synchronized and important canonical edits must be reviewed for behavior
+  preservation, replacement, weakening, or contradiction before closeout.
+- Why it matters: structural governance validation can still pass while a
+  status file remains stale or a historical summary looks current.
+- Evidence source: the Phase 6 after-state audit where `STATUS.md` still
+  reflected the pre-Phase-6 snapshot and `ENGINEERING_MILESTONE_SUMMARY.md`
+  needed explicit historical labeling even though governance validation passed.
+- When to apply it: whenever a milestone changes validated repository state or
+  edits an important canonical document.
+- What not to infer from it: do not turn this into a general semantic policy
+  engine or a license to auto-edit canonical documents.
+
 ## Promotion Criteria
 
 Move an insight into this document when it:

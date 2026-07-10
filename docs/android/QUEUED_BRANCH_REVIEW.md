@@ -1,5 +1,12 @@
 # Queued Branch Review
 
+## Historical Classification
+
+This document is historical evidence.
+It preserves branch-review state at the time of the cleanup.
+It is not authoritative for current status.
+For the current snapshot, see [STATUS.md](../../STATUS.md).
+
 This document reviews the queued branches as reference material only. The
 branches were not merged blindly; only useful concepts were retained and
 reimplemented on top of `android-runtime-v2`.

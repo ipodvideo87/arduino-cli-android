@@ -60,6 +60,31 @@ Current entries:
 - Related docs: `docs/android/DEVELOPMENT_WORKFLOW.md`,
   `docs/android/CLOSEOUT_REPORTING_STANDARD.md`
 
+## D-0002 - canonical documentation drift
+
+- Class: documentation
+- Root cause class: workflow
+- Reason: validated repository state can change while current-state documents
+  remain stale or historical evidence can keep looking current unless the
+  workflow forces synchronization and explicit classification.
+- Impact: canonical docs can drift from the validated repository state, which
+  weakens auditability and can mislead later reviews about what is current.
+- Evidence: the Phase 6 after-state audit found `STATUS.md` stale after the
+  Phase 6 kernel commit, while `ENGINEERING_MILESTONE_SUMMARY.md` retained
+  repository-state details that needed explicit historical labeling.
+- Smallest durable improvement: require a current-state synchronization
+  determination during closeout, require explicit historical classification for
+  archival docs, and extend governance validation with bounded deterministic
+  checks for routing, ownership, stale-path hygiene, and historical labels.
+- Exit criteria: current-state synchronization determination is required at
+  closeout; historical documents are explicitly classified; deterministic
+  checks catch the defined stale-state failures; and at least one later complete
+  milestone cycle closes without recurrence.
+- Owner: Codex governance workflow
+- Related docs: `docs/android/DEVELOPMENT_WORKFLOW.md`,
+  `docs/android/DOCUMENTATION_ARCHITECTURE.md`,
+  `docs/android/GOVERNANCE_COVERAGE_MATRIX.md`
+
 ## Guidance
 
 - Keep entries short and evidence-linked.

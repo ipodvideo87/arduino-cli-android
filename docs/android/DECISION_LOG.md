@@ -121,3 +121,38 @@ uncertainty is acceptable, or where it was moved if it is still active.
 - Roadmap impact: Project Zero becomes the next repo-level EOS adoption step
 - Follow-up: validate the manifest shape against EOS schema and decide whether
   any additional AGENTS reduction is justified
+
+## 2026-07-09 - protect canonical docs with explicit contracts and intent review
+
+- Question: how should the repository prevent validated engineering state from
+  drifting out of sync with canonical docs after a milestone closes?
+- Evidence: the Phase 6 after-state audit found `STATUS.md` stale after the
+  Phase 6 kernel commit, while `ENGINEERING_MILESTONE_SUMMARY.md` still looked
+  current unless the reader already knew it was historical; governance
+  validation passed because the validator covered structure and routing but not
+  the required current-state synchronization judgment.
+- Decision: keep the existing canonical ownership model, add explicit behavior
+  contracts to current-state, future-ordering, workflow, and historical docs,
+  require a canonical-document intent review in the workflow, and extend
+  governance validation with bounded read-only checks for document existence,
+  routing, ownership declarations, historical labels, current/future separation,
+  and stale-path hygiene.
+- Alternatives: add a new constitution; rely on manual review only; broaden the
+  governance validator into semantic prose analysis; auto-edit canonical docs.
+- Confidence: high because the drift mechanism is visible, the contract
+  boundaries are already established, and the proposed checks stay within
+  deterministic read-only enforcement. Confidence would increase if the new
+  checks catch the current stale-state cases and the next closeout completes
+  without manual reconciliation. Confidence would decrease if the same drift
+  recurs after the workflow and validator changes land.
+- Uncertainty removed: the recurrence is better addressed by synchronization
+  and review enforcement than by a new constitution.
+- Uncertainty remaining: whether one later milestone cycle is enough to retire
+  the new process debt.
+- Docs updated: `DOCUMENTATION_ARCHITECTURE.md`, `DEVELOPMENT_WORKFLOW.md`,
+  `STATUS.md`, `ENGINEERING_MILESTONE_SUMMARY.md`, `QUEUED_BRANCH_REVIEW.md`,
+  `GOVERNANCE_COVERAGE_MATRIX.md`, `ENGINEERING_DEBT_REGISTER.md`,
+  `VALIDATED_FINDINGS.md`, `LESSONS_LEARNED.md`
+- Roadmap impact: none
+- Follow-up: implement the bounded validator checks and verify the next closeout
+  can complete without stale current-state documentation
