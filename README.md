@@ -127,3 +127,37 @@ document.
 
 If you are here to continue work, use the documents above as the source of
 truth and keep this README current when the milestone mix changes.
+
+
+## Licensing, Attribution, and Upstream Relationship
+
+This repository is an independent, experimental, modified fork of Arduino CLI.
+
+Arduino CLI and the original upstream source remain copyright their
+respective authors and contributors and are licensed under the GNU General
+Public License version 3. The complete GPL-3.0 license text is preserved in
+[LICENSE.txt](LICENSE.txt).
+
+Original modifications and additions made in this fork remain copyright
+their respective authors, to the extent applicable, and are distributed
+under GPL-3.0 as part of this modified work.
+
+No ownership is claimed over unmodified Arduino CLI source code,
+third-party software, documentation, trademarks, logos, or other materials
+belonging to their respective owners.
+
+This repository is still under active development. A more detailed upstream
+baseline, modification manifest, authorship and provenance record,
+third-party notices inventory, and trademark notice are being prepared and
+will be added as the project develops.
+
+Until those records are completed, LICENSE.txt, preserved source-file
+headers, Git history, commit records, and existing upstream notices remain
+authoritative.
+
+This interim notice does not replace, restrict, expand, or modify the terms
+of GPL-3.0 or any applicable third-party license.
+
+Arduino® is a trademark of Arduino S.r.l. This project is independent and
+is not affiliated with, endorsed by, sponsored by, certified by, or
+officially associated with Arduino S.r.l.
