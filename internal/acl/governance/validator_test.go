@@ -94,6 +94,33 @@ Native Full-Flash Bootloader Package Validation
 			wantSubstring: "historical classification phrase",
 		},
 		{
+			name: "historical milestone summary missing explicit route to STATUS",
+			mutate: func(t *testing.T, root string) {
+				writeFixture(t, root, filepath.Join("docs", "android", "ENGINEERING_MILESTONE_SUMMARY.md"), strings.TrimSpace(`
+# Engineering Milestone Summary
+
+## Historical Classification
+
+This document is historical evidence.
+It preserves repository state at the time of the milestone.
+It is not authoritative for current status.
+
+## Milestone
+Native Full-Flash Bootloader Package Validation
+
+## Repository Footer
+Repository path: /root/arduino-cli-android
+Branch: android-runtime-v2
+Commit destination: local git commit on android-runtime-v2
+Work belongs to: arduino-cli-android
+Commit recommendation: yes
+Repository status: dirty working tree with tracked documentation edits and untracked EOS adoption files
+`))
+			},
+			wantCheck:     "historical classification",
+			wantSubstring: "explicit STATUS.md route",
+		},
+		{
 			name: "historical document missing route to STATUS",
 			mutate: func(t *testing.T, root string) {
 				writeFixture(t, root, filepath.Join("docs", "android", "QUEUED_BRANCH_REVIEW.md"), strings.TrimSpace(`
@@ -248,6 +275,39 @@ Historical repository path: /root/arduino-cli-android
 		}
 		require.True(t, checks["historical classification"].Passed)
 		require.True(t, checks["stale path hygiene"].Passed)
+	})
+
+	t.Run("historical milestone summary route removal fails", func(t *testing.T) {
+		writeCompliantGovernanceRepo(t, root)
+		writeFixture(t, root, filepath.Join("docs", "android", "ENGINEERING_MILESTONE_SUMMARY.md"), strings.TrimSpace(`
+# Engineering Milestone Summary
+
+## Historical Classification
+
+This document is historical evidence.
+It preserves repository state at the time of the milestone.
+It is not authoritative for current status.
+
+## Milestone
+Native Full-Flash Bootloader Package Validation
+
+## Repository Footer
+Repository path: /root/arduino-cli-android
+Branch: android-runtime-v2
+Commit destination: local git commit on android-runtime-v2
+Work belongs to: arduino-cli-android
+Commit recommendation: yes
+Repository status: dirty working tree with tracked documentation edits and untracked EOS adoption files
+`))
+
+		report := Validate(Options{RepoRoot: root, WorkingDir: root})
+		require.True(t, report.HasFailures(), "%+v", report)
+		checks := map[string]CheckResult{}
+		for _, check := range report.Checks {
+			checks[check.Name] = check
+		}
+		require.False(t, checks["historical classification"].Passed)
+		require.Contains(t, strings.Join(checks["historical classification"].Messages, "\n"), "explicit STATUS.md route")
 	})
 
 	t.Run("current-state docs still reject stale path", func(t *testing.T) {

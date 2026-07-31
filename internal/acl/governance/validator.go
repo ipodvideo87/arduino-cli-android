@@ -370,12 +370,14 @@ func checkHistoricalClassification(repoRoot string) CheckResult {
 			"## Historical Classification",
 			"This document is historical evidence.",
 			"It is not authoritative for current status.",
-			"STATUS.md",
 		}
 		for _, want := range requiredPhrases {
 			if !strings.Contains(content, want) {
 				check.Messages = append(check.Messages, fmt.Sprintf("%s is missing historical classification phrase %q", relPath, want))
 			}
+		}
+		if !strings.Contains(content, "For the current snapshot, see [STATUS.md](") {
+			check.Messages = append(check.Messages, fmt.Sprintf("%s is missing the explicit STATUS.md route for the current snapshot", relPath))
 		}
 	}
 	if len(check.Messages) == 0 {
