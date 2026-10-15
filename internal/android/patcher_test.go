@@ -196,7 +196,33 @@ func TestPlanPatchForELFUsesDifferentStrategyForGCCInternalBinaries(t *testing.T
 	require.True(t, driverPlan.Spec.setInterpreter)
 	require.Equal(t, patchActionWrapperLaunch, internalPlan.Action)
 	require.False(t, internalPlan.Spec.setInterpreter)
-	require.Contains(t, internalPlan.Reason, "patchelf --set-interpreter")
+	require.Contains(t, internalPlan.Reason, "PT_INTERP")
+}
+
+func TestPlanPatchForGCCLibexecSharedObjectUsesRunPath(t *testing.T) {
+	runtimeDir := "/tmp/runtime"
+	plugin := sampleAArch64ELFAnalysis("/opt/arduino-toolchain/libexec/gcc/avr/7.3.0/lto-plugin.so", "gcc-libexec")
+	plugin.FileType = "DYN"
+	plugin.Interpreter = ""
+
+	plan := planPatchForELF(plugin, runtimeDir)
+
+	require.Equal(t, patchActionRunPathOnly, plan.Action)
+	require.False(t, plan.Spec.setInterpreter)
+	require.Contains(t, plan.Spec.rpath, "$ORIGIN/../../../../.acl/runtime")
+	require.Empty(t, plan.WrapperTarget)
+	require.Empty(t, plan.WrapperBackup)
+}
+
+func TestPlanPatchForGCCLibexecPIEUsesWrapperLaunch(t *testing.T) {
+	pie := sampleAArch64ELFAnalysis("/opt/arduino-toolchain/libexec/gcc/xtensa-esp-elf/14.2.0/cc1plus", "gcc-libexec")
+	pie.FileType = "DYN"
+
+	plan := planPatchForELF(pie, "/tmp/runtime")
+
+	require.Equal(t, patchActionWrapperLaunch, plan.Action)
+	require.False(t, plan.Spec.setInterpreter)
+	require.Contains(t, plan.Reason, "PT_INTERP")
 }
 
 func TestPlanPatchForBuiltinCtagsUsesLoaderAndRPath(t *testing.T) {

@@ -287,9 +287,14 @@ Repository cleanup:
   `internal/android/runtime`; any future non-vendored runtime library still needs a
   native Termux source, but the currently required set is already shipped with the
   repo.
-- GCC internal executables under `libexec/gcc/` now use wrapper launch instead of
-  in-place interpreter rewriting; native Termux validation has advanced past the prior
-  `cc1plus` startup crash.
+- The current planner wraps GCC process executables under `libexec/gcc/` only
+  when they carry `PT_INTERP`; no-interpreter DYN files in that path retain their
+  ELF shared-object form and use RUNPATH-only patching. Planner regressions pass on
+  the host; packaging and physical-device AVR final-link validation remain pending.
+- Downstream AVR platform 1.8.8 compile run 14 reached final link, then `avr-ld`
+  reported `invalid ELF header` for `liblto_plugin.so`. The installed plugin path
+  contained a shell wrapper where the vendor archive provides a shared-object ELF.
+  The source fix is not yet integrated into a rebuilt app or device-validated.
 - Native Android upload/flash architecture is not yet implemented end-to-end; it still needs a reusable USB host and serial bridge before upload is marked complete.
 - The cause of the intermittent `termux-usb` acquisition/opening failures remains unknown.
 - Termux USB discovery and permission acquisition are now validated on Samsung A17 / Android 16, but `TERMUX_USB_FD` handoff remains unproven.
@@ -309,6 +314,7 @@ Repository cleanup:
 
 ## Next Engineering Milestone
 
-Validate the native Termux transport stream boundary with a fresh read-only
-helper probe if more evidence is needed, while keeping upload, flashing, and
-serial monitor out of scope.
+Integrate and pin the role-aware GCC `libexec` patcher in the Android app, then
+validate an AVR 1.8.8 UNO compile through final link on the isolated physical
+Android validation package. After that result is recorded, resume the native
+Termux transport stream milestone.

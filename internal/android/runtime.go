@@ -51,10 +51,14 @@ func installRuntime(root string) (string, error) {
 		if info, err := entry.Info(); err == nil {
 			mode = info.Mode().Perm()
 		}
+		mode |= 0o200
 		if entry.Name() == "ld-linux-aarch64.so.1" {
 			mode |= 0o111
 		}
 		if err := os.WriteFile(filepath.Join(runtimeDir, entry.Name()), data, mode); err != nil {
+			return "", err
+		}
+		if err := os.Chmod(filepath.Join(runtimeDir, entry.Name()), mode); err != nil {
 			return "", err
 		}
 	}

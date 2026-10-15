@@ -152,7 +152,7 @@ func elfInterpreter(f *elf.File) (string, error) {
 
 func buildRPath(path, runtimeDir string) string {
 	parts := []string{runtimeDir}
-	if isGCCInternalExecutable(path) {
+	if isGCCLibexecPath(path) {
 		parts = []string{"$ORIGIN/../../../../.acl/runtime"}
 		parts = append(parts,
 			"$ORIGIN/../../../../lib",
@@ -172,7 +172,7 @@ func buildRPath(path, runtimeDir string) string {
 	return strings.Join(uniquePathParts(parts), ":")
 }
 
-func isGCCInternalExecutable(path string) bool {
+func isGCCLibexecPath(path string) bool {
 	clean := filepath.ToSlash(strings.ToLower(path))
 	return strings.Contains(clean, "/libexec/gcc/")
 }
@@ -203,7 +203,10 @@ func patchWithPatchelf(path string, spec patchSpec) error {
 		args = append(args, "--set-rpath", spec.rpath)
 	}
 	args = append(args, path)
-	cmd := exec.Command("patchelf", args...)
+	cmd, err := patchelfCommand(args)
+	if err != nil {
+		return fmt.Errorf("patching %s: %w", path, err)
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		msg := strings.TrimSpace(string(output))
@@ -214,6 +217,44 @@ func patchWithPatchelf(path string, spec patchSpec) error {
 	}
 	return nil
 }
+
+
+func patchelfCommand(args []string) (*exec.Cmd, error) {
+	candidates := []string{}
+	if override := strings.TrimSpace(os.Getenv("ACL_PATCHELF_PATH")); override != "" {
+		candidates = append(candidates, override)
+	}
+	if exe, err := os.Executable(); err == nil {
+		dir := filepath.Dir(exe)
+		candidates = append(candidates,
+			filepath.Join(dir, "libpatchelf.so"),
+			filepath.Join(dir, "patchelf"),
+		)
+	}
+	if lookup, err := exec.LookPath("patchelf"); err == nil {
+		candidates = append(candidates, lookup)
+	}
+
+	seen := map[string]struct{}{}
+	for _, candidate := range candidates {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			continue
+		}
+		if _, ok := seen[candidate]; ok {
+			continue
+		}
+		seen[candidate] = struct{}{}
+		info, err := os.Stat(candidate)
+		if err != nil || info.IsDir() {
+			continue
+		}
+		return exec.Command(candidate, args...), nil
+	}
+
+	return nil, fmt.Errorf("patchelf executable was not found; checked ACL_PATCHELF_PATH, sibling libpatchelf.so, sibling patchelf, and PATH")
+}
+
 
 // isELF returns true if the file is an ELF executable.
 func isELF(path string) (bool, error) {

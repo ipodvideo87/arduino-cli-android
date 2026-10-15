@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"net/url"
 	"path/filepath"
 	"runtime"
@@ -258,7 +259,11 @@ func (s *arduinoCoreServerImpl) Init(req *rpc.InitRequest, stream rpc.ArduinoCor
 			}
 		}
 
+		skipAndroidBuiltinTools := runtime.GOOS == "android" && strings.TrimSpace(os.Getenv("ARDUINO_ANDROID_SKIP_DISCOVERIES")) == "1"
 		loadBuiltinTools := func() []error {
+			if skipAndroidBuiltinTools {
+				return nil
+			}
 			builtinPackage := pmb.GetOrCreatePackage("builtin")
 			return pmb.LoadToolsFromPackageDir(builtinPackage, pmb.PackagesDir.Join("builtin", "tools"))
 		}
@@ -286,13 +291,15 @@ func (s *arduinoCoreServerImpl) Init(req *rpc.InitRequest, stream rpc.ArduinoCor
 			_ = loadBuiltinTools()
 		}
 
-		if err := patchBuiltinToolsForAndroid(pmb.PackagesDir.Join("builtin", "tools")); err != nil {
-			e := &cmderrors.InitFailedError{
-				Code:   codes.Internal,
-				Cause:  err,
-				Reason: rpc.FailedInstanceInitReason_FAILED_INSTANCE_INIT_REASON_TOOL_LOAD_ERROR,
+		if !skipAndroidBuiltinTools {
+			if err := patchBuiltinToolsForAndroid(pmb.PackagesDir.Join("builtin", "tools")); err != nil {
+				e := &cmderrors.InitFailedError{
+					Code:   codes.Internal,
+					Cause:  err,
+					Reason: rpc.FailedInstanceInitReason_FAILED_INSTANCE_INIT_REASON_TOOL_LOAD_ERROR,
+				}
+				responseError(e.GRPCStatus())
 			}
-			responseError(e.GRPCStatus())
 		}
 
 		// We load hardware before verifying builtin tools are installed
@@ -352,9 +359,11 @@ func (s *arduinoCoreServerImpl) Init(req *rpc.InitRequest, stream rpc.ArduinoCor
 	}
 	defer release()
 
-	for _, err := range pme.LoadDiscoveries() {
-		s := &cmderrors.PlatformLoadingError{Cause: err}
-		responseError(s.GRPCStatus())
+	if !(runtime.GOOS == "android" && strings.TrimSpace(os.Getenv("ARDUINO_ANDROID_SKIP_DISCOVERIES")) == "1") {
+		for _, err := range pme.LoadDiscoveries() {
+			s := &cmderrors.PlatformLoadingError{Cause: err}
+			responseError(s.GRPCStatus())
+		}
 	}
 
 	// Create library manager and add libraries directories

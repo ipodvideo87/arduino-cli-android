@@ -159,13 +159,15 @@ func planPatchForELF(analysis elfAnalysis, runtimeDir string) patchPlan {
 				Analysis: analysis,
 			}
 		}
-		return patchPlan{
-			Action:         patchActionWrapperLaunch,
-			Reason:         "GCC internal executables under libexec/gcc must not be rewritten with patchelf --set-interpreter because the loader rewrite changes the ELF layout and crashes during startup on native Termux",
-			Analysis:       analysis,
-			WrapperBackup:  filepath.Join(filepath.Dir(analysis.Path), ".acl", "original", filepath.Base(analysis.Path)),
-			WrapperTarget:  analysis.Path,
-			WrapperRuntime: runtimeDir,
+		if analysis.Interpreter != "" {
+			return patchPlan{
+				Action:         patchActionWrapperLaunch,
+				Reason:         "GCC process executables under libexec/gcc with PT_INTERP must use wrapper launch because rewriting their interpreter changes the ELF layout and crashes during startup on native Termux",
+				Analysis:       analysis,
+				WrapperBackup:  filepath.Join(filepath.Dir(analysis.Path), ".acl", "original", filepath.Base(analysis.Path)),
+				WrapperTarget:  analysis.Path,
+				WrapperRuntime: runtimeDir,
+			}
 		}
 	}
 
@@ -216,7 +218,7 @@ func applyPatchPlan(plan patchPlan) error {
 }
 
 func applyPatchelfPlan(path string, spec patchSpec) error {
-	if spec.setInterpreter && isGCCInternalExecutable(path) {
+	if spec.setInterpreter && isGCCLibexecPath(path) {
 		return fmt.Errorf("refusing to apply --set-interpreter to GCC internal executable %q; use wrapper launch instead", path)
 	}
 	return patchWithPatchelf(path, spec)
@@ -246,7 +248,7 @@ func applyWrapperLaunch(plan patchPlan) error {
 }
 
 func gccWrapperScript(binaryName string) string {
-	return strings.TrimSpace(fmt.Sprintf(`#!/bin/sh
+	return strings.TrimSpace(fmt.Sprintf(`#!/system/bin/sh
 set -eu
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 runtime_dir="$script_dir/../../../../.acl/runtime"

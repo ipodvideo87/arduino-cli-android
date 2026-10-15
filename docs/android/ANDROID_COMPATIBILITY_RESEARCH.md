@@ -52,8 +52,8 @@ Use it to capture confirmed behavior, evidence, and open questions before making
 
 ## 5. ELF Interpreter and RUNPATH Patching
 
-- GCC internal executables under `libexec/gcc/` are treated differently from normal tool drivers for RPATH construction.
-  - Evidence: `internal/android/patcher.go` special-cases `isGCCInternalExecutable(path)` and adds `$.acl/runtime` plus sibling library search paths.
+- Files under `libexec/gcc/` use GCC-specific runtime search paths, but the path alone does not determine whether the payload is a process executable or a shared object.
+  - Evidence: `internal/android/elf.go` selects the GCC-specific RUNPATH prefix from the path; `internal/android/elf_plan.go` now chooses wrapper launch only when ELF analysis reports a nonempty `PT_INTERP`.
 - Tool patching is applied after installation, not during extraction.
   - Evidence: `internal/arduino/cores/packagemanager/install_uninstall.go` calls `android.PatchToolForAndroid(...)` after `toolResource.Install(...)`.
 - Builtin tools installed under `packages/builtin/tools/...` now also pass through the Android patcher after install.
@@ -63,9 +63,11 @@ Use it to capture confirmed behavior, evidence, and open questions before making
   - Original `cc1plus`: 10 program headers, `PT_INTERP=/lib/ld-linux-aarch64.so.1`, `DYNAMIC` at `0x1fe19f8`.
   - Patched with `--set-interpreter` only: 11 program headers, new low-address `LOAD` at `0x3e0000`, `DYNAMIC` moved to `0x66db88`.
   - Patched with `--set-rpath` only: still 10 program headers, original load layout retained.
-- GCC internal executables under `libexec/gcc/` are now launched through a shell wrapper that preserves the original binary in `.acl/original/` and invokes the bundled loader with `--library-path`; they are no longer rewritten in place with `patchelf --set-interpreter`.
-  - Evidence: repository implementation in `internal/android/elf_plan.go` and regression tests in `internal/android/patcher_test.go`.
-  - This is the current generic launch strategy for GCC internal executables on Android.
+- GCC process executables under `libexec/gcc/` with `PT_INTERP` use a shell wrapper that preserves the original binary in `.acl/original/` and invokes the bundled loader with `--library-path`; this includes PIE executables with ELF type DYN.
+  - Evidence: planner implementation in `internal/android/elf_plan.go` and tests for PT_INTERP-bearing DYN PIE files.
+- A DYN ELF under `libexec/gcc/` with no `PT_INTERP` follows RUNPATH-only patching and stays an ELF shared object. The path selects GCC library search paths; it does not turn a plugin into a process launcher.
+  - Evidence: `TestPlanPatchForGCCLibexecSharedObjectUsesRunPath` and `TestPlanPatchForGCCLibexecPIEUsesWrapperLaunch`.
+- Downstream physical app run 14 reached AVR final link but `avr-ld` failed to load `liblto_plugin.so` with `invalid ELF header`; the installed plugin was a wrapper script while the retained vendor archive contains the plugin ELF. The new planner rule has host coverage; a rebuilt APK and physical compile are still required.
 - The GCC wrapper scrubs `LD_PRELOAD`, `LD_LIBRARY_PATH`, `LD_AUDIT`, Termux loader variables, and `QEMU_` / `PROOT_` state before invoking the bundled glibc loader.
   - Evidence: repository implementation in `internal/android/elf_plan.go` and regression tests in `internal/android/patcher_test.go`.
 
@@ -104,19 +106,16 @@ Use it to capture confirmed behavior, evidence, and open questions before making
 
 - `cc1plus` is a GCC internal executable under `libexec/gcc/`, not a top-level driver in `bin/`.
   - Evidence: file path and GCC installation layout.
-- The current patching logic already recognizes GCC internal executables separately.
-  - Evidence: `internal/android/patcher.go` and `internal/android/patcher_test.go`.
-- The current open blocker is a `cc1plus` crash immediately after `execve`.
-  - Evidence: native Termux `strace` output:
-    `execve(.../cc1plus, ...) = 0`
-    followed by `SIGSEGV {si_code=SEGV_ACCERR, ...}`
+- The wrapper strategy for PT_INTERP-bearing GCC process executables is covered by planner tests and had previously advanced past the earlier `cc1plus` startup failure in native Termux validation.
+- The current downstream app blocker is AVR final-link loading of `liblto_plugin.so`: the prior installer converted a shared-object plugin into a shell wrapper. A planner correction now preserves no-interpreter DYN ELF files and applies RUNPATH-only treatment, but app packaging and physical-device validation remain pending.
+- Historical `cc1plus` crash evidence remains relevant to why its executable wrapper is used; it is not the current AVR link failure.
 
 ## 9. SELinux / Memory Protection / mmap / mprotect
 
 - Android can reject or harden memory access patterns that are tolerated elsewhere.
   - Evidence: Android behavior documentation on execute-only mappings and `mprotect`.
-- The current `cc1plus` crash has not yet been proven to be a code bug versus a glibc-loader/TLS/memory-protection incompatibility.
-  - Evidence: crash occurs before `main`, immediately after `execve`.
+- The cause of the historical `cc1plus` crash before `main` remains unproven; wrapper launch advanced past that observed startup failure but does not establish its underlying cause.
+  - Evidence: historical native Termux `strace` showed `execve(.../cc1plus, ...) = 0` followed by `SIGSEGV {si_code=SEGV_ACCERR, ...}`.
 
 ## 10. Known Fixed Issues
 
@@ -126,8 +125,8 @@ Use it to capture confirmed behavior, evidence, and open questions before making
   - Evidence: native validation and the runtime closure implementation.
 - The install pipeline now treats `permission-runtime-fixes` as a runtime execute-bit repair stage instead of rerunning the broader ELF patch pass.
   - Evidence: repository update in `internal/acl/install/android_executor.go` after the native Termux stage failure on permission repair.
-- GCC internal executable patching now uses wrapper launch instead of interpreter rewrite.
-  - Evidence: repository implementation, unit tests, and native Termux validation that now gets past the earlier `cc1plus` startup crash.
+- GCC process executables with `PT_INTERP` use wrapper launch; no-interpreter DYN shared objects under `libexec/gcc/` remain ELF and receive RUNPATH-only patching.
+  - Evidence: planner implementation and the new host regression tests. Physical-device validation of the AVR linker plugin remains pending.
 - ESP32-S3 firmware packages now need to carry the bootloader artifact and boot flash entry when the core exposes that metadata, otherwise the package should be treated as incomplete rather than silently app-only.
   - Evidence: repository firmware-package tests plus the upstream Arduino-ESP32 flash recipe metadata.
 - When metadata is incomplete, the firmware package generator now falls back to app-only with a warning instead of failing normal compile; explicit full-flash requests still fail validation when the bootloader file is missing.

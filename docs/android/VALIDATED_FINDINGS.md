@@ -2,6 +2,14 @@
 
 This file is a logbook of tested findings from the project history.
 
+## 2026-10-15
+
+- Environment: Windows host source checkout; downstream failure evidence came from an isolated physical Android app validation run.
+- Command/evidence: `go test ./internal/android -run 'Test(BuildRPath|PlanPatchFor|ApplyPatchelfPlanRejectsInterpreterRewriteForGCCInternalBinaries)'` passed; `go build -o <temporary-cli> .` passed; the rebuilt CLI `version` command ran. Downstream run 14 reached AVR final link and recorded `invalid ELF header` loading `liblto_plugin.so`.
+- Result: the planner selects wrapper launch for GCC `libexec` ELF files with `PT_INTERP`, including DYN PIE executables; it selects RUNPATH-only patching for a DYN ELF with no interpreter, preserving the library/plugin file type.
+- Confidence: high for the planner decision and host build; device runtime behavior after packaging is unverified.
+- Notes: `go test ./internal/android` as a whole reported five failures outside the targeted planner assertions: three checks could not observe Unix execute-bit behavior on this Windows host, and two runtime-closure tests could not find Termux glibc library sources. These failures remain unresolved and are not counted as passing. The patch still needs source pinning, app packaging, and a physical AVR compile through final link.
+
 ## 2026-07-06
 
 - Environment: native Termux on the target Android device
